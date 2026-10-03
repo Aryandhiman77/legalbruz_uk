@@ -24,7 +24,7 @@
             </tr>
             <tr>
                 <th>Amount</th>
-                <td>₹{{ number_format($payment->amount, 2) }}</td>
+                <td>£{{ number_format($payment->amount, 2) }}</td>
             </tr>
             <tr>
                 <th>Transaction ID</th>
@@ -33,7 +33,7 @@
             @if ($status === 'approved')
                 <tr>
                     <th>Date</th>
-                    <td>{{ $payment->paid_at?->timezone('Asia/Kolkata')->format('d M Y, h:i A') ?? now('Asia/Kolkata')->format('d M Y, h:i A') }}</td>
+                    <td>{{ $payment->paid_at?->timezone(config('app.timezone', 'Europe/London'))->format('d M Y, h:i A T') ?? now(config('app.timezone', 'Europe/London'))->format('d M Y, h:i A T') }}</td>
                 </tr>
             @endif
             <tr>

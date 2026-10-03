@@ -84,7 +84,6 @@ body.auth-body {
     display: flex;
     width: fit-content;
     max-width: 100%;
-    gap: 12px;
     align-items: center;
     color: #fff;
     text-decoration: none;
@@ -93,58 +92,38 @@ body.auth-body {
 .auth-brand-mark {
     position: relative;
     display: block;
-    flex: 0 0 68px;
-    width: 68px;
-    height: 68px;
+    flex: 0 0 82px;
+    width: 82px;
+    height: 82px;
     overflow: hidden;
-    border: 0;
+    border: 2px solid rgba(105, 234, 217, .75);
     border-radius: 50%;
     background: #fff;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, .2);
+    box-shadow: 0 14px 32px rgba(0, 0, 0, .24);
 }
 
 .auth-brand-mark img {
     position: absolute;
-    top: 1px;
+    top: -29px;
     left: 50%;
-    width: 132px;
+    display: block;
+    width: 218px;
     max-width: none;
     height: auto;
     transform: translateX(-50%);
 }
 
-.auth-brand-copy strong,
-.auth-brand-copy small {
-    display: block;
-}
-
-.auth-brand-copy strong {
-    color: #24b6a5;
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-size: 1.05rem;
-    font-weight: 800;
-    letter-spacing: -.02em;
-}
-
-.auth-brand-copy small {
-    margin-top: 3px;
-    color: rgba(255, 255, 255, .7);
-    font-size: .52rem;
-    font-weight: 700;
-    letter-spacing: .12em;
-    text-transform: uppercase;
-}
-
 .auth-panel-copy h1 {
     margin: 0 0 10px;
-    color: #fff;
+    color: #f8fffe;
     font-size: clamp(1.65rem, 2.3vw, 2.2rem);
     line-height: 1.16;
     letter-spacing: -.035em;
+    text-shadow: 0 8px 24px rgba(0, 0, 0, .18);
 }
 
 .auth-panel-copy h1 span {
-    color: #18bca8;
+    color: #69ead9;
 }
 
 .auth-panel-copy > p {
@@ -356,11 +335,8 @@ body.auth-body {
     .auth-page { padding: 0 12px; }
     .auth-shell { border-radius: 16px; }
     .auth-panel { min-height: 190px; padding: 18px; }
-    .auth-brand { gap: 9px; }
-    .auth-brand-mark { flex-basis: 58px; width: 58px; height: 58px; }
-    .auth-brand-mark img { top: 1px; width: 112px; }
-    .auth-brand-copy strong { font-size: .92rem; }
-    .auth-brand-copy small { font-size: .46rem; }
+    .auth-brand-mark { flex-basis: 70px; width: 70px; height: 70px; }
+    .auth-brand-mark img { top: -27px; width: 194px; }
     .auth-panel-copy { margin: 18px 0 4px; }
     .auth-panel-copy h1 { margin-bottom: 7px; font-size: 1.55rem; }
     .auth-panel-copy > p { font-size: .8rem; line-height: 1.5; }

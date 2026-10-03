@@ -11,6 +11,7 @@ use App\Support\TrademarkWorkflow;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 
 class PaymentController extends Controller
 {
@@ -30,20 +31,36 @@ class PaymentController extends Controller
         $totalAmount = $autoApplyCoupon
             ? $autoApplyCoupon->discountedAmountFor($originalTotalAmount)
             : $originalTotalAmount;
-        $advanceAmount = round($totalAmount * 0.50);
-        $paidServiceQuery = $application->payments()->whereIn('status', ['completed', 'approved']);
+        $advanceAmount = round($totalAmount * 0.50, 2);
+        $completedPayments = $application->payments()
+            ->whereIn('status', ['completed', 'approved'])
+            ->get();
+        $servicePayments = $completedPayments->filter(
+            fn (Payment $payment) => in_array($this->paymentKind($payment), ['advance', 'final', 'full'], true)
+        );
+        $hasFullPayment = $servicePayments->contains(
+            fn (Payment $payment) => $this->paymentKind($payment) === 'full'
+        );
+        $hasAdvancePayment = $servicePayments->contains(
+            fn (Payment $payment) => $this->paymentKind($payment) === 'advance'
+        );
+        $paidServiceAmount = (float) $servicePayments->sum('amount');
+        $finalAmount = max($totalAmount - $paidServiceAmount, 0);
 
-        if ($this->hasPaymentsColumn('payment_type')) {
-            $paidServiceQuery->whereIn('payment_type', ['advance', 'full']);
+        if ($hasFullPayment || $finalAmount <= 0) {
+            return redirect()->route('trademark.status', $application->id)
+                ->with('info', 'Your professional fee is already paid.');
         }
 
-        $paidServiceAmount = (float) $paidServiceQuery->sum('amount');
-        $finalAmount = max($totalAmount - $paidServiceAmount, 0);
-        $paymentType = $application->current_status === TrademarkWorkflow::PAYMENT_PENDING_FINAL ? 'final' : 'advance';
-
-        if ($paymentType === 'final' && $finalAmount <= 0) {
+        if (! $hasAdvancePayment) {
+            // Payment history is authoritative. This also safely repairs legacy
+            // applications that were incorrectly labelled as final-payment due.
+            $paymentType = 'advance';
+        } elseif ($application->current_status === TrademarkWorkflow::PAYMENT_PENDING_FINAL) {
+            $paymentType = 'final';
+        } else {
             return redirect()->route('trademark.status', $application->id)
-                ->with('info', 'Your final balance is already paid.');
+                ->with('info', 'Your 50% advance has been received. The final balance becomes due after you approve the filing draft.');
         }
 
         return view('payments.razorpay-form', [
@@ -55,6 +72,7 @@ class PaymentController extends Controller
             'razorpayKeyId' => config('razorpay.key_id'),
             'paymentCoupons' => DiscountCoupon::availableForPayment('trademark_filing', Auth::id()),
             'autoApplyCoupon' => $autoApplyCoupon,
+            'paidServiceAmount' => $paidServiceAmount,
         ]);
     }
 
@@ -75,26 +93,84 @@ class PaymentController extends Controller
 
         $validated = $request->validate([
             'amount' => "required|numeric|min:$minAmount|max:$maxAmount",
-            'payment_type' => 'required|in:advance,final,full,custom',
+            'payment_type' => 'required|in:advance,final',
+            'discount_coupon_id' => ['nullable', 'integer'],
         ]);
+
+        $coupon = null;
+        if (! empty($validated['discount_coupon_id'])) {
+            $coupon = DiscountCoupon::availableForPayment('trademark_filing', Auth::id())
+                ->firstWhere('id', (int) $validated['discount_coupon_id']);
+
+            if (! $coupon) {
+                throw ValidationException::withMessages([
+                    'discount_coupon_id' => 'This discount coupon is no longer available.',
+                ]);
+            }
+        }
+
+        $serviceTotalAmount = TrademarkPricing::amountForApplicantType($application->entity_type);
+        $discountedTotalAmount = $coupon
+            ? $coupon->discountedAmountFor($serviceTotalAmount)
+            : $serviceTotalAmount;
+        $completedPayments = $application->payments()
+            ->whereIn('status', ['completed', 'approved'])
+            ->get();
+        $servicePayments = $completedPayments->filter(
+            fn (Payment $payment) => in_array($this->paymentKind($payment), ['advance', 'final', 'full'], true)
+        );
+        $hasAdvancePayment = $servicePayments->contains(
+            fn (Payment $payment) => $this->paymentKind($payment) === 'advance'
+        );
+        $hasFinalOrFullPayment = $servicePayments->contains(
+            fn (Payment $payment) => in_array($this->paymentKind($payment), ['final', 'full'], true)
+        );
+        $paidServiceAmount = (float) $servicePayments->sum('amount');
+
+        if ($validated['payment_type'] === 'advance' && ($hasAdvancePayment || $hasFinalOrFullPayment)) {
+            throw ValidationException::withMessages([
+                'payment_type' => 'The initial professional-fee payment has already been completed.',
+            ]);
+        }
+
+        if ($validated['payment_type'] === 'final'
+            && (! $hasAdvancePayment
+                || $hasFinalOrFullPayment
+                || $application->current_status !== TrademarkWorkflow::PAYMENT_PENDING_FINAL)) {
+            throw ValidationException::withMessages([
+                'payment_type' => 'The final 50% balance is available only after the advance payment and client approval.',
+            ]);
+        }
+
+        $verifiedAmount = match ($validated['payment_type']) {
+            'final' => max($discountedTotalAmount - $paidServiceAmount, 0),
+            default => round($discountedTotalAmount * 0.5, 2),
+        };
+
+        if ($verifiedAmount <= 0) {
+            throw ValidationException::withMessages([
+                'amount' => 'There is no remaining balance to pay.',
+            ]);
+        }
 
         try {
             // Initialize Razorpay API using cURL (to avoid dependency)
             $razorpayKeyId = config('razorpay.key_id');
             $razorpaySecret = config('razorpay.key_secret');
 
-            // Convert to paise (1 rupee = 100 paise)
-            $amountInPaise = (int) ($validated['amount'] * 100);
+            // Razorpay expects the amount in the currency's smallest unit (pence for GBP).
+            $amountInSmallestUnit = (int) round($verifiedAmount * 100);
+            $currency = config('razorpay.currency', 'GBP');
 
             // Create Razorpay order via REST API
             $ch = curl_init('https://api.razorpay.com/v1/orders');
             curl_setopt($ch, CURLOPT_USERPWD, "$razorpayKeyId:$razorpaySecret");
             curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
             curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
-                'amount' => $amountInPaise,
-                'currency' => 'INR',
+                'amount' => $amountInSmallestUnit,
+                'currency' => $currency,
                 'receipt' => 'order_' . $application->id . '_' . time(),
-                'description' => 'Trademark Registration - ' . $application->brand_name,
+                'description' => 'UK Trade Mark Application - ' . $application->brand_name,
             ]));
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
@@ -112,16 +188,14 @@ class PaymentController extends Controller
             // Save payment record with pending status
             $normalizedPaymentType = match ($validated['payment_type']) {
                 'final' => 'final',
-                'full' => 'full',
                 default => 'advance',
             };
-            $serviceTotalAmount = TrademarkPricing::amountForApplicantType($application->entity_type);
             $paymentData = [
                 'application_id' => $applicationId,
                 'user_id' => Auth::id(),
-                'amount' => $validated['amount'],
+                'amount' => $verifiedAmount,
                 'total_amount' => $serviceTotalAmount,
-                'percentage' => $normalizedPaymentType === 'advance' ? '50%' : '100%',
+                'percentage' => '50%',
                 'payment_method' => 'razorpay',
                 'status' => 'pending',
                 'reference_number' => $order['id'],
@@ -136,8 +210,8 @@ class PaymentController extends Controller
             return response()->json([
                 'status' => 'success',
                 'order_id' => $order['id'],
-                'amount' => $amountInPaise,
-                'currency' => 'INR',
+                'amount' => $amountInSmallestUnit,
+                'currency' => $currency,
                 'key' => $razorpayKeyId,
                 'user_email' => Auth::user()->email,
                 'user_phone' => Auth::user()->phone ?? '',
@@ -267,10 +341,25 @@ class PaymentController extends Controller
             abort(403);
         }
 
+        return $this->renderInvoice($payment);
+    }
+
+    public function viewAdminInvoice(Payment $payment)
+    {
+        if (! Auth::guard('admin')->check()) {
+            abort(403);
+        }
+
+        return $this->renderInvoice($payment);
+    }
+
+    private function renderInvoice(Payment $payment)
+    {
         if (!in_array(strtolower((string) $payment->status), ['completed', 'approved'], true)) {
             abort(404);
         }
 
+        $payment->loadMissing(['application', 'user']);
         $application = $payment->application;
 
         $pdf = \PDF::loadView('emails.attachments.invoice', [

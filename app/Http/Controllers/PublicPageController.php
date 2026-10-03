@@ -125,6 +125,7 @@ class PublicPageController extends Controller
             ->pluck('label')
             ->push('Copyright Registration')
             ->push('Patent Registration')
+            ->push('Examination Response')
             ->push('Other')
             ->unique()
             ->values()

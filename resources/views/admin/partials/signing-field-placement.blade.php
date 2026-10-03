@@ -1,8 +1,6 @@
 @php
     $fileFields = [
         'engagement_letter' => ['name' => 'engagement_letter_file', 'accept' => '.pdf'],
-        'poa' => ['name' => 'poa_file', 'accept' => '.pdf'],
-        'affidavit' => ['name' => 'affidavit_file', 'accept' => '.pdf,.jpg,.jpeg,.png,.doc,.docx'],
     ];
     $plainUploadDocuments = $plainUploadDocuments ?? [];
     $pendingUploads = session('admin_onboarding_uploads.' . $application->id, []);

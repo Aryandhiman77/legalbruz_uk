@@ -71,7 +71,7 @@
                             <label for="service_interested">Service Interested In</label>
                             <select id="service_interested" name="service_interested" class="form-select @error('service_interested') is-invalid @enderror" required>
                                 <option value="" disabled @selected(! old('service_interested'))>Select a service</option>
-                                @foreach (($contactServices ?? collect(config('visitor_services'))->pluck('label')->push('Copyright Registration')->push('Patent Registration')->push('Other')->all()) as $service)
+                                @foreach (($contactServices ?? collect(config('visitor_services'))->pluck('label')->push('Copyright Registration')->push('Patent Registration')->push('Examination Response')->push('Other')->all()) as $service)
                                     <option value="{{ $service }}" @selected(old('service_interested') === $service)>{{ $service }}</option>
                                 @endforeach
                                 

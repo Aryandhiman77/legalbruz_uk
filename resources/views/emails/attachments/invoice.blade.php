@@ -111,10 +111,10 @@
             </thead>
             <tbody>
                 <tr>
-                    <td>{{ $paymentLabel }} for trademark registration services</td>
+                    <td>{{ $paymentLabel }} for UK trade mark application services</td>
                     <td>{{ $payment->transaction_id ?: ($payment->reference_number ?: 'N/A') }}</td>
-                    <td>{{ ($payment->paid_at ?? $payment->created_at)?->timezone('Asia/Kolkata')->format('d M Y') }}</td>
-                    <td class="text-right">INR {{ number_format((float) $payment->amount, 2) }}</td>
+                    <td>{{ ($payment->paid_at ?? $payment->created_at)?->timezone(config('app.timezone', 'Europe/London'))->format('d M Y') }}</td>
+                    <td class="text-right">GBP {{ number_format((float) $payment->amount, 2) }}</td>
                 </tr>
             </tbody>
         </table>
@@ -133,27 +133,27 @@
                 <table style="width: 100%;">
                     <tr>
                         <td>Total service amount</td>
-                        <td class="text-right">INR {{ number_format((float) $payment->total_amount, 2) }}</td>
+                        <td class="text-right">GBP {{ number_format((float) $payment->total_amount, 2) }}</td>
                     </tr>
                     @if ($isAdvanceInvoice)
                         <tr>
                             <td>50% advance payment</td>
-                            <td class="text-right">INR {{ number_format($advanceBaseAmount, 2) }}</td>
+                            <td class="text-right">GBP {{ number_format($advanceBaseAmount, 2) }}</td>
                         </tr>
                     @endif
                     @if ($invoiceDiscountAmount > 0)
                         <tr>
                             <td>Coupon discount{{ $invoiceDiscountLabel ? ' (' . $invoiceDiscountLabel . ')' : '' }}</td>
-                            <td class="text-right">- INR {{ number_format($invoiceDiscountAmount, 2) }}</td>
+                            <td class="text-right">- GBP {{ number_format($invoiceDiscountAmount, 2) }}</td>
                         </tr>
                     @endif
                     <tr>
                         <td>Amount paid now</td>
-                        <td class="text-right">INR {{ number_format((float) $payment->amount, 2) }}</td>
+                        <td class="text-right">GBP {{ number_format((float) $payment->amount, 2) }}</td>
                     </tr>
                     <tr>
                         <td class="grand-total">Invoice total</td>
-                        <td class="text-right grand-total">INR {{ number_format((float) $payment->amount, 2) }}</td>
+                        <td class="text-right grand-total">GBP {{ number_format((float) $payment->amount, 2) }}</td>
                     </tr>
                 </table>
             </td>
@@ -162,7 +162,7 @@
 
     <div class="footer section muted">
         This invoice reflects the payment selected and completed for this application at the time of approval email issuance.<br>
-        <strong>Government fees are not included.</strong> Any applicable Government or Registry fee is payable separately.
+        <strong>UKIPO official fees are not included.</strong> Any applicable official fee is payable separately.
     </div>
 </body>
 </html>

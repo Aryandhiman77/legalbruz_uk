@@ -102,7 +102,7 @@ class TrademarkProbabilityController extends Controller
             'keyword' => $validated['keyword'],
             'analysis' => $analysis,
             'records' => $validated['records'] ?? [],
-            'generatedAt' => now('Asia/Kolkata')->format('d M Y, h:i A'),
+            'generatedAt' => now(config('app.timezone', 'Europe/London'))->format('d M Y, h:i A T'),
             'formalDisclaimer' => TrademarkProbabilityService::DISCLAIMER,
         ])->setPaper('a4');
 

@@ -1,6 +1,14 @@
 @extends('layouts.app-modern')
 
 @section('content')
+    @php
+        $formatPounds = static function ($amount): string {
+            $amount = (float) $amount;
+            $decimals = abs($amount - round($amount)) > 0.00001 ? 2 : 0;
+
+            return '£' . number_format($amount, $decimals);
+        };
+    @endphp
     <style>
         .coupon-price-original {
             background: linear-gradient(135deg, #2A9D8F 0%, #228974 100%);
@@ -61,17 +69,17 @@
                                 <p class="text-muted small">Total Professional Fee</p>
                                 @if (!empty($autoApplyCoupon) && ($originalTotalAmount ?? $totalAmount) > $totalAmount)
                                     <h6>
-                                        <span class="coupon-price-original">₹{{ number_format($originalTotalAmount, 0) }}</span>
-                                        <span class="coupon-price-new">₹{{ number_format($totalAmount, 0) }}</span>
+                                        <span class="coupon-price-original">{{ $formatPounds($originalTotalAmount) }}</span>
+                                        <span class="coupon-price-new" data-service-total>{{ $formatPounds($totalAmount) }}</span>
                                     </h6>
                                     <div class="coupon-auto-note">{{ $autoApplyCoupon->code }}</div>
                                 @else
-                                    <h6 style="color: #1D3557;"><strong>₹{{ number_format($totalAmount, 0) }}</strong></h6>
+                                    <h6 style="color: #1D3557;"><strong data-service-total>{{ $formatPounds($totalAmount) }}</strong></h6>
                                 @endif
                             </div>
                             <div class="col-6">
                                 <p class="text-muted small">{{ ($paymentType ?? 'advance') === 'final' ? 'Payable Now' : 'Advance (50%)' }}</p>
-                                <h6 style="color: #2A9D8F;"><strong>₹{{ number_format($advanceAmount, 0) }}</strong></h6>
+                                <h6 style="color: #2A9D8F;"><strong data-payable-now>{{ $formatPounds($advanceAmount) }}</strong></h6>
                             </div>
                         </div>
 
@@ -80,18 +88,21 @@
                         <div class="row">
                             <div class="col-6">
                                 <p class="text-muted small">{{ ($paymentType ?? 'advance') === 'final' ? 'Remaining After This Payment' : 'Remaining Payment (50%)' }}</p>
-                                <h6 style="color: #4A4A4A;"><strong>₹{{ number_format(max($totalAmount - $advanceAmount, 0), 0) }}</strong></h6>
+                                <h6 style="color: #4A4A4A;"><strong data-remaining-balance>{{ $formatPounds(max($totalAmount - $paidServiceAmount - $advanceAmount, 0)) }}</strong></h6>
                             </div>
                             <div class="col-6">
-                                <p class="text-muted small">After Document Upload</p>
-                                <small class="text-muted">Due upon approval</small>
+                                <p class="text-muted small">{{ ($paymentType ?? 'advance') === 'final' ? 'Payment Stage' : 'Final Balance' }}</p>
+                                <small class="text-muted">{{ ($paymentType ?? 'advance') === 'final' ? 'Due now before filing' : 'Due after client approval' }}</small>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Application Info Card -->
-                @include('partials.payment-coupons')
+                @include('partials.payment-coupons', [
+                    'paymentAmount' => $originalTotalAmount,
+                    'selectedCouponId' => $autoApplyCoupon?->id,
+                ])
 
                 <div class="card border-0 shadow-sm mb-4">
                     <div class="card-body p-4">
@@ -115,7 +126,7 @@
                             </div>
                             <div class="col-6">
                                 <p class="text-muted small">Application Type</p>
-                                <p class="mb-0"><strong>Trademark Registration</strong></p>
+                                <p class="mb-0"><strong>UK Trade Mark Application</strong></p>
                             </div>
                         </div>
                     </div>
@@ -128,7 +139,7 @@
 
                         <div id="payment-options">
                             <!-- Primary option -->
-                            <div class="payment-option mb-3" onclick="selectPaymentOption('{{ ($paymentType ?? 'advance') === 'final' ? 'final' : 'advance' }}', {{ $advanceAmount }}, this)">
+                            <div class="payment-option mb-3" onclick="selectPaymentOption('{{ ($paymentType ?? 'advance') === 'final' ? 'final' : 'advance' }}', this)">
                                 <div class="p-3 border rounded-lg cursor-pointer"
                                     style="border: 2px solid #2A9D8F !important; background: #f0f9f8;">
                                     <div class="d-flex justify-content-between align-items-center">
@@ -141,35 +152,11 @@
                                             </small>
                                         </div>
                                         <div>
-                                            <h5 class="{{ !empty($autoApplyCoupon) ? 'coupon-price-new' : '' }}" style="{{ empty($autoApplyCoupon) ? 'color: #2A9D8F;' : '' }}">₹{{ number_format($advanceAmount, 0) }}</h5>
+                                            <h5 class="{{ !empty($autoApplyCoupon) ? 'coupon-price-new' : '' }}" style="{{ empty($autoApplyCoupon) ? 'color: #2A9D8F;' : '' }}" data-primary-option-amount>{{ $formatPounds($advanceAmount) }}</h5>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-
-                            @if (($paymentType ?? 'advance') !== 'final')
-                                <div class="payment-option mb-3" onclick="selectPaymentOption('full', {{ $totalAmount }}, this)">
-                                    <div class="p-3 border rounded-lg cursor-pointer"
-                                        style="border: 2px solid #e9ecef !important;">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <div>
-                                                <h6 class="mb-1" style="color: #1D3557;">Full Payment</h6>
-                                                <small class="text-muted">Complete payment now</small>
-                                            </div>
-                                            <div>
-                                                @if (!empty($autoApplyCoupon) && ($originalTotalAmount ?? $totalAmount) > $totalAmount)
-                                                    <h5>
-                                                        <span class="coupon-price-original">₹{{ number_format($originalTotalAmount, 0) }}</span>
-                                                        <span class="coupon-price-new">₹{{ number_format($totalAmount, 0) }}</span>
-                                                    </h5>
-                                                @else
-                                                    <h5 style="color: #4A4A4A;">₹{{ number_format($totalAmount, 0) }}</h5>
-                                                @endif
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            @endif
 
                             <!-- Custom Amount
                             <div class="payment-option" onclick="selectPaymentOption('custom', 0)">
@@ -179,8 +166,8 @@
                                         <div>
                                             <h6 class="mb-1" style="color: #1D3557;">Custom Amount</h6>
                                             <small class="text-muted">Pay any amount between
-                                                ₹{{ config('razorpay.custom_payments.min_amount') }} -
-                                                ₹{{ number_format(config('razorpay.custom_payments.max_amount'), 0) }}</small>
+                                                £{{ config('razorpay.custom_payments.min_amount') }} -
+                                                £{{ number_format(config('razorpay.custom_payments.max_amount'), 0) }}</small>
                                         </div>
                                         <div>
                                             <button class="btn btn-sm btn-outline-secondary">Enter Amount</button>
@@ -192,7 +179,7 @@
 
                         <!-- Custom Amount Input (Hidden) -->
                         <div id="custom-amount-div" style="display: none; margin-top: 15px;">
-                            <label for="custom_amount" class="form-label">Enter Custom Amount (₹)</label>
+                            <label for="custom_amount" class="form-label">Enter Custom Amount (£)</label>
                             <input type="number" id="custom_amount" class="form-control"
                                 placeholder="Enter amount between {{ config('razorpay.custom_payments.min_amount') }} - {{ config('razorpay.custom_payments.max_amount') }}"
                                 min="{{ config('razorpay.custom_payments.min_amount') }}"
@@ -209,7 +196,7 @@
                         <div class="alert alert-info d-flex align-items-center" role="alert">
                             <i class="bi bi-shield-check me-2"></i>
                             <small>Your payment is secured with Razorpay's encryption. We accept all major credit/debit
-                                cards and UPI.</small>
+                                cards.</small>
                         </div>
 
                         <img src="https://razorpay.com/favicon.ico" alt="Razorpay" style="height: 20px;">
@@ -248,17 +235,39 @@
         // Initialize payment option
         let selectedPaymentType = '{{ $paymentType ?? 'advance' }}';
         let selectedAmount = {{ $advanceAmount }};
+        let discountedServiceTotal = {{ $totalAmount }};
+        const originalServiceTotal = {{ $originalTotalAmount }};
+        const previouslyPaidAmount = {{ $paidServiceAmount ?? 0 }};
 
-        function selectPaymentOption(type, amount, element = null) {
+        function calculateSelectedAmount(type) {
+            if (type === 'final') return Math.max(discountedServiceTotal - previouslyPaidAmount, 0);
+            return Math.round(discountedServiceTotal * 50) / 100;
+        }
+
+        function formatPounds(amount) {
+            const numericAmount = Number(amount);
+            const hasPence = !Number.isInteger(numericAmount);
+
+            return `£${new Intl.NumberFormat('en-GB', {
+                minimumFractionDigits: hasPence ? 2 : 0,
+                maximumFractionDigits: 2
+            }).format(numericAmount)}`;
+        }
+
+        function refreshPaymentAmounts() {
+            selectedAmount = calculateSelectedAmount(selectedPaymentType);
+            const primaryType = '{{ ($paymentType ?? 'advance') === 'final' ? 'final' : 'advance' }}';
+            const primaryAmount = calculateSelectedAmount(primaryType);
+            document.querySelectorAll('[data-service-total]').forEach(el => el.textContent = formatPounds(discountedServiceTotal));
+            document.querySelectorAll('[data-payable-now]').forEach(el => el.textContent = formatPounds(selectedAmount));
+            document.querySelectorAll('[data-remaining-balance]').forEach(el => el.textContent = formatPounds(Math.max(discountedServiceTotal - previouslyPaidAmount - selectedAmount, 0)));
+            document.querySelectorAll('[data-primary-option-amount]').forEach(el => el.textContent = formatPounds(primaryAmount));
+        }
+
+        function selectPaymentOption(type, element = null) {
             selectedPaymentType = type;
-
-            if (type === 'custom') {
-                document.getElementById('custom-amount-div').style.display = 'block';
-                selectedAmount = 0;
-            } else {
-                document.getElementById('custom-amount-div').style.display = 'none';
-                selectedAmount = amount;
-            }
+            document.getElementById('custom-amount-div').style.display = 'none';
+            refreshPaymentAmounts();
 
             // Update UI
             document.querySelectorAll('.payment-option > div').forEach(el => {
@@ -283,14 +292,6 @@
             const maxAmount = {{ config('razorpay.custom_payments.max_amount') }};
 
             // If custom amount selected, get value from input
-            if (selectedPaymentType === 'custom') {
-                amount = parseFloat(document.getElementById('custom_amount').value);
-                if (!amount || amount < minAmount || amount > maxAmount) {
-                    alert(`Please enter a valid amount between ₹${minAmount} and ₹${maxAmount}`);
-                    return;
-                }
-            }
-
             // Create Razorpay order
             createRazorpayOrder(amount);
         });
@@ -307,7 +308,8 @@
                     },
                     body: JSON.stringify({
                         amount: amount,
-                        payment_type: selectedPaymentType
+                        payment_type: selectedPaymentType,
+                        discount_coupon_id: document.querySelector('.payment-coupon-radio:checked')?.value || null
                     })
                 })
                 .then(response => response.json())
@@ -331,7 +333,7 @@
                 amount: orderData.amount,
                 currency: orderData.currency,
                 name: '{{ config('app.name') }}',
-                description: 'Trademark Registration - {{ $application->brand_name }}',
+                description: 'UK Trade Mark Application - {{ $application->brand_name }}',
                 order_id: orderData.order_id,
                 handler: function(response) {
                     verifyPaymentSignature(response);
@@ -400,8 +402,20 @@
                 });
         }
 
-        // Select advance payment by default
-        selectPaymentOption('{{ $paymentType ?? 'advance' }}', {{ $advanceAmount }}, document.querySelector('.payment-option'));
+        document.querySelectorAll('.payment-coupon-radio').forEach(input => {
+            input.addEventListener('change', function () {
+                discountedServiceTotal = Number.parseFloat(this.dataset.payableAmount || originalServiceTotal);
+                refreshPaymentAmounts();
+            });
+        });
+
+        const selectedCoupon = document.querySelector('.payment-coupon-radio:checked');
+        if (selectedCoupon) {
+            discountedServiceTotal = Number.parseFloat(selectedCoupon.dataset.payableAmount || originalServiceTotal);
+        }
+
+        // Select the required payment stage by default.
+        selectPaymentOption('{{ $paymentType ?? 'advance' }}', document.querySelector('.payment-option'));
     </script>
 
     <!-- SweetAlert2 for notifications -->

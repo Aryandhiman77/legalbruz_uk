@@ -933,20 +933,12 @@
                     <a href="{{ route('trademark.type-selection') }}" class="dashboard-service-link">
                         <span class="dashboard-service-link-copy"><strong>File a Trademark</strong><small>Start a new application</small></span>
                     </a>
-                    <a href="{{ route('stuck-trademark.landing') }}" class="dashboard-service-link">
-                        <span class="dashboard-service-link-copy"><strong>Filed and Stuck</strong><small>Recover a delayed application</small></span>
-                    </a>
-                    <a href="{{ route('trademark.opposition-management') }}" class="dashboard-service-link">
-                        <span class="dashboard-service-link-copy"><strong>Opposition Management</strong><small>Defend or oppose a trademark</small></span>
-                    </a>
-                    <a href="{{ route('examination-reply.create') }}" class="dashboard-service-link">
-                        <span class="dashboard-service-link-copy"><strong>Examination Reply</strong><small>Respond to an objection</small></span>
-                    </a>
                 </div>
             </div>
         </div>
 
-        <!-- Applications List -->
+        @if (config('uk_site.legacy_services_enabled'))
+        <!-- Historical case-management services (disabled on the UK site) -->
             <div class="row mb-4">
                 <div class="col-md-12">
                     <div class="dashboard-section-card">
@@ -1465,7 +1457,7 @@
                                             <div class="dashboard-application-detail">
                                                 <div class="dashboard-application-copy">
                                                     <span>Updated</span>
-                                                    <strong>{{ $recoveryCase->updated_at->timezone('Asia/Kolkata')->format('d M Y') }}</strong>
+                                                    <strong>{{ $recoveryCase->updated_at->timezone(config('app.timezone', 'Europe/London'))->format('d M Y') }}</strong>
                                                 </div>
                                             </div>
                                         </div>
@@ -1490,6 +1482,7 @@
                     </div>
                 </div>
             </div>
+        @endif
         <div class="row">
             <div class="col-md-12">
                 <div class="dashboard-section-card">
@@ -1542,13 +1535,17 @@
                                                 <td>{{ $app->entity_type === 'individual' ? 'Individual / Proprietor / Trader' : ucfirst($app->entity_type) }}</td>
                                                 <td>
                                                     @php
-                                                        $appStatusClass = match ($app->current_status) {
-                                                            'ONBOARDING_PENDING', 'PAYMENT_PENDING_FINAL', 'FILED', 'POST_FILING' => 'status-blue',
-                                                            'AWAITING_APPROVAL', 'APPROVED_FOR_FILING', 'PAYMENT_COMPLETED' => 'status-green',
-                                                            'UNDER_REVIEW', 'APPLICATION_SUBMITTED', 'STRATEGY_COMPLETED', 'DRAFT_READY' => 'status-orange',
-                                                            'CHANGES_REQUESTED', 'REJECTED' => 'status-red',
-                                                            'STRATEGY_IN_PROGRESS' => 'status-dark',
-                                                            default => 'status-gray',
+                                                        $appStatusClass = match ($app->status_label) {
+                                                            'Registered' => 'status-green',
+                                                            'Opposed', 'Withdrawn or Closed' => 'status-red',
+                                                            default => match ($app->current_status) {
+                                                                'ONBOARDING_PENDING', 'PAYMENT_PENDING_FINAL', 'FILED', 'POST_FILING' => 'status-blue',
+                                                                'AWAITING_APPROVAL', 'APPROVED_FOR_FILING', 'PAYMENT_COMPLETED' => 'status-green',
+                                                                'UNDER_REVIEW', 'APPLICATION_SUBMITTED', 'STRATEGY_COMPLETED', 'DRAFT_READY' => 'status-orange',
+                                                                'CHANGES_REQUESTED', 'REJECTED' => 'status-red',
+                                                                'STRATEGY_IN_PROGRESS' => 'status-dark',
+                                                                default => 'status-gray',
+                                                            },
                                                         };
                                                     @endphp
                                                     <span class="dashboard-badge {{ $appStatusClass }}">
@@ -1585,7 +1582,7 @@
                                                             Pending</span>
                                                     @endif
                                                 </td>
-                                                <td><i class="far fa-calendar-alt text-muted me-1"></i>{{ $app->created_at->timezone('Asia/Kolkata')->format('d M Y') }}</td>
+                                                <td><i class="far fa-calendar-alt text-muted me-1"></i>{{ $app->created_at->timezone(config('app.timezone', 'Europe/London'))->format('d M Y') }}</td>
                                                 <td>
                                                     <div class="dashboard-actions">
                                                         @if ($app->current_status === $workflow::DRAFT)
@@ -1629,13 +1626,17 @@
                                 @foreach ($applications as $app)
                                     @php
                                         $trademarkImagePath = $app->logo_path ?: data_get($app->members_details, 'trademark_details.image_of_trademark');
-                                        $appStatusClass = match ($app->current_status) {
-                                            'ONBOARDING_PENDING', 'PAYMENT_PENDING_FINAL', 'FILED', 'POST_FILING' => 'status-blue',
-                                            'AWAITING_APPROVAL', 'APPROVED_FOR_FILING', 'PAYMENT_COMPLETED' => 'status-green',
-                                            'UNDER_REVIEW', 'APPLICATION_SUBMITTED', 'STRATEGY_COMPLETED', 'DRAFT_READY' => 'status-orange',
-                                            'CHANGES_REQUESTED', 'REJECTED' => 'status-red',
-                                            'STRATEGY_IN_PROGRESS' => 'status-dark',
-                                            default => 'status-gray',
+                                        $appStatusClass = match ($app->status_label) {
+                                            'Registered' => 'status-green',
+                                            'Opposed', 'Withdrawn or Closed' => 'status-red',
+                                            default => match ($app->current_status) {
+                                                'ONBOARDING_PENDING', 'PAYMENT_PENDING_FINAL', 'FILED', 'POST_FILING' => 'status-blue',
+                                                'AWAITING_APPROVAL', 'APPROVED_FOR_FILING', 'PAYMENT_COMPLETED' => 'status-green',
+                                                'UNDER_REVIEW', 'APPLICATION_SUBMITTED', 'STRATEGY_COMPLETED', 'DRAFT_READY' => 'status-orange',
+                                                'CHANGES_REQUESTED', 'REJECTED' => 'status-red',
+                                                'STRATEGY_IN_PROGRESS' => 'status-dark',
+                                                default => 'status-gray',
+                                            },
                                         };
                                         $payments = $app->payments->sortByDesc('id');
                                         $completedPayments = $payments->filter(fn ($payment) => in_array(strtolower((string) $payment->status), ['completed', 'approved'], true));
@@ -1719,7 +1720,7 @@
                                             <div class="dashboard-application-detail">
                                                 <div class="dashboard-application-copy">
                                                     <span>Created</span>
-                                                    <strong>{{ $app->created_at->timezone('Asia/Kolkata')->format('d M Y') }}</strong>
+                                                    <strong>{{ $app->created_at->timezone(config('app.timezone', 'Europe/London'))->format('d M Y') }}</strong>
                                                 </div>
                                             </div>
                                         </div>

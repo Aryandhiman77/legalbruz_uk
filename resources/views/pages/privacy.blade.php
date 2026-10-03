@@ -1,9 +1,9 @@
 @extends('layouts.app')
 @section('title', 'Privacy Policy | Legal Bruz')
-@section('meta_description', 'Learn how Legal Bruz LLP collects, uses, stores, shares, and protects personal data.')
+@section('meta_description', 'Learn how Legal Bruz Pvt. Ltd. collects, uses, stores, shares, and protects personal data.')
 @section('canonical_url', route('privacy'))
 @section('og_title', 'Privacy Policy | Legal Bruz')
-@section('og_description', 'How Legal Bruz LLP handles and protects personal data.')
+@section('og_description', 'How Legal Bruz Pvt. Ltd. handles and protects personal data.')
 
 @section('content')
     @include('pages.partials.styles')
@@ -12,7 +12,7 @@
             <div class="legal-hero-inner">
                 <span class="legal-hero-eyebrow">Your Information</span>
                 <h1>{{ $legalPage['title'] ?? 'Privacy Policy' }}</h1>
-                <p class="legal-hero-copy">This policy explains how Legal Bruz LLP collects, uses, stores, shares, and protects personal data.</p>
+                <p class="legal-hero-copy">This policy explains how Legal Bruz Pvt. Ltd. collects, uses, stores, shares, and protects personal data.</p>
             </div>
         </header>
 

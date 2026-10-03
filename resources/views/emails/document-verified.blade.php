@@ -32,7 +32,7 @@
             </tr>
             <tr>
                 <th>Verified On</th>
-                <td>{{ $document->verified_at?->timezone('Asia/Kolkata')->format('d M Y, h:i A') ?? $document->updated_at->timezone('Asia/Kolkata')->format('d M Y, h:i A') }}</td>
+                <td>{{ $document->verified_at?->timezone(config('app.timezone', 'Europe/London'))->format('d M Y, h:i A T') ?? $document->updated_at->timezone(config('app.timezone', 'Europe/London'))->format('d M Y, h:i A T') }}</td>
             </tr>
             <tr>
                 <th>Status</th>

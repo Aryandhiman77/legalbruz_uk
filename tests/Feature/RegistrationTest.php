@@ -11,14 +11,14 @@ class RegistrationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_registration_requires_and_normalizes_an_indian_mobile_number(): void
+    public function test_registration_requires_and_normalizes_a_uk_mobile_number(): void
     {
         Mail::fake();
 
         $response = $this->post(route('register'), [
             'name' => 'Mobile User',
             'email' => 'mobile-user@example.com',
-            'mobile' => '+919876543210',
+            'mobile' => '07123456789',
             'password' => 'password123',
             'password_confirmation' => 'password123',
         ]);
@@ -27,7 +27,7 @@ class RegistrationTest extends TestCase
         $this->assertGuest();
         $this->assertDatabaseHas('users', [
             'email' => 'mobile-user@example.com',
-            'mobile' => '9876543210',
+            'mobile' => '+447123456789',
         ]);
 
         $code = null;
@@ -44,7 +44,7 @@ class RegistrationTest extends TestCase
         $this->assertNotNull(auth()->user()->email_verified_at);
     }
 
-    public function test_registration_rejects_missing_or_invalid_indian_mobile_numbers(): void
+    public function test_registration_rejects_missing_or_invalid_uk_mobile_numbers(): void
     {
         Mail::fake();
 

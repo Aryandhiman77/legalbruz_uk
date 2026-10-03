@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\CustomerReview;
+use App\Models\Faq;
 use App\Models\TrademarkPricing;
+use Illuminate\Support\Facades\Schema;
 
 class HomeController extends Controller
 {
@@ -24,9 +26,14 @@ class HomeController extends Controller
      */
     public function index()
     {
-        return view('home', [
+        $faqs = Schema::hasTable('faqs')
+            ? Faq::query()->published()->where('category', 'like', 'UK%')->orderBy('sort_order')->orderBy('id')->get()
+            : collect();
+
+        return view('home-uk', [
             'trademarkPricingPlans' => TrademarkPricing::activePlans(),
             'customerReviews' => CustomerReview::homepageReviews(),
+            'faqs' => $faqs,
         ]);
     }
 }

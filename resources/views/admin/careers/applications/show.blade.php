@@ -5,7 +5,7 @@
         <div class="d-flex flex-wrap justify-content-between gap-3 mb-4">
             <div>
                 <h1 class="h3 mb-1" style="color:#1D3557;">{{ $application->full_name }}</h1>
-                <p class="text-muted mb-0">Applied for {{ $application->job->title }} on {{ $application->created_at->timezone('Asia/Kolkata')->format('d M Y, h:i A') }}</p>
+                <p class="text-muted mb-0">Applied for {{ $application->job->title }} on {{ $application->created_at->timezone(config('app.timezone', 'Europe/London'))->format('d M Y, h:i A T') }}</p>
             </div>
             <a href="{{ route('admin.career-applications.index') }}" class="btn btn-outline-secondary btn-sm align-self-start">Back to Applications</a>
         </div>

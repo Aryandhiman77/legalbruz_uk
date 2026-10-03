@@ -7,18 +7,20 @@ use App\Models\Document;
 use App\Models\Payment;
 use App\Models\TrademarkPricing;
 use App\Services\TrademarkWorkflowService;
+use App\Services\UkPostcodeLookupService;
 use App\Support\TrademarkWorkflow;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TrademarkController extends Controller
 {
-    private const GST_NUMBER_REGEX = '/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/';
-    private const MOBILE_NUMBER_REGEX = '/^[6789]\d{9}$/';
-    private const PINCODE_REGEX = '/^\d{6}$/';
+    private const MOBILE_NUMBER_REGEX = '/^(?:\+44|0)7[0-9]{9}$/';
+    private const PINCODE_REGEX = '/^(?:GIR\s*0AA|[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})$/i';
 
     /**
      * Show trademark type selection
@@ -35,14 +37,13 @@ class TrademarkController extends Controller
     {
         $kycRequirements = [
             'individual' => [
-                'PAN Card',
+                'Passport or Driving Licence',
                 'Address Proof',
                 'Email & Phone',
             ],
             'company' => [
                 'Certificate of Incorporation',
-                'PAN',
-                'GST (if available)',
+                'Registered Office Address',
                 'Authorized Signatory ID Proof',
             ]
         ];
@@ -64,155 +65,204 @@ class TrademarkController extends Controller
     /**
      * Store trademark application
      */
-    public function storeApplication(Request $request, TrademarkWorkflowService $workflow)
+    public function storeApplication(Request $request, TrademarkWorkflowService $workflow, UkPostcodeLookupService $postcodeLookup)
     {
+        $this->normalizeUkMobileInputs($request);
+
         $validated = $request->validate([
             'billing_name' => 'required|string|max:255',
             'billing_address' => 'required|string|max:500',
             'billing_email' => 'required|email|max:255',
-            'billing_mobile' => ['required', 'string', 'size:10', 'regex:' . self::MOBILE_NUMBER_REGEX],
-            'gst_number' => ['nullable', 'string', 'max:15', 'regex:' . self::GST_NUMBER_REGEX],
-
+            'billing_mobile' => ['required', 'string', 'max:30', 'regex:' . self::MOBILE_NUMBER_REGEX],
+            'applicant_type' => 'required|in:individual,limited_company,llp,partnership,charity,other,joint_applicants',
             'applicant_name' => 'required|string|max:255',
-            'applicant_address' => 'required|string|max:500',
-            'applicant_district' => 'required|string|max:255',
-            'applicant_state' => 'required|string|max:255',
-            'applicant_pincode' => ['required', 'string', 'size:6', 'regex:' . self::PINCODE_REGEX],
-            'applicant_phone' => ['required', 'string', 'size:10', 'regex:' . self::MOBILE_NUMBER_REGEX],
+            'company_number' => 'nullable|required_if:applicant_type,limited_company,llp|string|max:40',
+            'company_registration_country' => 'nullable|required_if:applicant_type,limited_company,llp|string|max:100',
+            'applicant_address_line_1' => 'required|string|max:255',
+            'applicant_address_line_2' => 'nullable|string|max:255',
+            'applicant_postcode' => ['required', 'string', 'max:10', 'regex:' . self::PINCODE_REGEX],
+            'applicant_nation' => 'required|in:England,Scotland,Wales,Northern Ireland',
+            'applicant_region' => 'nullable|string|max:255',
+            'applicant_town_city' => 'required|string|max:255',
+            'applicant_country' => 'required|in:United Kingdom',
+            'uk_address_for_service' => 'required|string|max:1000',
+            'applicant_phone' => ['required', 'string', 'max:30', 'regex:' . self::MOBILE_NUMBER_REGEX],
             'applicant_email' => 'required|email|max:255',
-            'type_of_applicant' => 'required|in:individual,company,llp,ngo,small_enterprise,startup,others',
-
-            'signatory_name' => 'required|string|max:255',
-            'signatory_father_name' => 'required|string|max:255',
-            'signatory_address' => 'required|string|max:500',
-            'signatory_district' => 'required|string|max:255',
-            'signatory_state' => 'required|string|max:255',
-            'signatory_pincode' => ['required', 'string', 'size:6', 'regex:' . self::PINCODE_REGEX],
-            'signatory_phone' => ['required', 'string', 'size:10', 'regex:' . self::MOBILE_NUMBER_REGEX],
-            'signatory_email' => 'required|email|max:255',
-            'signatory_designation' => 'required|in:director,partner,proprietor,authorised_signatory',
-
-            'co_applicant_name' => 'nullable|string|max:255',
-            'co_applicant_father_name' => 'nullable|string|max:255',
-            'co_applicant_address' => 'nullable|string|max:500',
-            'co_applicant_state' => 'nullable|string|max:255',
-            'co_applicant_district' => 'nullable|string|max:255',
-            'co_applicant_pincode' => ['nullable', 'string', 'size:6', 'regex:' . self::PINCODE_REGEX],
-            'co_applicant_mobile' => ['nullable', 'string', 'size:10', 'regex:' . self::MOBILE_NUMBER_REGEX],
-            'co_applicant_email' => 'nullable|email|max:255',
-            'co_applicant_designation' => 'nullable|in:co_applicant,partner',
-
-            'trademark_type' => 'required|in:word,device,shape_of_goods,colour,sound_mark,three_dimensional,taste_mark,smell_mark',
+            'authorised_person_name' => 'required|string|max:255',
+            'authorised_person_position' => ['required', 'string', Rule::in(array_keys(config('uk_site.authorised_person_positions', [])))],
+            'authorised_person_email' => 'required|email|max:255',
+            'authorised_person_phone' => ['required', 'string', 'max:30', 'regex:' . self::MOBILE_NUMBER_REGEX],
+            'authority_confirmed' => 'accepted',
+            'joint_applicants' => 'required|in:yes,no',
+            'additional_applicant_type' => 'nullable|required_if:joint_applicants,yes|in:individual,limited_company,llp,partnership,charity,other',
+            'additional_applicant_name' => 'nullable|required_if:joint_applicants,yes|string|max:255',
+            'additional_company_number' => 'nullable|string|max:40',
+            'additional_applicant_address' => 'nullable|required_if:joint_applicants,yes|string|max:500',
+            'additional_applicant_email' => 'nullable|required_if:joint_applicants,yes|email|max:255',
+            'additional_applicant_phone' => ['nullable', 'required_if:joint_applicants,yes', 'string', 'max:30', 'regex:' . self::MOBILE_NUMBER_REGEX],
+            'trademark_type' => 'required|in:word,logo,combined,other',
             'mark_brand' => 'required|string|max:255',
-            'trademark_language' => 'required|string|max:255',
-            'trademark_origin_description' => 'nullable|string|max:1000',
-            'mark_conditions' => 'nullable|string|max:1000',
-            'trademark_image' => 'required|image|mimes:jpeg,png,jpg,webp|max:4096',
-            'goods_services' => 'required|string|max:2000',
-            'trade_description' => 'required|in:manufacturer,trader,service_provider',
-            'trademark_usage_status' => 'required|in:used,proposed',
-            'trademark_use_date' => 'nullable|date',
-            'proof_of_use' => 'nullable|file|mimes:pdf,jpeg,png,jpg,webp|max:5120',
-            'application_type' => 'required|in:trademark,certification,collective,series',
+            'trademark_language' => 'required|string|max:100',
+            'trademark_translation' => 'nullable|string|max:500',
+            'trademark_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:4096',
+            'business_activities' => 'required|string|max:3000',
+            'currently_in_use' => 'required|in:yes,no',
+            'first_use_date' => 'nullable|date|before_or_equal:today',
+            'supporting_evidence' => 'nullable|file|mimes:pdf,jpeg,png,jpg,webp|max:5120',
+            'proposed_classes' => 'nullable|string|max:500',
+            'special_limitations' => 'nullable|string|max:1000',
+            'application_route' => 'required|in:standard,right_start',
+            'earlier_foreign_application' => 'required|in:yes,no',
+            'priority_country' => 'nullable|required_if:earlier_foreign_application,yes|string|max:100',
+            'priority_application_number' => 'nullable|required_if:earlier_foreign_application,yes|string|max:100',
+            'priority_filing_date' => 'nullable|required_if:earlier_foreign_application,yes|date|before_or_equal:today',
+            'priority_earlier_applicant' => 'nullable|required_if:earlier_foreign_application,yes|string|max:255',
+            'priority_document' => 'nullable|file|mimes:pdf,jpeg,png,jpg,webp|max:5120',
         ], $this->validationMessages());
 
-        $entityType = $validated['type_of_applicant'] === 'individual' ? 'individual' : 'company';
-        $billingAddress = trim($validated['billing_address']);
-        $applicantFullAddress = trim(
-            $validated['applicant_address'] . ', ' .
-            $validated['applicant_district'] . ', ' .
-            $validated['applicant_state'] . ' - ' .
-            $validated['applicant_pincode']
-        );
-        $logoPath = null;
-        $proofOfUsePath = null;
+        $this->hydrateUkLocations($validated, $postcodeLookup);
 
-        if ($request->hasFile('trademark_image')) {
-            $logoPath = $request->file('trademark_image')->store('logos', 'public');
-        }
-
-        if ($request->hasFile('proof_of_use')) {
-            $proofOfUsePath = $request->file('proof_of_use')->store('proof-of-use', 'public');
-        }
+        $logoPath = $request->hasFile('trademark_image')
+            ? $request->file('trademark_image')->store('logos', 'public')
+            : null;
+        $supportingEvidencePath = $request->hasFile('supporting_evidence')
+            ? $request->file('supporting_evidence')->store('supporting-evidence', 'public')
+            : null;
+        $priorityDocumentPath = $request->hasFile('priority_document')
+            ? $request->file('priority_document')->store('priority-documents', 'public')
+            : null;
+        $priorityDetails = $validated['earlier_foreign_application'] === 'yes' ? [
+            'priority_claim_required' => true,
+            'priority_country' => $validated['priority_country'],
+            'priority_application_number' => $validated['priority_application_number'],
+            'priority_filing_date' => $validated['priority_filing_date'],
+            'earlier_applicant' => $validated['priority_earlier_applicant'],
+            'priority_document' => $priorityDocumentPath,
+            'priority_deadline' => null,
+            'approved_by_admin' => false,
+        ] : ['priority_claim_required' => false];
+        $applicantFullAddress = implode(', ', array_filter([
+            $validated['applicant_address_line_1'],
+            $validated['applicant_address_line_2'] ?? null,
+            $validated['applicant_town_city'],
+            $validated['applicant_region'] ?? null,
+            $validated['applicant_postcode'],
+            $validated['applicant_country'],
+        ]));
 
         $application = Application::create([
             'user_id' => Auth::id(),
-            'type' => $validated['application_type'],
-            'entity_type' => $entityType,
+            'type' => 'trademark',
+            'entity_type' => $validated['applicant_type'] === 'individual' ? 'individual' : 'company',
             'applicant_name' => $validated['applicant_name'],
             'phone' => $validated['applicant_phone'],
             'email' => $validated['applicant_email'],
             'brand_name' => $validated['mark_brand'],
             'logo_path' => $logoPath,
-            'description' => $validated['trademark_origin_description'] ?? null,
-            'industry' => $validated['trade_description'],
-            'usage_type' => 'india',
-            'first_use_date' => $validated['trademark_usage_status'] === 'used'
-                ? ($validated['trademark_use_date'] ?? null)
-                : null,
-            'currently_selling' => $validated['trademark_usage_status'] === 'used',
+            'description' => $validated['business_activities'],
+            'industry' => null,
+            'usage_type' => 'uk',
+            'first_use_date' => $validated['currently_in_use'] === 'yes' ? ($validated['first_use_date'] ?? null) : null,
+            'currently_selling' => $validated['currently_in_use'] === 'yes',
             'address' => $applicantFullAddress,
-            'goods_services' => $validated['goods_services'],
-            'usage' => $validated['trademark_usage_status'] === 'used' ? 'used' : 'proposed',
+            'goods_services' => $validated['business_activities'],
+            'usage' => $validated['currently_in_use'] === 'yes' ? 'used' : 'proposed',
             'members_details' => [
-                'billing_company_details' => [
+                'billing_details' => [
                     'billing_name' => $validated['billing_name'],
-                    'billing_address' => $billingAddress,
                     'billing_email' => $validated['billing_email'],
-                    'billing_mobile' => $validated['billing_mobile'],
-                    'gst_number' => $validated['gst_number'] ?? null,
+                    'billing_phone' => $validated['billing_mobile'],
+                    'billing_address' => trim($validated['billing_address']),
+                    'invoice_number' => null,
+                    'professional_fee' => null,
+                    'ukipo_official_fee' => null,
+                    'total_paid' => null,
+                    'payment_status' => 'Payment pending',
                 ],
-                'trademark_applicant_details' => [
-                    'applicant_name' => $validated['applicant_name'],
-                    'address_of_applicant' => $validated['applicant_address'],
-                    'district' => $validated['applicant_district'],
-                    'state' => $validated['applicant_state'],
-                    'pin_code' => $validated['applicant_pincode'],
-                    'phone_mobile_number' => $validated['applicant_phone'],
-                    'email_id' => $validated['applicant_email'],
-                    'type_of_applicant' => $validated['type_of_applicant'],
+                'applicant_details' => [
+                    'applicant_type' => $validated['applicant_type'],
+                    'legal_name' => $validated['applicant_name'],
+                    'company_registration_number' => $validated['company_number'] ?? null,
+                    'company_registration_country' => $validated['company_registration_country'] ?? null,
+                    'address_line_1' => $validated['applicant_address_line_1'],
+                    'address_line_2' => $validated['applicant_address_line_2'] ?? null,
+                    'town_city' => $validated['applicant_town_city'],
+                    'county_or_region' => $validated['applicant_region'] ?? null,
+                    'nation' => $validated['applicant_nation'],
+                    'postcode' => $validated['applicant_postcode'],
+                    'country' => $validated['applicant_country'],
+                    'email' => $validated['applicant_email'],
+                    'phone' => $validated['applicant_phone'],
+                    'uk_address_for_service' => $validated['uk_address_for_service'],
                 ],
-                'details_of_signatory' => [
-                    'name_of_signatory' => $validated['signatory_name'],
-                    'fathers_name' => $validated['signatory_father_name'],
-                    'address_of_ar_signatory' => $validated['signatory_address'],
-                    'district' => $validated['signatory_district'],
-                    'state' => $validated['signatory_state'],
-                    'pin_code' => $validated['signatory_pincode'],
-                    'phone_mobile_number' => $validated['signatory_phone'],
-                    'email_id' => $validated['signatory_email'],
-                    'designation_of_signatory' => $validated['signatory_designation'],
+                'authorised_person' => [
+                    'full_name' => $validated['authorised_person_name'],
+                    'position_or_capacity' => $validated['authorised_person_position'],
+                    'email' => $validated['authorised_person_email'],
+                    'phone' => $validated['authorised_person_phone'],
+                    'authority_confirmed' => true,
+                    'final_application_approved' => false,
+                    'approval_date' => null,
                 ],
-                'details_of_co_applicant_or_partners' => [
-                    'name_of_co_applicant_partner' => $validated['co_applicant_name'] ?? null,
-                    'fathers_name' => $validated['co_applicant_father_name'] ?? null,
-                    'address' => $validated['co_applicant_address'] ?? null,
-                    'state' => $validated['co_applicant_state'] ?? null,
-                    'district' => $validated['co_applicant_district'] ?? null,
-                    'pin_code' => $validated['co_applicant_pincode'] ?? null,
-                    'mobile_number' => $validated['co_applicant_mobile'] ?? null,
-                    'email_id' => $validated['co_applicant_email'] ?? null,
-                    'designation' => $validated['co_applicant_designation'] ?? null,
-                ],
+                'joint_applicants' => $validated['joint_applicants'] === 'yes',
+                'additional_applicants' => $validated['joint_applicants'] === 'yes' ? [[
+                    'applicant_type' => $validated['additional_applicant_type'],
+                    'legal_name' => $validated['additional_applicant_name'],
+                    'company_registration_number' => $validated['additional_company_number'] ?? null,
+                    'address' => $validated['additional_applicant_address'],
+                    'email' => $validated['additional_applicant_email'],
+                    'phone' => $validated['additional_applicant_phone'],
+                ]] : [],
                 'trademark_details' => [
-                    'trademark_type' => $validated['trademark_type'],
-                    'mark_brand_in_words' => $validated['mark_brand'],
-                    'language_of_trademark' => $validated['trademark_language'],
-                    'origin_of_trademark' => $validated['trademark_origin_description'] ?? null,
-                    'conditions_or_limitations' => $validated['mark_conditions'] ?? null,
-                    'image_of_trademark' => $logoPath,
-                    'goods_or_services' => $validated['goods_services'],
-                    'trade_description' => $validated['trade_description'],
-                    'user_date_or_proposed' => $validated['trademark_usage_status'],
-                    'trademark_use_date' => $validated['trademark_use_date'] ?? null,
-                    'proof_of_use_of_trademark' => $proofOfUsePath,
-                    'application_type' => $validated['application_type'],
+                    'mark_type' => $validated['trademark_type'],
+                    'trade_mark_wording' => $validated['mark_brand'],
+                    'logo_mark_file' => $logoPath,
+                    'language' => $validated['trademark_language'],
+                    'translation' => $validated['trademark_translation'] ?? null,
+                    'business_activities' => $validated['business_activities'],
+                    'currently_in_use' => $validated['currently_in_use'] === 'yes',
+                    'first_use_date' => $validated['currently_in_use'] === 'yes' ? ($validated['first_use_date'] ?? null) : null,
+                    'supporting_evidence' => $supportingEvidencePath,
+                    'proposed_classes' => $validated['proposed_classes'] ?? null,
+                    'final_approved_classes' => null,
+                    'final_goods_and_services_specification' => null,
+                    'special_limitations' => $validated['special_limitations'] ?? null,
+                    'application_route' => $validated['application_route'],
+                ],
+                'priority_details' => $priorityDetails,
+            ],
+            'workflow_meta' => [
+                'application_route' => $validated['application_route'],
+                'priority' => $priorityDetails,
+                'client_approval' => [
+                    'applicant_approved' => false,
+                    'mark_approved' => false,
+                    'classes_and_specification_approved' => false,
+                    'genuine_use_or_intention_confirmed' => false,
+                    'filing_authority_confirmed' => false,
+                ],
+                'ukipo' => [
+                    'application_number' => null,
+                    'filing_date' => null,
+                    'examination_deadline' => null,
+                    'publication_date' => null,
+                    'opposition_deadline' => null,
+                    'registration_number' => null,
+                    'renewal_date' => null,
                 ],
             ],
-            'status' => 'payment_pending',
+            // A newly completed intake is still awaiting its first payment.
+            // PAYMENT_PENDING is a legacy alias for the *final* payment stage.
+            'status' => TrademarkWorkflow::DRAFT,
+            'service_status' => TrademarkWorkflow::DRAFT,
         ]);
 
         $workflow->initialize($application);
+        $workflow->notifyAdminsOfClientAction(
+            $application->loadMissing('user'),
+            'New UK trade mark application submitted',
+            'The client completed and submitted the UK trade mark application form. The first 50% payment is still pending.'
+        );
 
         return redirect()->route('payment.show', $application->id)
             ->with('success', 'Application created. Please complete 50% payment.');
@@ -273,175 +323,6 @@ class TrademarkController extends Controller
 
         return redirect()->route('trademark.status', $application->id)
             ->with('error', 'Application editing is disabled after payment.');
-
-        if (!in_array($application->current_status, [TrademarkWorkflow::APPLICATION_SUBMITTED], true)) {
-            return redirect()->route('trademark.status', $application->id)
-                ->with('error', 'Application editing is disabled after it has been submitted for admin review.');
-        }
-
-        $existingDetails = $application->members_details ?? [];
-        $existingTrademarkDetails = $existingDetails['trademark_details'] ?? [];
-        $existingTrademarkImagePath = $application->logo_path ?: ($existingTrademarkDetails['image_of_trademark'] ?? null);
-        $existingProofOfUsePath = $existingTrademarkDetails['proof_of_use_of_trademark'] ?? null;
-        $hasTrademarkImage = filled($existingTrademarkImagePath)
-            && Storage::disk('public')->exists($this->normalizePublicStoragePath((string) $existingTrademarkImagePath));
-        $hasProofOfUse = filled($existingProofOfUsePath)
-            && Storage::disk('public')->exists($this->normalizePublicStoragePath((string) $existingProofOfUsePath));
-
-        $validated = $request->validate([
-            'billing_name' => 'required|string|max:255',
-            'billing_address' => 'required|string|max:500',
-            'billing_email' => 'required|email|max:255',
-            'billing_mobile' => ['required', 'string', 'size:10', 'regex:' . self::MOBILE_NUMBER_REGEX],
-            'gst_number' => ['nullable', 'string', 'max:15', 'regex:' . self::GST_NUMBER_REGEX],
-
-            'applicant_name' => 'required|string|max:255',
-            'applicant_address' => 'required|string|max:500',
-            'applicant_district' => 'required|string|max:255',
-            'applicant_state' => 'required|string|max:255',
-            'applicant_pincode' => ['required', 'string', 'size:6', 'regex:' . self::PINCODE_REGEX],
-            'applicant_phone' => ['required', 'string', 'size:10', 'regex:' . self::MOBILE_NUMBER_REGEX],
-            'applicant_email' => 'required|email|max:255',
-            'type_of_applicant' => 'required|in:individual,company,llp,ngo,small_enterprise,startup,others',
-
-            'signatory_name' => 'required|string|max:255',
-            'signatory_father_name' => 'required|string|max:255',
-            'signatory_address' => 'required|string|max:500',
-            'signatory_district' => 'required|string|max:255',
-            'signatory_state' => 'required|string|max:255',
-            'signatory_pincode' => ['required', 'string', 'size:6', 'regex:' . self::PINCODE_REGEX],
-            'signatory_phone' => ['required', 'string', 'size:10', 'regex:' . self::MOBILE_NUMBER_REGEX],
-            'signatory_email' => 'required|email|max:255',
-            'signatory_designation' => 'required|in:director,partner,proprietor,authorised_signatory',
-
-            'co_applicant_name' => 'nullable|string|max:255',
-            'co_applicant_father_name' => 'nullable|string|max:255',
-            'co_applicant_address' => 'nullable|string|max:500',
-            'co_applicant_state' => 'nullable|string|max:255',
-            'co_applicant_district' => 'nullable|string|max:255',
-            'co_applicant_pincode' => ['nullable', 'string', 'size:6', 'regex:' . self::PINCODE_REGEX],
-            'co_applicant_mobile' => ['nullable', 'string', 'size:10', 'regex:' . self::MOBILE_NUMBER_REGEX],
-            'co_applicant_email' => 'nullable|email|max:255',
-            'co_applicant_designation' => 'nullable|in:co_applicant,partner',
-
-            'trademark_type' => 'required|in:word,device,shape_of_goods,colour,sound_mark,three_dimensional,taste_mark,smell_mark',
-            'mark_brand' => 'required|string|max:255',
-            'trademark_language' => 'required|string|max:255',
-            'trademark_origin_description' => 'nullable|string|max:1000',
-            'mark_conditions' => 'nullable|string|max:1000',
-            'trademark_image' => ($hasTrademarkImage ? 'nullable' : 'required') . '|image|mimes:jpeg,png,jpg,webp|max:4096',
-            'goods_services' => 'required|string|max:2000',
-            'trade_description' => 'required|in:manufacturer,trader,service_provider',
-            'trademark_usage_status' => 'required|in:used,proposed',
-            'trademark_use_date' => 'nullable|date',
-            'proof_of_use' => 'nullable|file|mimes:pdf,jpeg,png,jpg,webp|max:5120',
-            'application_type' => 'required|in:trademark,certification,collective,series',
-        ], $this->validationMessages());
-
-        $entityType = $validated['type_of_applicant'] === 'individual' ? 'individual' : 'company';
-        $billingAddress = trim($validated['billing_address']);
-        $applicantFullAddress = trim(
-            $validated['applicant_address'] . ', ' .
-            $validated['applicant_district'] . ', ' .
-            $validated['applicant_state'] . ' - ' .
-            $validated['applicant_pincode']
-        );
-
-        $logoPath = $application->logo_path;
-        if ($request->hasFile('trademark_image')) {
-            $logoPath = $request->file('trademark_image')->store('logos', 'public');
-        }
-
-        $proofOfUsePath = $existingTrademarkDetails['proof_of_use_of_trademark'] ?? null;
-        if ($request->hasFile('proof_of_use')) {
-            $proofOfUsePath = $request->file('proof_of_use')->store('proof-of-use', 'public');
-        }
-
-        $application->update([
-            'applicant_name' => $validated['applicant_name'],
-            'entity_type' => $entityType,
-            'type' => $validated['application_type'],
-            'phone' => $validated['applicant_phone'],
-            'email' => $validated['applicant_email'],
-            'brand_name' => $validated['mark_brand'],
-            'logo_path' => $logoPath,
-            'description' => $validated['trademark_origin_description'] ?? null,
-            'industry' => $validated['trade_description'],
-            'usage_type' => 'india',
-            'first_use_date' => $validated['trademark_usage_status'] === 'used'
-                ? ($validated['trademark_use_date'] ?? null)
-                : null,
-            'currently_selling' => $validated['trademark_usage_status'] === 'used',
-            'address' => $applicantFullAddress,
-            'goods_services' => $validated['goods_services'],
-            'usage' => $validated['trademark_usage_status'] === 'used' ? 'used' : 'proposed',
-            'members_details' => [
-                'billing_company_details' => [
-                    'billing_name' => $validated['billing_name'],
-                    'billing_address' => $billingAddress,
-                    'billing_email' => $validated['billing_email'],
-                    'billing_mobile' => $validated['billing_mobile'],
-                    'gst_number' => $validated['gst_number'] ?? null,
-                ],
-                'trademark_applicant_details' => [
-                    'applicant_name' => $validated['applicant_name'],
-                    'address_of_applicant' => $validated['applicant_address'],
-                    'district' => $validated['applicant_district'],
-                    'state' => $validated['applicant_state'],
-                    'pin_code' => $validated['applicant_pincode'],
-                    'phone_mobile_number' => $validated['applicant_phone'],
-                    'email_id' => $validated['applicant_email'],
-                    'type_of_applicant' => $validated['type_of_applicant'],
-                ],
-                'details_of_signatory' => [
-                    'name_of_signatory' => $validated['signatory_name'],
-                    'fathers_name' => $validated['signatory_father_name'],
-                    'address_of_ar_signatory' => $validated['signatory_address'],
-                    'district' => $validated['signatory_district'],
-                    'state' => $validated['signatory_state'],
-                    'pin_code' => $validated['signatory_pincode'],
-                    'phone_mobile_number' => $validated['signatory_phone'],
-                    'email_id' => $validated['signatory_email'],
-                    'designation_of_signatory' => $validated['signatory_designation'],
-                ],
-                'details_of_co_applicant_or_partners' => [
-                    'name_of_co_applicant_partner' => $validated['co_applicant_name'] ?? null,
-                    'fathers_name' => $validated['co_applicant_father_name'] ?? null,
-                    'address' => $validated['co_applicant_address'] ?? null,
-                    'state' => $validated['co_applicant_state'] ?? null,
-                    'district' => $validated['co_applicant_district'] ?? null,
-                    'pin_code' => $validated['co_applicant_pincode'] ?? null,
-                    'mobile_number' => $validated['co_applicant_mobile'] ?? null,
-                    'email_id' => $validated['co_applicant_email'] ?? null,
-                    'designation' => $validated['co_applicant_designation'] ?? null,
-                ],
-                'trademark_details' => [
-                    'trademark_type' => $validated['trademark_type'],
-                    'mark_brand_in_words' => $validated['mark_brand'],
-                    'language_of_trademark' => $validated['trademark_language'],
-                    'origin_of_trademark' => $validated['trademark_origin_description'] ?? null,
-                    'conditions_or_limitations' => $validated['mark_conditions'] ?? null,
-                    'image_of_trademark' => $logoPath,
-                    'goods_or_services' => $validated['goods_services'],
-                    'trade_description' => $validated['trade_description'],
-                    'user_date_or_proposed' => $validated['trademark_usage_status'],
-                    'trademark_use_date' => $validated['trademark_use_date'] ?? null,
-                    'proof_of_use_of_trademark' => $proofOfUsePath,
-                    'application_type' => $validated['application_type'],
-                ],
-            ],
-        ]);
-
-        $reviewNoteUpdates = ['rejection_reason' => null];
-        if (Schema::hasColumn('applications', 'admin_review_note')) {
-            $reviewNoteUpdates['admin_review_note'] = null;
-        }
-        $application->forceFill($reviewNoteUpdates)->save();
-
-        $workflow->submitForReview($application->fresh());
-
-        return redirect()->route('trademark.status', $application->id)
-            ->with('success', 'Your application has been submitted for admin review.');
     }
 
     /**
@@ -473,6 +354,8 @@ class TrademarkController extends Controller
             'documents.*' => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
         ]);
 
+        $uploadedDocumentCount = 0;
+
         foreach ($request->all() as $key => $value) {
             if ($request->hasFile($key) && $key !== '_token') {
                 $file = $request->file($key);
@@ -488,10 +371,19 @@ class TrademarkController extends Controller
                     'file_size' => $file->getSize(),
                     'status' => 'pending',
                 ]);
+                $uploadedDocumentCount++;
             }
         }
 
         $workflow->refreshOnboardingStatus($application);
+
+        if ($uploadedDocumentCount > 0) {
+            $workflow->notifyAdminsOfClientAction(
+                $application->loadMissing('user'),
+                'Applicant submitted application documents',
+                $uploadedDocumentCount . ' document(s) were uploaded by the client for review.'
+            );
+        }
 
         return redirect()->route('trademark.status', $application->id)
             ->with('success', 'Documents uploaded successfully.');
@@ -559,6 +451,7 @@ class TrademarkController extends Controller
 
         $imagePath = $this->resolvePublicFilePath([
             $this->decodedFileQuery($request),
+            data_get($application->members_details, 'trademark_details.logo_mark_file'),
             data_get($application->members_details, 'trademark_details.image_of_trademark'),
             $application->logo_path,
         ], ['logos']);
@@ -583,8 +476,10 @@ class TrademarkController extends Controller
 
         $proofOfUsePath = $this->resolvePublicFilePath([
             $this->decodedFileQuery($request),
+            data_get($application->members_details, 'trademark_details.supporting_evidence'),
+            data_get($application->members_details, 'priority_details.priority_document'),
             data_get($application->members_details, 'trademark_details.proof_of_use_of_trademark'),
-        ], ['proof-of-use']);
+        ], ['supporting-evidence', 'priority-documents', 'proof-of-use']);
 
         if (!$proofOfUsePath) {
             abort(404, 'Proof of use file not found.');
@@ -899,8 +794,8 @@ HTML;
 HTML;
 
         $html .= '<p>I, <strong>' . htmlspecialchars($user->name) . '</strong>, resident of ______________, ';
-        $html .= 'do hereby authorize and appoint <strong>Legal Bruz  LLP (Law Firm)</strong>, ';
-        $html .= 'having their office at 34 Krishna Nagar, Ambala Cantt, Haryana 133001, India, ';
+        $html .= 'do hereby authorise and appoint <strong>Legal Bruz Pvt. Ltd.</strong>, ';
+        $html .= 'at the address stated in the engagement letter, ';
         $html .= 'to act as my Attorney in the matter of registration of Trademark bearing ';
         $html .= 'Application No. <strong>' . htmlspecialchars($application->id) . '</strong>.</p>';
 
@@ -994,17 +889,49 @@ HTML;
     private function validationMessages(): array
     {
         return [
-            'billing_mobile.regex' => 'Enter a valid Indian mobile number.',
-            'applicant_phone.regex' => 'Enter a valid Indian mobile number.',
-            'signatory_phone.regex' => 'Enter a valid Indian mobile number.',
-            'co_applicant_mobile.regex' => 'Enter a valid Indian mobile number.',
-            'applicant_pincode.regex' => 'Enter a valid 6-digit pincode.',
-            'signatory_pincode.regex' => 'Enter a valid 6-digit pincode.',
-            'co_applicant_pincode.regex' => 'Enter a valid 6-digit pincode.',
-            'gst_number.regex' => 'Enter a valid GST number.',
-            'trademark_image.required' => 'Please upload the image of the trademark.',
-            'proof_of_use.required' => 'Please upload proof of use of the trademark.',
+            'billing_mobile.regex' => 'Enter a valid UK mobile number beginning with 07 or +44 7.',
+            'applicant_phone.regex' => 'Enter a valid UK mobile number beginning with 07 or +44 7.',
+            'authorised_person_phone.regex' => 'Enter a valid UK mobile number beginning with 07 or +44 7.',
+            'additional_applicant_phone.regex' => 'Enter a valid UK mobile number beginning with 07 or +44 7.',
+            'applicant_postcode.regex' => 'Enter a valid UK postcode.',
+            'first_use_date.before_or_equal' => 'The first-use date cannot be in the future.',
+            'priority_filing_date.before_or_equal' => 'The priority filing date cannot be in the future.',
+            'authority_confirmed.accepted' => 'Confirm that the authorised person has authority to act for the applicant.',
         ];
+    }
+
+    private function normalizeUkMobileInputs(Request $request): void
+    {
+        $normalized = [];
+
+        foreach (['billing_mobile', 'applicant_phone', 'authorised_person_phone', 'additional_applicant_phone'] as $field) {
+            $mobile = preg_replace('/[\s()-]+/', '', (string) $request->input($field));
+
+            if (str_starts_with($mobile, '07')) {
+                $mobile = '+44' . substr($mobile, 1);
+            }
+
+            $normalized[$field] = $mobile;
+        }
+
+        $request->merge($normalized);
+    }
+
+    private function hydrateUkLocations(array &$validated, UkPostcodeLookupService $postcodeLookup): void
+    {
+        $location = $postcodeLookup->lookup((string) $validated['applicant_postcode']);
+
+        if (($location['status'] ?? 'error') !== 'success') {
+            throw ValidationException::withMessages([
+                'applicant_postcode' => $location['message'] ?? 'Enter a valid UK postcode.',
+            ]);
+        }
+
+        $validated['applicant_postcode'] = $location['postcode'];
+        $validated['applicant_nation'] = $location['nation'];
+        $validated['applicant_region'] = $location['region'];
+        $validated['applicant_town_city'] = $location['town_city'];
+        $validated['applicant_country'] = 'United Kingdom';
     }
 
     private function normalizeApplicationRelations(Application $application): Application

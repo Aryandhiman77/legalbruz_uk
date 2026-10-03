@@ -94,7 +94,7 @@ class DocumentGenerator
         $designation = self::getDesignation($entityType);
 
         $attorneyName = config('app.trademark_attorney_name', 'Vilas Sharma Advocate');
-        $lawFirmName = config('app.law_firm_name', 'LEGAL BRUZ LLP (LAW FIRM)');
+        $lawFirmName = config('app.law_firm_name', 'LEGAL BRUZ PVT. LTD.');
         $lawFirmAddress = config('app.law_firm_address', '34 KRISHNA NAGAR, AMBALA CANTT, HARYANA-133001, India');
 
         // Create document record first to get ID

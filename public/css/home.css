@@ -19,7 +19,7 @@ html {
 }
 
 body {
-    font-family: "Inter", sans-serif;
+    font-family: "DM Sans", sans-serif;
     color: var(--slate);
     background: var(--light-bg);
     line-height: 1.6;
@@ -31,7 +31,7 @@ h3,
 h4,
 h5,
 h6 {
-    font-family: "Plus Jakarta Sans", sans-serif;
+    font-family: "Manrope", sans-serif;
     color: var(--navy);
     font-weight: 800;
 }
@@ -52,13 +52,40 @@ nav.navbar {
 }
 
 .navbar-brand {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    padding: 0;
     font-size: 1.8rem;
     font-weight: 900;
-    background: linear-gradient(135deg, var(--navy) 0%, var(--emerald) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
     letter-spacing: -1px;
+}
+
+.navbar-brand .navbar-logo {
+    display: block;
+    width: 106px;
+    max-width: 106px;
+    height: 79px;
+    max-height: 79px;
+    object-fit: contain;
+}
+
+@media (max-width: 768px) {
+    .navbar-brand .navbar-logo {
+        width: 92px;
+        max-width: 92px;
+        height: 68px;
+        max-height: 68px;
+    }
+}
+
+@media (max-width: 480px) {
+    .navbar-brand .navbar-logo {
+        width: 84px;
+        max-width: 84px;
+        height: 62px;
+        max-height: 62px;
+    }
 }
 
 .nav-link {
@@ -663,7 +690,7 @@ nav.navbar {
     font-weight: 900;
     color: var(--emerald);
     margin-bottom: 8px;
-    font-family: "Plus Jakarta Sans", sans-serif;
+    font-family: "Manrope", sans-serif;
 }
 
 .stat-label {
@@ -1109,7 +1136,7 @@ nav.navbar {
     font-weight: 900;
     color: var(--emerald);
     margin: 12px 0;
-    font-family: "Plus Jakarta Sans", sans-serif;
+    font-family: "Manrope", sans-serif;
 }
 
 .pricing-period {
@@ -3079,13 +3106,6 @@ footer {
         margin-top: 42px;
     }
 
-    .flow-guide-btn {
-        min-width: 0;
-        width: 100%;
-        padding: 17px 20px;
-        font-size: 1rem;
-    }
-
     .footer-content {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 32px 22px;
@@ -3161,11 +3181,6 @@ footer {
         padding: 30px 22px 24px;
     }
 
-    .flow-guide-btn {
-        width: auto;
-        min-width: min(100%, 340px);
-        border-radius: 9px;
-    }
 }
 
 @media (max-width: 767.98px) {

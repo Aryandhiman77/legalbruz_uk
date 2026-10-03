@@ -5,9 +5,10 @@
 @section('og_title', 'About Legal Bruz')
 @section('og_description', 'Protecting brands and empowering founders through accessible, technology-enabled intellectual property solutions.')
 @section('og_image', asset('anshul-sharma-founder.png'))
+@section('body_class', 'about-body')
 
 @section('head')
-    <link rel="stylesheet" href="{{ asset('css/about.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/about.css') }}?v={{ filemtime(public_path('css/about.css')) }}">
 @endsection
 
 @section('content')
@@ -25,7 +26,7 @@
                 </div>
                 <div class="about-hero-mark" aria-hidden="true">
                     <span class="about-hero-mark-ring"></span>
-                    <img src="{{ asset('logo4.png') }}" alt="">
+                    <img src="{{ asset('legal-bruz-pvt-ltd-logo.png') }}" alt="">
                     <div class="about-hero-mark-note">
                         <i class="bi bi-patch-check-fill"></i>
                         <span>Built for brands.<br>Backed by law.</span>

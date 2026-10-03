@@ -116,7 +116,7 @@
                                             <x-admin-status :status="$adminStatusLabel" />
                                         </td>
                                         <td>
-                                            <small>{{ $app->created_at->timezone('Asia/Kolkata')->format('M d, Y') }}</small>
+                                            <small>{{ $app->created_at->timezone(config('app.timezone', 'Europe/London'))->format('M d, Y') }}</small>
                                         </td>
                                         <td>
                                             <a href="{{ route('admin.review-application', $app->id) }}"

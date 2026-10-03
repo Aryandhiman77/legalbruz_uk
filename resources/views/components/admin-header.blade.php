@@ -7,10 +7,10 @@
             </button>
             <a class="admin-topbar-brand" href="{{ route('admin.dashboard') }}">
                 <span class="admin-topbar-logo" aria-hidden="true">
-                    <img src="{{ asset('logo4.png') }}" alt="">
+                    <img src="{{ asset('legal-bruz-pvt-ltd-logo.png') }}" alt="">
                 </span>
                 <span>
-                    <strong>Legal Bruz LLP</strong>
+                    <strong>Legal Bruz Pvt. Ltd.</strong>
                     <small>Administration</small>
                 </span>
             </a>

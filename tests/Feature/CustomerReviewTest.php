@@ -28,6 +28,7 @@ class CustomerReviewTest extends TestCase
         CustomerReview::create([
             'customer_name' => 'First Customer',
             'customer_title' => 'Founder',
+            'logo_path' => 'customer-reviews/logos/first-customer.png',
             'review' => 'This should be displayed first.',
             'rating' => 5,
             'sort_order' => 10,
@@ -42,16 +43,33 @@ class CustomerReviewTest extends TestCase
             'is_active' => false,
         ]);
 
-        $this->get(route('landing'))
+        $response = $this->get(route('landing'))
             ->assertOk()
             ->assertSeeInOrder(['First Customer', 'Second Customer'])
             ->assertDontSee('Hidden Customer')
-            ->assertSee('data-testimonials-carousel', false);
+            ->assertSee(route('storage.public.view', ['path' => 'customer-reviews/logos/first-customer.png']), false)
+            ->assertSee('data-testimonials-carousel', false)
+            ->assertSee('data-review-track', false)
+            ->assertSee('data-review-controls', false)
+            ->assertSee('data-review-dots', false);
+
+        $this->assertStringContainsString('window.setInterval(() => goToPage(currentPage + 1), 4500)', $response->getContent());
+        $this->assertStringContainsString('Math.max(track.scrollWidth - track.clientWidth, 0)', $response->getContent());
+        $this->assertStringContainsString('renderPagination();', $response->getContent());
 
         $carouselCss = file_get_contents(public_path('css/home.css'));
         $this->assertStringContainsString('--reviews-per-view: 3', $carouselCss);
         $this->assertStringContainsString('--reviews-per-view: 2', $carouselCss);
         $this->assertStringContainsString('--reviews-per-view: 1', $carouselCss);
+
+        $ukHomepageCss = file_get_contents(public_path('css/home-uk.css'));
+        $this->assertStringContainsString('-webkit-line-clamp:4', $ukHomepageCss);
+        $this->assertStringContainsString('.review-logo img', $ukHomepageCss);
+        $this->assertStringContainsString('--reviews-per-page:3', $ukHomepageCss);
+        $this->assertStringContainsString('--reviews-per-page:2', $ukHomepageCss);
+        $this->assertStringContainsString('--reviews-per-page:1', $ukHomepageCss);
+        $this->assertStringContainsString('.review-pagination-dot.is-active', $ukHomepageCss);
+        $this->assertStringContainsString('grid-template-columns:38px minmax(0,1fr) auto 38px', $ukHomepageCss);
     }
 
     public function test_admin_can_create_update_and_delete_a_review(): void

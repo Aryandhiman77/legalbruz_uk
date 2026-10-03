@@ -44,14 +44,14 @@
                                 <div class="card-body">
                                     <div class="d-flex justify-content-between mb-2">
                                         <span>Total Professional Fee:</span>
-                                        <span>₹{{ number_format($totalAmount, 0) }}</span>
+                                        <span>£{{ number_format($totalAmount, 0) }}</span>
                                     </div>
                                     <hr>
                                     <div class="d-flex justify-content-between text-success mb-2">
                                         <span><strong>50% Advance Payment:</strong></span>
-                                        <span class="h5">₹{{ number_format($amount, 0) }}</span>
+                                        <span class="h5">£{{ number_format($amount, 0) }}</span>
                                     </div>
-                                    <small class="text-muted">Remaining ₹{{ number_format($totalAmount - $amount, 0) }} to
+                                    <small class="text-muted">Remaining £{{ number_format($totalAmount - $amount, 0) }} to
                                         be paid after filing</small>
                                 </div>
                             </div>
@@ -92,7 +92,7 @@
                             </div>
 
                             <button type="submit" class="btn btn-success w-100 btn-lg">
-                                <i class="fas fa-lock"></i> Proceed to Payment - ₹{{ number_format($amount, 0) }}
+                                <i class="fas fa-lock"></i> Proceed to Payment - £{{ number_format($amount, 0) }}
                             </button>
                         </form>
                     </div>
@@ -109,7 +109,7 @@
                         @if ($application->entity_type === 'individual')
                             <div class="list-group list-group-flush">
                                 <div class="list-group-item">
-                                    <span class="badge bg-primary">1</span> PAN Card
+                                    <span class="badge bg-primary">1</span> Passport or Driving Licence
                                 </div>
                                 <div class="list-group-item">
                                     <span class="badge bg-primary">2</span> Address Proof
@@ -127,19 +127,16 @@
                                     <span class="badge bg-primary">1</span> Certificate of Incorporation
                                 </div>
                                 <div class="list-group-item">
-                                    <span class="badge bg-primary">2</span> PAN Card
+                                    <span class="badge bg-primary">2</span> Registered Office Address Proof
                                 </div>
                                 <div class="list-group-item">
-                                    <span class="badge bg-primary">3</span> GST Certificate
+                                    <span class="badge bg-primary">3</span> Authorized Signatory ID
                                 </div>
                                 <div class="list-group-item">
-                                    <span class="badge bg-primary">4</span> Authorized Signatory ID
+                                    <span class="badge bg-primary">4</span> Affidavit
                                 </div>
                                 <div class="list-group-item">
-                                    <span class="badge bg-primary">5</span> Affidavit
-                                </div>
-                                <div class="list-group-item">
-                                    <span class="badge bg-primary">6</span> Power of Attorney
+                                    <span class="badge bg-primary">5</span> Power of Attorney
                                 </div>
                             </div>
                         @endif

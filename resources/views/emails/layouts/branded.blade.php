@@ -1,8 +1,8 @@
 @php
-    $brandName = config('app.name', 'Legal Bruz LLP');
+    $brandName = config('app.name', 'Legal Bruz Pvt. Ltd.');
     $brandEmail = config('mail.from.address', 'info@legalbruz.com');
     $brandUrl = config('app.url');
-    $logoUrl = asset('logo4-mark.png');
+    $logoUrl = asset('legal-bruz-pvt-ltd-logo.png');
 @endphp
 <!DOCTYPE html>
 <html lang="en">
@@ -289,7 +289,7 @@
         <table width="100%" cellpadding="0" cellspacing="0" role="presentation" bgcolor="#f8fcfd" style="background-color:#f8fcfd !important; background:#f8fcfd !important; color:#082653 !important; border-bottom:6px solid #0f9f90 !important;">
             <tr>
                 <td align="center" bgcolor="#f8fcfd" style="background-color:#f8fcfd !important; background:#f8fcfd !important; padding:30px 38px;">
-                    <img src="{{ $logoUrl }}" alt="Legal Bruz LLP logo" width="96" style="display:block; width:96px; max-width:100%; height:auto; margin:0 auto;">
+                    <img src="{{ $logoUrl }}" alt="Legal Bruz Pvt. Ltd. logo" width="96" style="display:block; width:96px; max-width:100%; height:auto; margin:0 auto;">
                 </td>
             </tr>
         </table>
@@ -308,7 +308,7 @@
         <table width="100%" cellpadding="0" cellspacing="0" role="presentation" bgcolor="#f8fcfd" style="background-color:#f8fcfd !important; background:#f8fcfd !important; color:#334155 !important; border-top:6px solid #0f9f90 !important;">
             <tr>
                 <td align="center" bgcolor="#f8fcfd" style="background-color:#f8fcfd !important; background:#f8fcfd !important; padding:28px 38px; color:#334155 !important;">
-                    <img src="{{ $logoUrl }}" alt="Legal Bruz LLP logo" width="72" style="display:block; width:72px; max-width:100%; height:auto; margin:0 auto 18px;">
+                    <img src="{{ $logoUrl }}" alt="Legal Bruz Pvt. Ltd. logo" width="72" style="display:block; width:72px; max-width:100%; height:auto; margin:0 auto 18px;">
                     <strong style="display:block; color:#0f766e !important; margin-bottom:8px;">Contact Us</strong>
                     <p style="margin:5px 0; color:#334155 !important; font-size:14px;">{{ $brandEmail }}</p>
                     <p style="margin:5px 0; color:#334155 !important; font-size:14px;">{{ $brandUrl }}</p>

@@ -90,8 +90,14 @@ class Payment extends Model
 
     public function isAdvanceInvoice(): bool
     {
-        return strtolower((string) ($this->payment_type ?? '')) === 'advance'
-            || (string) $this->percentage === '50%';
+        $paymentType = strtolower((string) ($this->payment_type ?? ''));
+
+        if ($paymentType !== '') {
+            return $paymentType === 'advance';
+        }
+
+        // Retain support for records created before payment_type was added.
+        return (string) $this->percentage === '50%';
     }
 
     public function invoiceAdvanceBaseAmount(): float

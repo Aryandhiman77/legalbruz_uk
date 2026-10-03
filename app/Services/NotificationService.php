@@ -21,7 +21,7 @@ class NotificationService
             'user_id' => $user->id,
             'type' => 'payment_approved',
             'title' => '✅ Payment Approved',
-            'message' => 'Your payment of ₹' . number_format($payment->amount, 2) . ' has been approved successfully!',
+            'message' => 'Your payment of £' . number_format($payment->amount, 2) . ' has been approved successfully!',
             'data' => [
                 'payment_id' => $payment->id,
                 'application_id' => $payment->application_id,
@@ -49,7 +49,7 @@ class NotificationService
             'user_id' => $user->id,
             'type' => 'payment_rejected',
             'title' => '❌ Payment Rejected',
-            'message' => 'Your payment of ₹' . number_format($payment->amount, 2) . ' has been rejected. Please contact support.',
+            'message' => 'Your payment of £' . number_format($payment->amount, 2) . ' has been rejected. Please contact support.',
             'data' => [
                 'payment_id' => $payment->id,
                 'application_id' => $payment->application_id,

@@ -5,947 +5,194 @@
         $trademarkFormCoupon = auth()->check()
             ? \App\Models\DiscountCoupon::autoApplyForPayment('trademark_filing', auth()->id())
             : \App\Models\DiscountCoupon::autoApplyForPublicService('trademark_filing');
-        $trademarkPricingPlans = $trademarkPricingPlans ?? \App\Models\TrademarkPricing::activePlans();
-        $trademarkPricingDefaults = \App\Models\TrademarkPricing::defaults();
-        $individualPlanAmount = (float) ($trademarkPricingPlans['individual']['amount'] ?? $trademarkPricingDefaults['individual']['amount']);
-        $otherApplicantPlanAmount = (float) ($trademarkPricingPlans['company']['amount'] ?? $trademarkPricingDefaults['company']['amount']);
-        $individualOfferAmount = $trademarkFormCoupon
-            ? $trademarkFormCoupon->discountedAmountFor($individualPlanAmount)
-            : $individualPlanAmount;
-        $otherApplicantOfferAmount = $trademarkFormCoupon
-            ? $trademarkFormCoupon->discountedAmountFor($otherApplicantPlanAmount)
-            : $otherApplicantPlanAmount;
-        $showTrademarkFormOffer = $trademarkFormCoupon
-            && ($individualOfferAmount < $individualPlanAmount || $otherApplicantOfferAmount < $otherApplicantPlanAmount);
+        $plans = $trademarkPricingPlans ?? \App\Models\TrademarkPricing::activePlans();
+        $defaults = \App\Models\TrademarkPricing::defaults();
+        $applicationAmount = (float) ($plans['uk_application']['amount'] ?? $defaults['uk_application']['amount']);
+        $offerAmount = $trademarkFormCoupon ? $trademarkFormCoupon->discountedAmountFor($applicationAmount) : $applicationAmount;
+        $hasOffer = $trademarkFormCoupon && $offerAmount < $applicationAmount;
+        $oldApplicantType = old('applicant_type');
+        $oldJointApplicants = old('joint_applicants', 'no');
+        $oldPriority = old('earlier_foreign_application', 'no');
+        $oldUse = old('currently_in_use', 'no');
     @endphp
 
-    <div class="container">
-        <div class="progress-section">
-            <div class="step-tracker step-tracker-5">
-                <div class="step-item active" data-step-indicator="1">
-                    <div class="step-number">1</div>
-                    <div class="step-label">Trademark Applicant Details</div>
-                </div>
-                <div class="step-item" data-step-indicator="2">
-                    <div class="step-number">2</div>
-                    <div class="step-label">Details of Signatory</div>
-                </div>
-                <div class="step-item" data-step-indicator="3">
-                    <div class="step-number">3</div>
-                    <div class="step-label">Co-Applicant / Partners</div>
-                </div>
-                <div class="step-item" data-step-indicator="4">
-                    <div class="step-number">4</div>
-                    <div class="step-label">Trademark Details</div>
-                </div>
-                <div class="step-item" data-step-indicator="5">
-                    <div class="step-number">5</div>
-                    <div class="step-label">Billing Company Details</div>
-                </div>
-            </div>
+    <main class="uk-application-page">
+        <div class="application-shell">
+            <header class="application-heading">
+                <span class="application-kicker">UK TRADE MARK SERVICES</span>
+                <h1>UK Trade Mark Application</h1>
+                <p>Tell us about the applicant and the mark. We will review the details before anything is filed with the UKIPO.</p>
+            </header>
+
+            <ol class="form-progress" aria-label="Application progress">
+                @foreach (['Applicant', 'Authorised person', 'Joint applicants', 'Trade mark', 'Billing'] as $index => $label)
+                    <li class="{{ $index === 0 ? 'is-active' : '' }}" data-step-indicator="{{ $index + 1 }}">
+                        <span>{{ str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT) }}</span>
+                        <strong>{{ $label }}</strong>
+                    </li>
+                @endforeach
+            </ol>
+
+            <section class="application-card">
+                @if ($errors->any())
+                    <div class="form-alert" role="alert"><strong>Please check the highlighted fields.</strong><span>Your information has been kept so you can correct it.</span></div>
+                @endif
+
+                <form action="{{ route('trademark.store') }}" method="POST" enctype="multipart/form-data" id="ukTrademarkForm" novalidate>
+                    @csrf
+
+                    <section class="form-step is-active" data-step="1">
+                        <div class="step-heading"><span>01</span><div><h2>Applicant details</h2><p>Enter the exact person or organisation that will own the UK trade mark.</p></div></div>
+                        <div class="form-grid">
+                            <div class="field field-half">
+                                <label for="applicant_type">Applicant Type <b>*</b></label>
+                                <select id="applicant_type" name="applicant_type" required class="@error('applicant_type') is-invalid @enderror">
+                                    <option value="">Select applicant type</option>
+                                    @foreach (['individual' => 'Individual', 'limited_company' => 'Limited company', 'llp' => 'Limited liability partnership', 'partnership' => 'Partnership', 'charity' => 'Charity', 'joint_applicants' => 'Joint applicants', 'other' => 'Other'] as $value => $label)
+                                        <option value="{{ $value }}" @selected($oldApplicantType === $value)>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                                @error('applicant_type')<div class="field-error">{{ $message }}</div>@enderror
+                            </div>
+                            <div class="field field-half">
+                                <label for="applicant_name">Legal Name of Applicant <b>*</b></label>
+                                <input id="applicant_name" name="applicant_name" value="{{ old('applicant_name') }}" maxlength="255" required class="@error('applicant_name') is-invalid @enderror">
+                                @error('applicant_name')<div class="field-error">{{ $message }}</div>@enderror
+                            </div>
+                            <div class="conditional-fields field-full" data-company-fields @if (!in_array($oldApplicantType, ['limited_company', 'llp'])) hidden @endif>
+                                <div class="form-grid compact-grid">
+                                    <div class="field field-half"><label for="company_number">Company Registration Number <b>*</b></label><input id="company_number" name="company_number" value="{{ old('company_number') }}" maxlength="40" class="@error('company_number') is-invalid @enderror">@error('company_number')<div class="field-error">{{ $message }}</div>@enderror</div>
+                                    <div class="field field-half"><label for="company_registration_country">Company Registration Country <b>*</b></label><input id="company_registration_country" name="company_registration_country" value="{{ old('company_registration_country', 'United Kingdom') }}" maxlength="100" class="@error('company_registration_country') is-invalid @enderror">@error('company_registration_country')<div class="field-error">{{ $message }}</div>@enderror</div>
+                                </div>
+                            </div>
+                            <div class="field field-half"><label for="applicant_address_line_1">Registered or Residential Address — Line 1 <b>*</b></label><input id="applicant_address_line_1" name="applicant_address_line_1" value="{{ old('applicant_address_line_1') }}" maxlength="255" autocomplete="address-line1" required class="@error('applicant_address_line_1') is-invalid @enderror">@error('applicant_address_line_1')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="field field-half"><label for="applicant_address_line_2">Address Line 2 <span>Optional</span></label><input id="applicant_address_line_2" name="applicant_address_line_2" value="{{ old('applicant_address_line_2') }}" maxlength="255" autocomplete="address-line2" class="@error('applicant_address_line_2') is-invalid @enderror">@error('applicant_address_line_2')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="field field-postcode">
+                                <label for="applicant_postcode">Postcode <b>*</b></label>
+                                <div class="postcode-control"><input id="applicant_postcode" name="applicant_postcode" value="{{ old('applicant_postcode') }}" maxlength="10" autocomplete="postal-code" placeholder="SW1A 1AA" required class="@error('applicant_postcode') is-invalid @enderror"><button type="button" data-postcode-lookup><span data-lookup-label>Find address</span></button></div>
+                                <small id="postcode_status" aria-live="polite">UK postcodes only</small>
+                                @error('applicant_postcode')<div class="field-error">{{ $message }}</div>@enderror
+                            </div>
+                            <div class="field field-location"><label for="applicant_nation">Nation <b>*</b></label><input id="applicant_nation" name="applicant_nation" value="{{ old('applicant_nation') }}" readonly required placeholder="Filled from postcode" class="@error('applicant_nation') is-invalid @enderror">@error('applicant_nation')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="field field-location"><label for="applicant_region">County or Region <span>Optional</span></label><input id="applicant_region" name="applicant_region" value="{{ old('applicant_region') }}" readonly placeholder="Filled from postcode" class="@error('applicant_region') is-invalid @enderror">@error('applicant_region')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="field field-location"><label for="applicant_town_city">Town / City <b>*</b></label><input id="applicant_town_city" name="applicant_town_city" value="{{ old('applicant_town_city') }}" readonly required placeholder="Filled from postcode" class="@error('applicant_town_city') is-invalid @enderror">@error('applicant_town_city')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="field field-half"><label for="applicant_country">Country <b>*</b></label><input id="applicant_country" name="applicant_country" value="{{ old('applicant_country', 'United Kingdom') }}" readonly required></div>
+                            <div class="field field-half"><label for="applicant_email">Email Address <b>*</b></label><input type="email" id="applicant_email" name="applicant_email" value="{{ old('applicant_email', auth()->user()->email ?? '') }}" maxlength="255" autocomplete="email" required class="@error('applicant_email') is-invalid @enderror">@error('applicant_email')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="field field-half"><label for="applicant_phone">UK Mobile Number <b>*</b></label><input type="tel" id="applicant_phone" name="applicant_phone" value="{{ old('applicant_phone') }}" data-uk-mobile maxlength="16" placeholder="07123 456789" autocomplete="tel" required class="@error('applicant_phone') is-invalid @enderror">@error('applicant_phone')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="field field-full"><label for="uk_address_for_service">UK Address for Service <b>*</b></label><textarea id="uk_address_for_service" name="uk_address_for_service" rows="3" maxlength="1000" required class="@error('uk_address_for_service') is-invalid @enderror">{{ old('uk_address_for_service') }}</textarea><small>This must be a UK, Gibraltar or Channel Islands address where UKIPO correspondence can be received.</small>@error('uk_address_for_service')<div class="field-error">{{ $message }}</div>@enderror</div>
+                        </div>
+                        <div class="step-actions"><a href="{{ route('dashboard') }}" class="button-secondary">Back</a><button type="button" class="button-primary" data-next="2">Continue</button></div>
+                    </section>
+
+                    <section class="form-step" data-step="2">
+                        <div class="step-heading"><span>02</span><div><h2>Authorised person</h2><p>Who may approve the final application and authorise filing for the applicant?</p></div></div>
+                        <div class="form-grid">
+                            <div class="field field-half"><label for="authorised_person_name">Full Name <b>*</b></label><input id="authorised_person_name" name="authorised_person_name" value="{{ old('authorised_person_name') }}" required maxlength="255" class="@error('authorised_person_name') is-invalid @enderror">@error('authorised_person_name')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="field field-half"><label for="authorised_person_position">Position or Capacity <b>*</b></label><select id="authorised_person_position" name="authorised_person_position" required class="@error('authorised_person_position') is-invalid @enderror"><option value="">Select position or capacity</option>@foreach (config('uk_site.authorised_person_positions') as $value => $label)<option value="{{ $value }}" @selected(old('authorised_person_position') === $value)>{{ $label }}</option>@endforeach</select>@error('authorised_person_position')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="field field-half"><label for="authorised_person_email">Email Address <b>*</b></label><input type="email" id="authorised_person_email" name="authorised_person_email" value="{{ old('authorised_person_email') }}" required maxlength="255" class="@error('authorised_person_email') is-invalid @enderror">@error('authorised_person_email')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="field field-half"><label for="authorised_person_phone">UK Mobile Number <b>*</b></label><input type="tel" id="authorised_person_phone" name="authorised_person_phone" value="{{ old('authorised_person_phone') }}" data-uk-mobile required maxlength="16" placeholder="07123 456789" class="@error('authorised_person_phone') is-invalid @enderror">@error('authorised_person_phone')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="field field-full checkbox-field"><label><input type="checkbox" name="authority_confirmed" value="1" required @checked(old('authority_confirmed'))><span>I confirm that this person has authority to act for the applicant. <b>*</b></span></label>@error('authority_confirmed')<div class="field-error">{{ $message }}</div>@enderror</div>
+                        </div>
+                        <div class="step-actions"><button type="button" class="button-secondary" data-prev="1">Back</button><button type="button" class="button-primary" data-next="3">Continue</button></div>
+                    </section>
+
+                    <section class="form-step" data-step="3">
+                        <div class="step-heading"><span>03</span><div><h2>Joint applicants</h2><p>Add another owner only where the trade mark will be jointly owned.</p></div></div>
+                        <div class="form-grid">
+                            <div class="field field-full choice-row"><span>Are there joint applicants? <b>*</b></span><label><input type="radio" name="joint_applicants" value="no" @checked($oldJointApplicants === 'no') required> No</label><label><input type="radio" name="joint_applicants" value="yes" @checked($oldJointApplicants === 'yes') required> Yes</label>@error('joint_applicants')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="conditional-fields field-full" data-joint-fields @if ($oldJointApplicants !== 'yes') hidden @endif>
+                                <div class="form-grid compact-grid">
+                                    <div class="field field-half"><label for="additional_applicant_type">Applicant Type <b>*</b></label><select id="additional_applicant_type" name="additional_applicant_type" class="@error('additional_applicant_type') is-invalid @enderror"><option value="">Select applicant type</option>@foreach (['individual' => 'Individual', 'limited_company' => 'Limited company', 'llp' => 'Limited liability partnership', 'partnership' => 'Partnership', 'charity' => 'Charity', 'other' => 'Other'] as $value => $label)<option value="{{ $value }}" @selected(old('additional_applicant_type') === $value)>{{ $label }}</option>@endforeach</select>@error('additional_applicant_type')<div class="field-error">{{ $message }}</div>@enderror</div>
+                                    <div class="field field-half"><label for="additional_applicant_name">Legal Name <b>*</b></label><input id="additional_applicant_name" name="additional_applicant_name" value="{{ old('additional_applicant_name') }}" maxlength="255" class="@error('additional_applicant_name') is-invalid @enderror">@error('additional_applicant_name')<div class="field-error">{{ $message }}</div>@enderror</div>
+                                    <div class="field field-half"><label for="additional_company_number">Company Registration Number <span>Where applicable</span></label><input id="additional_company_number" name="additional_company_number" value="{{ old('additional_company_number') }}" maxlength="40"></div>
+                                    <div class="field field-half"><label for="additional_applicant_email">Email Address <b>*</b></label><input type="email" id="additional_applicant_email" name="additional_applicant_email" value="{{ old('additional_applicant_email') }}" maxlength="255" class="@error('additional_applicant_email') is-invalid @enderror">@error('additional_applicant_email')<div class="field-error">{{ $message }}</div>@enderror</div>
+                                    <div class="field field-half"><label for="additional_applicant_phone">UK Mobile Number <b>*</b></label><input type="tel" id="additional_applicant_phone" name="additional_applicant_phone" value="{{ old('additional_applicant_phone') }}" data-uk-mobile maxlength="16" placeholder="07123 456789" class="@error('additional_applicant_phone') is-invalid @enderror">@error('additional_applicant_phone')<div class="field-error">{{ $message }}</div>@enderror</div>
+                                    <div class="field field-full"><label for="additional_applicant_address">Address <b>*</b></label><textarea id="additional_applicant_address" name="additional_applicant_address" rows="3" maxlength="500" class="@error('additional_applicant_address') is-invalid @enderror">{{ old('additional_applicant_address') }}</textarea>@error('additional_applicant_address')<div class="field-error">{{ $message }}</div>@enderror</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="step-actions"><button type="button" class="button-secondary" data-prev="2">Back</button><button type="button" class="button-primary" data-next="4">Continue</button></div>
+                    </section>
+
+                    <section class="form-step" data-step="4">
+                        <div class="step-heading"><span>04</span><div><h2>Trade mark and priority</h2><p>Describe the mark and the real business activities it will cover.</p></div></div>
+                        <div class="form-grid">
+                            <div class="field field-half"><label for="trademark_type">Mark Type <b>*</b></label><select id="trademark_type" name="trademark_type" required class="@error('trademark_type') is-invalid @enderror"><option value="">Select mark type</option>@foreach (['word' => 'Word mark', 'logo' => 'Logo mark', 'combined' => 'Combined word and logo mark', 'other' => 'Other'] as $value => $label)<option value="{{ $value }}" @selected(old('trademark_type') === $value)>{{ $label }}</option>@endforeach</select>@error('trademark_type')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="field field-half"><label for="mark_brand">Trade Mark Wording <b>*</b></label><input id="mark_brand" name="mark_brand" value="{{ old('mark_brand') }}" maxlength="255" required class="@error('mark_brand') is-invalid @enderror">@error('mark_brand')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="field field-half"><label for="trademark_language">Language <b>*</b></label><select id="trademark_language" name="trademark_language" required class="@error('trademark_language') is-invalid @enderror">@include('trademark.partials.language-options', ['selectedLanguage' => old('trademark_language', 'English')])</select>@error('trademark_language')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="field field-half"><label for="trademark_translation">Translation <span>Optional</span></label><input id="trademark_translation" name="trademark_translation" value="{{ old('trademark_translation') }}" maxlength="500" class="@error('trademark_translation') is-invalid @enderror">@error('trademark_translation')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="field field-half"><label for="trademark_image">Logo or Mark File <span>Optional</span></label><input type="file" id="trademark_image" name="trademark_image" accept="image/png,image/jpeg,image/webp" class="@error('trademark_image') is-invalid @enderror"><small>JPG, PNG or WEBP. Maximum 4 MB.</small>@error('trademark_image')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="field field-half"><label for="application_route">UKIPO Application Route <b>*</b></label><select id="application_route" name="application_route" required class="@error('application_route') is-invalid @enderror"><option value="standard" @selected(old('application_route', 'standard') === 'standard')>Standard</option><option value="right_start" @selected(old('application_route') === 'right_start')>Right Start</option></select>@error('application_route')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="field field-full"><label for="business_activities">Business Activities <b>*</b></label><textarea id="business_activities" name="business_activities" rows="4" maxlength="3000" required class="@error('business_activities') is-invalid @enderror">{{ old('business_activities') }}</textarea><small>Use plain language. The final legal goods and services specification will be prepared separately for your approval.</small>@error('business_activities')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="field field-half choice-row vertical-choice"><span>Is the mark currently in use? <b>*</b></span><label><input type="radio" name="currently_in_use" value="yes" @checked($oldUse === 'yes') required> Yes</label><label><input type="radio" name="currently_in_use" value="no" @checked($oldUse === 'no') required> No</label>@error('currently_in_use')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="field field-half" data-first-use @if ($oldUse !== 'yes') hidden @endif><label for="first_use_date">First-use Date <span>Optional</span></label><input type="date" id="first_use_date" name="first_use_date" value="{{ old('first_use_date') }}" max="{{ now()->toDateString() }}" class="@error('first_use_date') is-invalid @enderror">@error('first_use_date')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="field field-half"><label for="supporting_evidence">Supporting Evidence <span>Optional</span></label><input type="file" id="supporting_evidence" name="supporting_evidence" accept=".pdf,image/png,image/jpeg,image/webp" class="@error('supporting_evidence') is-invalid @enderror"><small>PDF, JPG, PNG or WEBP. Maximum 5 MB.</small>@error('supporting_evidence')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="field field-half"><label for="proposed_classes">Proposed Classes <span>Optional</span></label><input id="proposed_classes" name="proposed_classes" value="{{ old('proposed_classes') }}" maxlength="500" placeholder="e.g. 9, 35, 42" class="@error('proposed_classes') is-invalid @enderror">@error('proposed_classes')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="field field-full"><label for="special_limitations">Special Limitations <span>Optional</span></label><textarea id="special_limitations" name="special_limitations" rows="2" maxlength="1000" class="@error('special_limitations') is-invalid @enderror">{{ old('special_limitations') }}</textarea>@error('special_limitations')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="field field-full choice-row"><span>Was an earlier foreign application filed for this mark? <b>*</b></span><label><input type="radio" name="earlier_foreign_application" value="no" @checked($oldPriority === 'no') required> No</label><label><input type="radio" name="earlier_foreign_application" value="yes" @checked($oldPriority === 'yes') required> Yes</label>@error('earlier_foreign_application')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="conditional-fields field-full" data-priority-fields @if ($oldPriority !== 'yes') hidden @endif>
+                                <div class="form-grid compact-grid">
+                                    <div class="field field-half"><label for="priority_country">Priority Country <b>*</b></label><input id="priority_country" name="priority_country" value="{{ old('priority_country') }}" maxlength="100" class="@error('priority_country') is-invalid @enderror">@error('priority_country')<div class="field-error">{{ $message }}</div>@enderror</div>
+                                    <div class="field field-half"><label for="priority_application_number">Priority Application Number <b>*</b></label><input id="priority_application_number" name="priority_application_number" value="{{ old('priority_application_number') }}" maxlength="100" class="@error('priority_application_number') is-invalid @enderror">@error('priority_application_number')<div class="field-error">{{ $message }}</div>@enderror</div>
+                                    <div class="field field-half"><label for="priority_filing_date">Priority Filing Date <b>*</b></label><input type="date" id="priority_filing_date" name="priority_filing_date" value="{{ old('priority_filing_date') }}" max="{{ now()->toDateString() }}" class="@error('priority_filing_date') is-invalid @enderror">@error('priority_filing_date')<div class="field-error">{{ $message }}</div>@enderror</div>
+                                    <div class="field field-half"><label for="priority_earlier_applicant">Earlier Applicant <b>*</b></label><input id="priority_earlier_applicant" name="priority_earlier_applicant" value="{{ old('priority_earlier_applicant') }}" maxlength="255" class="@error('priority_earlier_applicant') is-invalid @enderror">@error('priority_earlier_applicant')<div class="field-error">{{ $message }}</div>@enderror</div>
+                                    <div class="field field-half"><label for="priority_document">Priority Document <span>Optional</span></label><input type="file" id="priority_document" name="priority_document" accept=".pdf,image/png,image/jpeg,image/webp" class="@error('priority_document') is-invalid @enderror">@error('priority_document')<div class="field-error">{{ $message }}</div>@enderror</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="step-actions"><button type="button" class="button-secondary" data-prev="3">Back</button><button type="button" class="button-primary" data-next="5">Continue</button></div>
+                    </section>
+
+                    <section class="form-step" data-step="5">
+                        <div class="step-heading"><span>05</span><div><h2>Billing details</h2><p>These details will be used for invoices and payment correspondence.</p></div></div>
+                        <div class="form-grid">
+                            <div class="field field-half"><label for="billing_name">Billing Name <b>*</b></label><input id="billing_name" name="billing_name" value="{{ old('billing_name', auth()->user()->name ?? '') }}" maxlength="255" required class="@error('billing_name') is-invalid @enderror">@error('billing_name')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="field field-half"><label for="billing_email">Billing Email <b>*</b></label><input type="email" id="billing_email" name="billing_email" value="{{ old('billing_email', auth()->user()->email ?? '') }}" maxlength="255" required class="@error('billing_email') is-invalid @enderror">@error('billing_email')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="field field-half"><label for="billing_mobile">Billing Phone <b>*</b></label><input type="tel" id="billing_mobile" name="billing_mobile" value="{{ old('billing_mobile') }}" data-uk-mobile maxlength="16" placeholder="07123 456789" required class="@error('billing_mobile') is-invalid @enderror">@error('billing_mobile')<div class="field-error">{{ $message }}</div>@enderror</div>
+                            <div class="field field-full"><label for="billing_address">Billing Address <b>*</b></label><textarea id="billing_address" name="billing_address" rows="3" maxlength="500" required class="@error('billing_address') is-invalid @enderror">{{ old('billing_address') }}</textarea>@error('billing_address')<div class="field-error">{{ $message }}</div>@enderror</div>
+                        </div>
+                        <div class="fee-note"><strong>Professional fee: @if ($hasOffer)<s>£{{ number_format($applicationAmount, 0) }}</s> £{{ number_format($offerAmount, 0) }}@else £{{ number_format($applicationAmount, 0) }}@endif</strong><span>UKIPO official fees are shown separately and are not included unless expressly stated.</span></div>
+                        <div class="step-actions"><button type="button" class="button-secondary" data-prev="4">Back</button><button type="submit" class="button-primary">Continue to payment</button></div>
+                    </section>
+                </form>
+            </section>
         </div>
-
-        <div class="row justify-content-center">
-            <div class="col-lg-10">
-                <div class="card">
-                    <div class="card-header">
-                        <h2>Trademark Filing in India</h2>
-                        <small>Complete all 5 steps before moving to payment</small>
-                    </div>
-                    <div class="card-body">
-                        <form action="{{ route('trademark.store') }}" method="POST" enctype="multipart/form-data" id="multiStepTrademarkForm">
-                            @csrf
-
-                            <div class="section-block form-step" data-step="5">
-                                <div class="section-title-row">
-                                    <span class="section-step">E.</span>
-                                    <h5>Billing Company Details</h5>
-                                </div>
-
-                                <div class="row g-4">
-                                    <div class="col-md-6">
-                                        <label for="billing_name" class="form-label required">Billing Name</label>
-                                        <input type="text" id="billing_name" name="billing_name"
-                                            class="form-control @error('billing_name') is-invalid @enderror"
-                                            value="{{ old('billing_name', auth()->user()->name ?? '') }}" required>
-                                        @error('billing_name')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="billing_email" class="form-label required">Email ID</label>
-                                        <input type="email" id="billing_email" name="billing_email"
-                                            class="form-control @error('billing_email') is-invalid @enderror"
-                                            value="{{ old('billing_email', auth()->user()->email ?? '') }}" required>
-                                        @error('billing_email')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-8">
-                                        <label for="billing_address" class="form-label required">Billing Address</label>
-                                        <textarea id="billing_address" name="billing_address" rows="3"
-                                            class="form-control @error('billing_address') is-invalid @enderror" required>{{ old('billing_address') }}</textarea>
-                                        @error('billing_address')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label for="billing_mobile" class="form-label required">Mobile Number</label>
-                                        <input type="text" id="billing_mobile" name="billing_mobile"
-                                            class="form-control @error('billing_mobile') is-invalid @enderror"
-                                            value="{{ old('billing_mobile') }}" inputmode="numeric" maxlength="10"
-                                            pattern="[6789][0-9]{9}" title="Enter a 10-digit Indian mobile number"
-                                            oninput="this.value = this.value.replace(/\D/g, '').slice(0, 10)" required>
-                                        @error('billing_mobile')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="gst_number" class="form-label">GST Number</label>
-                                        <input type="text" id="gst_number" name="gst_number"
-                                            class="form-control @error('gst_number') is-invalid @enderror"
-                                            value="{{ old('gst_number') }}" maxlength="15"
-                                            pattern="[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}"
-                                            title="Enter a valid GST number" oninput="this.value = this.value.toUpperCase()">
-                                        @error('gst_number')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                </div>
-
-                                <div class="step-actions">
-                                    <button type="button" class="btn btn-outline-secondary btn-lg prev-step-btn" data-prev-step="4">
-                                        <i class="bi bi-arrow-left" style="margin-right: 8px;"></i>Back to Step 4
-                                    </button>
-                                    <button type="submit" class="btn btn-primary btn-lg">
-                                        Continue to Payment<i class="bi bi-arrow-right" style="margin-left: 8px;"></i>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div class="section-block form-step active" data-step="1">
-                                <div class="section-title-row">
-                                    <span class="section-step">A.</span>
-                                    <h5>Trademark Applicant Details (Owner of the Trademark)</h5>
-                                </div>
-
-                                <div class="row g-4">
-                                    <div class="col-md-6">
-                                        <label for="applicant_name" class="form-label required">Applicant Name</label>
-                                        <input type="text" id="applicant_name" name="applicant_name"
-                                            class="form-control @error('applicant_name') is-invalid @enderror"
-                                            value="{{ old('applicant_name', auth()->user()->name ?? '') }}" required>
-                                        @error('applicant_name')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="applicant_email" class="form-label required">Email ID</label>
-                                        <input type="email" id="applicant_email" name="applicant_email"
-                                            class="form-control @error('applicant_email') is-invalid @enderror"
-                                            value="{{ old('applicant_email', auth()->user()->email ?? '') }}" required>
-                                        @error('applicant_email')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-12">
-                                        <label for="applicant_address" class="form-label required">Address of Applicant</label>
-                                        <textarea id="applicant_address" name="applicant_address" rows="3"
-                                            class="form-control @error('applicant_address') is-invalid @enderror" required>{{ old('applicant_address') }}</textarea>
-                                        @error('applicant_address')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label for="applicant_pincode" class="form-label required">Pin Code</label>
-                                        <input type="text" id="applicant_pincode" name="applicant_pincode"
-                                            class="form-control @error('applicant_pincode') is-invalid @enderror"
-                                            value="{{ old('applicant_pincode') }}" inputmode="numeric" maxlength="6"
-                                            pattern="[0-9]{6}" title="Enter a 6-digit pincode"
-                                            oninput="this.value = this.value.replace(/\D/g, '').slice(0, 6)" required>
-                                        @error('applicant_pincode')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label for="applicant_state" class="form-label required">State</label>
-                                        <select id="applicant_state" name="applicant_state"
-                                            class="form-select @error('applicant_state') is-invalid @enderror"
-                                            data-selected="{{ old('applicant_state') }}" required>
-                                            <option value="{{ old('applicant_state') }}">{{ old('applicant_state') ?: 'Enter pincode first' }}</option>
-                                        </select>
-                                        @error('applicant_state')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label for="applicant_district" class="form-label required">District</label>
-                                        <select id="applicant_district" name="applicant_district"
-                                            class="form-select @error('applicant_district') is-invalid @enderror"
-                                            data-selected="{{ old('applicant_district') }}" required>
-                                            <option value="{{ old('applicant_district') }}">{{ old('applicant_district') ?: 'Enter pincode first' }}</option>
-                                        </select>
-                                        @error('applicant_district')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="applicant_phone" class="form-label required">Mobile Number</label>
-                                        <input type="text" id="applicant_phone" name="applicant_phone"
-                                            class="form-control @error('applicant_phone') is-invalid @enderror"
-                                            value="{{ old('applicant_phone') }}" inputmode="numeric" maxlength="10"
-                                            pattern="[6789][0-9]{9}" title="Enter a 10-digit Indian mobile number"
-                                            oninput="this.value = this.value.replace(/\D/g, '').slice(0, 10)" required>
-                                        @error('applicant_phone')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="type_of_applicant" class="form-label required">Type of Applicant</label>
-                                        <select id="type_of_applicant" name="type_of_applicant"
-                                            class="form-select @error('type_of_applicant') is-invalid @enderror" required>
-                                            <option value="">Select applicant type</option>
-                                            <option value="individual"
-                                                {{ old('type_of_applicant') === 'individual' ? 'selected' : '' }}>
-                                                Individual / Proprietor / Trader</option>
-                                            <option value="company"
-                                                {{ old('type_of_applicant') === 'company' ? 'selected' : '' }}>
-                                                Company</option>
-                                            <option value="llp"
-                                                {{ old('type_of_applicant') === 'llp' ? 'selected' : '' }}>LLP
-                                            </option>
-                                            <option value="ngo"
-                                                {{ old('type_of_applicant') === 'ngo' ? 'selected' : '' }}>NGO
-                                            </option>
-                                            <option value="small_enterprise"
-                                                {{ old('type_of_applicant') === 'small_enterprise' ? 'selected' : '' }}>
-                                                Small Enterprise</option>
-                                            <option value="startup"
-                                                {{ old('type_of_applicant') === 'startup' ? 'selected' : '' }}>Startup
-                                            </option>
-                                        </select>
-                                        <div class="alert alert-warning mt-3 mb-0 py-2 px-3 small fw-semibold">
-                                            Fees vary based on applicant type. Please select the appropriate category for your trademark application.
-                                        </div>
-                                        @error('type_of_applicant')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                </div>
-
-                                <div class="step-actions">
-                                    <a href="{{ route('dashboard') }}" class="btn btn-outline-secondary btn-lg">
-                                        <i class="bi bi-arrow-left" style="margin-right: 8px;"></i>Back
-                                    </a>
-                                    <button type="button" class="btn btn-primary btn-lg next-step-btn" data-next-step="2">
-                                        Continue to Step 2<i class="bi bi-arrow-right" style="margin-left: 8px;"></i>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div class="section-block form-step" data-step="2">
-                                <div class="section-title-row">
-                                    <span class="section-step">B.</span>
-                                    <h5>Details of Signatory (Director, Partner, Authorised Signatory) (if any)</h5>
-                                </div>
-                                <div class="signatory-owner-note d-none" data-signatory-owner-note>
-                                    <i class="bi bi-info-circle-fill"></i>
-                                    <span><strong>Individual / Proprietor / Trader:</strong> The signatory person is the owner of the business.</span>
-                                </div>
-
-                                <div class="row g-4">
-                                    <div class="col-md-6">
-                                        <label for="signatory_name" class="form-label required">Name of Signatory</label>
-                                        <input type="text" id="signatory_name" name="signatory_name"
-                                            class="form-control @error('signatory_name') is-invalid @enderror"
-                                            value="{{ old('signatory_name') }}" required>
-                                        @error('signatory_name')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="signatory_father_name" class="form-label required">Father's Name</label>
-                                        <input type="text" id="signatory_father_name" name="signatory_father_name"
-                                            class="form-control @error('signatory_father_name') is-invalid @enderror"
-                                            value="{{ old('signatory_father_name') }}" required>
-                                        @error('signatory_father_name')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-12">
-                                        <label for="signatory_address" class="form-label required">Address of
-                                            AR/Signatory</label>
-                                        <textarea id="signatory_address" name="signatory_address" rows="3"
-                                            class="form-control @error('signatory_address') is-invalid @enderror" required>{{ old('signatory_address') }}</textarea>
-                                        @error('signatory_address')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label for="signatory_pincode" class="form-label required">Pin Code</label>
-                                        <input type="text" id="signatory_pincode" name="signatory_pincode"
-                                            class="form-control @error('signatory_pincode') is-invalid @enderror"
-                                            value="{{ old('signatory_pincode') }}" inputmode="numeric" maxlength="6"
-                                            pattern="[0-9]{6}" title="Enter a 6-digit pincode"
-                                            oninput="this.value = this.value.replace(/\D/g, '').slice(0, 6)" required>
-                                        @error('signatory_pincode')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label for="signatory_state" class="form-label required">State</label>
-                                        <select id="signatory_state" name="signatory_state"
-                                            class="form-select @error('signatory_state') is-invalid @enderror"
-                                            data-selected="{{ old('signatory_state') }}" required>
-                                            <option value="{{ old('signatory_state') }}">{{ old('signatory_state') ?: 'Enter pincode first' }}</option>
-                                        </select>
-                                        @error('signatory_state')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label for="signatory_district" class="form-label required">District</label>
-                                        <select id="signatory_district" name="signatory_district"
-                                            class="form-select @error('signatory_district') is-invalid @enderror"
-                                            data-selected="{{ old('signatory_district') }}" required>
-                                            <option value="{{ old('signatory_district') }}">{{ old('signatory_district') ?: 'Enter pincode first' }}</option>
-                                        </select>
-                                        @error('signatory_district')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="signatory_phone" class="form-label">Mobile Number</label>
-                                        <input type="text" id="signatory_phone" name="signatory_phone"
-                                            class="form-control @error('signatory_phone') is-invalid @enderror"
-                                            value="{{ old('signatory_phone') }}" inputmode="numeric" maxlength="10"
-                                            pattern="[6789][0-9]{9}" title="Enter a 10-digit Indian mobile number"
-                                            oninput="this.value = this.value.replace(/\D/g, '').slice(0, 10)">
-                                        @error('signatory_phone')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="signatory_email" class="form-label">Email ID</label>
-                                        <input type="email" id="signatory_email" name="signatory_email"
-                                            class="form-control @error('signatory_email') is-invalid @enderror"
-                                            value="{{ old('signatory_email') }}">
-                                        @error('signatory_email')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="signatory_designation" class="form-label required">Designation of
-                                            Signatory</label>
-                                        <select id="signatory_designation" name="signatory_designation"
-                                            class="form-select @error('signatory_designation') is-invalid @enderror"
-                                            required>
-                                            <option value="">Select designation</option>
-                                            <option value="director"
-                                                {{ old('signatory_designation') === 'director' ? 'selected' : '' }}>
-                                                Director</option>
-                                            <option value="partner"
-                                                {{ old('signatory_designation') === 'partner' ? 'selected' : '' }}>Partner
-                                            </option>
-                                            <option value="proprietor"
-                                                {{ old('signatory_designation') === 'proprietor' ? 'selected' : '' }}>
-                                                Proprietor / Individual / Trader</option>
-                                            <option value="authorised_signatory"
-                                                {{ old('signatory_designation') === 'authorised_signatory' ? 'selected' : '' }}>
-                                                Authorised Signatory</option>
-                                        </select>
-                                        @error('signatory_designation')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                </div>
-
-                                <div class="step-actions">
-                                    <button type="button" class="btn btn-outline-secondary btn-lg prev-step-btn" data-prev-step="1">
-                                        <i class="bi bi-arrow-left" style="margin-right: 8px;"></i>Back to Step 1
-                                    </button>
-                                    <button type="button" class="btn btn-primary btn-lg next-step-btn" data-next-step="3">
-                                        Continue to Step 3<i class="bi bi-arrow-right" style="margin-left: 8px;"></i>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div class="section-block form-step" data-step="3">
-                                <div class="section-title-row">
-                                    <span class="section-step">C.</span>
-                                    <h5>Details of Co-Applicant/Joint Applicant or Partners</h5>
-                                </div>
-
-                                <div class="row g-4">
-                                    <div class="col-md-6">
-                                        <label for="co_applicant_name" class="form-label">Name of Co-applicant / Partner</label>
-                                        <input type="text" id="co_applicant_name" name="co_applicant_name"
-                                            class="form-control @error('co_applicant_name') is-invalid @enderror"
-                                            value="{{ old('co_applicant_name') }}">
-                                        @error('co_applicant_name')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="co_applicant_father_name" class="form-label">Father's Name</label>
-                                        <input type="text" id="co_applicant_father_name" name="co_applicant_father_name"
-                                            class="form-control @error('co_applicant_father_name') is-invalid @enderror"
-                                            value="{{ old('co_applicant_father_name') }}">
-                                        @error('co_applicant_father_name')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-12">
-                                        <label for="co_applicant_address" class="form-label">Address</label>
-                                        <textarea id="co_applicant_address" name="co_applicant_address" rows="3"
-                                            class="form-control @error('co_applicant_address') is-invalid @enderror">{{ old('co_applicant_address') }}</textarea>
-                                        @error('co_applicant_address')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label for="co_applicant_pincode" class="form-label">Pin Code</label>
-                                        <input type="text" id="co_applicant_pincode" name="co_applicant_pincode"
-                                            class="form-control @error('co_applicant_pincode') is-invalid @enderror"
-                                            value="{{ old('co_applicant_pincode') }}" inputmode="numeric" maxlength="6"
-                                            pattern="[0-9]{6}" title="Enter a 6-digit pincode"
-                                            oninput="this.value = this.value.replace(/\D/g, '').slice(0, 6)">
-                                        @error('co_applicant_pincode')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label for="co_applicant_state" class="form-label">State</label>
-                                        <select id="co_applicant_state" name="co_applicant_state"
-                                            class="form-select @error('co_applicant_state') is-invalid @enderror"
-                                            data-selected="{{ old('co_applicant_state') }}">
-                                            <option value="{{ old('co_applicant_state') }}">{{ old('co_applicant_state') ?: 'Enter pincode first' }}</option>
-                                        </select>
-                                        @error('co_applicant_state')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label for="co_applicant_district" class="form-label">District</label>
-                                        <select id="co_applicant_district" name="co_applicant_district"
-                                            class="form-select @error('co_applicant_district') is-invalid @enderror"
-                                            data-selected="{{ old('co_applicant_district') }}">
-                                            <option value="{{ old('co_applicant_district') }}">{{ old('co_applicant_district') ?: 'Enter pincode first' }}</option>
-                                        </select>
-                                        @error('co_applicant_district')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="co_applicant_mobile" class="form-label">Mobile Number</label>
-                                        <input type="text" id="co_applicant_mobile" name="co_applicant_mobile"
-                                            class="form-control @error('co_applicant_mobile') is-invalid @enderror"
-                                            value="{{ old('co_applicant_mobile') }}" inputmode="numeric" maxlength="10"
-                                            pattern="[6789][0-9]{9}" title="Enter a 10-digit Indian mobile number"
-                                            oninput="this.value = this.value.replace(/\D/g, '').slice(0, 10)">
-                                        @error('co_applicant_mobile')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="co_applicant_email" class="form-label">Email ID</label>
-                                        <input type="email" id="co_applicant_email" name="co_applicant_email"
-                                            class="form-control @error('co_applicant_email') is-invalid @enderror"
-                                            value="{{ old('co_applicant_email') }}">
-                                        @error('co_applicant_email')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="co_applicant_designation" class="form-label">Designation</label>
-                                        <select id="co_applicant_designation" name="co_applicant_designation"
-                                            class="form-select @error('co_applicant_designation') is-invalid @enderror">
-                                            <option value="">Select designation</option>
-                                            <option value="co_applicant"
-                                                {{ old('co_applicant_designation') === 'co_applicant' ? 'selected' : '' }}>
-                                                Co-applicant</option>
-                                            <option value="partner"
-                                                {{ old('co_applicant_designation') === 'partner' ? 'selected' : '' }}>
-                                                Partner</option>
-                                        </select>
-                                        @error('co_applicant_designation')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                </div>
-
-                                <div class="step-actions">
-                                    <button type="button" class="btn btn-outline-secondary btn-lg prev-step-btn" data-prev-step="2">
-                                        <i class="bi bi-arrow-left" style="margin-right: 8px;"></i>Back to Step 2
-                                    </button>
-                                    <button type="button" class="btn btn-primary btn-lg next-step-btn" data-next-step="4">
-                                        Continue to Step 4<i class="bi bi-arrow-right" style="margin-left: 8px;"></i>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div class="section-block form-step" data-step="4">
-                                <div class="section-title-row">
-                                    <span class="section-step">D.</span>
-                                    <h5>Trademark Details</h5>
-                                </div>
-
-                                <div class="row g-4">
-                                    <div class="col-md-6">
-                                        <label for="trademark_type" class="form-label required">Select the Type of Trademark</label>
-                                        <select id="trademark_type" name="trademark_type"
-                                            class="form-select @error('trademark_type') is-invalid @enderror" required>
-                                            <option value="">Select trademark type</option>
-                                            <option value="word" {{ old('trademark_type') === 'word' ? 'selected' : '' }}>Word</option>
-                                            <option value="device" {{ old('trademark_type') === 'device' ? 'selected' : '' }}>Device</option>
-                                            <option value="shape_of_goods" {{ old('trademark_type') === 'shape_of_goods' ? 'selected' : '' }}>Shape of Goods</option>
-                                            <option value="colour" {{ old('trademark_type') === 'colour' ? 'selected' : '' }}>Colour</option>
-                                            <option value="sound_mark" {{ old('trademark_type') === 'sound_mark' ? 'selected' : '' }}>Sound Mark</option>
-                                            <option value="three_dimensional" {{ old('trademark_type') === 'three_dimensional' ? 'selected' : '' }}>Three Dimensional</option>
-                                            <option value="taste_mark" {{ old('trademark_type') === 'taste_mark' ? 'selected' : '' }}>Taste Mark</option>
-                                            <option value="smell_mark" {{ old('trademark_type') === 'smell_mark' ? 'selected' : '' }}>Smell Mark</option>
-                                        </select>
-                                        @error('trademark_type')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="mark_brand" class="form-label required">Mark/Brand (in words)</label>
-                                        <input type="text" id="mark_brand" name="mark_brand"
-                                            class="form-control @error('mark_brand') is-invalid @enderror"
-                                            value="{{ old('mark_brand') }}" required>
-                                        @error('mark_brand')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="trademark_language" class="form-label required">Language of Trademark</label>
-                                        <select id="trademark_language" name="trademark_language"
-                                            class="form-select @error('trademark_language') is-invalid @enderror" required>
-                                            @include('trademark.partials.language-options', [
-                                                'selectedLanguage' => old('trademark_language'),
-                                            ])
-                                        </select>
-                                        @error('trademark_language')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-12">
-                                        <label for="trademark_origin_description" class="form-label">A Brief Description of the Origin of the Trademark</label>
-                                        <textarea id="trademark_origin_description" name="trademark_origin_description" rows="3"
-                                            class="form-control @error('trademark_origin_description') is-invalid @enderror">{{ old('trademark_origin_description') }}</textarea>
-                                        @error('trademark_origin_description')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-12">
-                                        <label for="mark_conditions" class="form-label">Conditions or Limitations to the Mark (if any)</label>
-                                        <textarea id="mark_conditions" name="mark_conditions" rows="2"
-                                            class="form-control @error('mark_conditions') is-invalid @enderror">{{ old('mark_conditions') }}</textarea>
-                                        @error('mark_conditions')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="trademark_image" class="form-label required">Image of the Trademark</label>
-                                        <input type="file" id="trademark_image" name="trademark_image"
-                                            class="form-control @error('trademark_image') is-invalid @enderror"
-                                            accept="image/png,image/jpeg,image/jpg,image/webp" required>
-                                        <small class="text-muted d-block mt-2">Allowed formats: JPG, PNG, WEBP. Max size: 4 MB.</small>
-                                        @error('trademark_image')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-12">
-                                        <label for="goods_services" class="form-label required">Goods or Services for which the TM is Used or Proposed to be Used</label>
-                                        <textarea id="goods_services" name="goods_services" rows="3"
-                                            class="form-control @error('goods_services') is-invalid @enderror" required>{{ old('goods_services') }}</textarea>
-                                        @error('goods_services')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="trade_description" class="form-label required">Trade Description</label>
-                                        <select id="trade_description" name="trade_description"
-                                            class="form-select @error('trade_description') is-invalid @enderror" required>
-                                            <option value="">Select trade description</option>
-                                            <option value="manufacturer" {{ old('trade_description') === 'manufacturer' ? 'selected' : '' }}>Manufacturer</option>
-                                            <option value="trader" {{ old('trade_description') === 'trader' ? 'selected' : '' }}>Trader</option>
-                                            <option value="service_provider" {{ old('trade_description') === 'service_provider' ? 'selected' : '' }}>Service Provider</option>
-                                        </select>
-                                        @error('trade_description')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="trademark_usage_status" class="form-label required">Use Date of Trademark</label>
-                                        <select id="trademark_usage_status" name="trademark_usage_status"
-                                            class="form-select @error('trademark_usage_status') is-invalid @enderror" required>
-                                            <option value="">Select usage status</option>
-                                            <option value="used" {{ old('trademark_usage_status') === 'used' ? 'selected' : '' }}>Used</option>
-                                            <option value="proposed" {{ old('trademark_usage_status') === 'proposed' ? 'selected' : '' }}>Proposed to be used</option>
-                                        </select>
-                                        @error('trademark_usage_status')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="trademark_use_date" class="form-label">Use Date of Trademark</label>
-                                        <input type="date" id="trademark_use_date" name="trademark_use_date"
-                                            class="form-control @error('trademark_use_date') is-invalid @enderror"
-                                            value="{{ old('trademark_use_date') }}">
-                                        @error('trademark_use_date')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="proof_of_use" class="form-label">Proof of Use of Trademark</label>
-                                        <input type="file" id="proof_of_use" name="proof_of_use"
-                                            class="form-control @error('proof_of_use') is-invalid @enderror"
-                                            accept=".pdf,image/png,image/jpeg,image/jpg,image/webp">
-                                        <small class="text-muted d-block mt-2">Allowed formats: PDF, JPG, PNG, WEBP. Max size: 5 MB.</small>
-                                        @error('proof_of_use')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="application_type" class="form-label required">Application Type</label>
-                                        <select id="application_type" name="application_type"
-                                            class="form-select @error('application_type') is-invalid @enderror" required>
-                                            <option value="">Select application type</option>
-                                            <option value="trademark" {{ old('application_type') === 'trademark' ? 'selected' : '' }}>Trademark</option>
-                                            <option value="certification" {{ old('application_type') === 'certification' ? 'selected' : '' }}>Certification</option>
-                                            <option value="collective" {{ old('application_type') === 'collective' ? 'selected' : '' }}>Collective</option>
-                                            <option value="series" {{ old('application_type') === 'series' ? 'selected' : '' }}>Series</option>
-                                        </select>
-                                        @error('application_type')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                </div>
-
-                                <div class="alert alert-info mt-4 mb-0">
-                                    <i class="bi bi-info-circle"></i>
-                                    <strong>Next Step:</strong> After submitting this form, you'll need to complete billing details and then proceed to payment.
-                                    @if ($showTrademarkFormOffer)
-                                        With offer {{ $trademarkFormCoupon->code }}, individual applicants pay from the
-                                        <span class="plan-price-old">₹{{ number_format($individualPlanAmount, 0) }}</span>
-                                        <strong class="plan-price-offer">₹{{ number_format($individualOfferAmount, 0) }}</strong>
-                                        plan and all other applicant types pay from the
-                                        <span class="plan-price-old">₹{{ number_format($otherApplicantPlanAmount, 0) }}</span>
-                                        <strong class="plan-price-offer">₹{{ number_format($otherApplicantOfferAmount, 0) }}</strong>
-                                        plan.
-                                    @else
-                                        Individual applicants pay from the ₹{{ number_format($individualPlanAmount, 0) }} plan and all other
-                                        applicant types pay from the ₹{{ number_format($otherApplicantPlanAmount, 0) }} plan.
-                                    @endif
-                                </div>
-
-                                <div class="step-actions">
-                                    <button type="button" class="btn btn-outline-secondary btn-lg prev-step-btn" data-prev-step="3">
-                                        <i class="bi bi-arrow-left" style="margin-right: 8px;"></i>Back to Step 3
-                                    </button>
-                                    <button type="button" class="btn btn-primary btn-lg next-step-btn" data-next-step="5">
-                                        Continue to Step 5<i class="bi bi-arrow-right" style="margin-left: 8px;"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    </main>
 
     <style>
-        .section-block + .section-block {
-            margin-top: 36px;
-        }
-
-        .plan-price-old {
-            color: #6c757d;
-            font-weight: 600;
-            margin: 0 3px;
-            text-decoration: line-through;
-            text-decoration-thickness: 2px;
-        }
-
-        .plan-price-offer {
-            color: #5546ea;
-            margin: 0 3px;
-            white-space: nowrap;
-        }
-
-        .form-step {
-            display: none;
-        }
-
-        .form-step.active {
-            display: block;
-        }
-
-        .section-title-row {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            margin-bottom: 24px;
-            padding-bottom: 14px;
-            border-bottom: 2px solid var(--border);
-        }
-
-        .section-step {
-            font-size: 1.8rem;
-            font-weight: 900;
-            color: var(--navy);
-            line-height: 1;
-        }
-
-        .section-title-row h5 {
-            margin: 0;
-            color: var(--navy);
-            font-weight: 800;
-        }
-
-        .signatory-owner-note:not(.d-none) {
-            display: flex;
-        }
-
-        .signatory-owner-note {
-            align-items: flex-start;
-            gap: 10px;
-            margin: -8px 0 22px;
-            padding: 14px 16px;
-            border: 1px solid rgba(42, 157, 143, 0.28);
-            border-left: 4px solid var(--teal);
-            border-radius: 10px;
-            background: rgba(42, 157, 143, 0.08);
-            color: #173f3a;
-            font-weight: 700;
-        }
-
-        .signatory-owner-note i {
-            color: var(--teal);
-            margin-top: 2px;
-        }
-
-        .step-actions {
-            display: flex;
-            justify-content: space-between;
-            gap: 16px;
-            margin-top: 30px;
-        }
-
-        .step-actions .btn {
-            min-width: 220px;
-        }
-
-        @media (max-width: 768px) {
-            .section-title-row {
-                align-items: flex-start;
-            }
-
-            .section-step {
-                font-size: 1.5rem;
-            }
-
-            .step-actions {
-                flex-direction: column;
-            }
-
-            .step-actions .btn {
-                width: 100%;
-            }
-        }
+        .uk-application-page{padding:52px 20px 80px;background:#f3f8fa;color:#0c2d52;min-height:100vh}.application-shell{width:min(1120px,100%);margin:auto}.application-heading{text-align:center;max-width:760px;margin:0 auto 34px}.application-kicker{display:inline-block;margin-bottom:10px;color:#087f73;font-size:.76rem;font-weight:800;letter-spacing:.16em}.application-heading h1{margin:0;font-size:clamp(2rem,4vw,3.25rem);font-weight:800;letter-spacing:-.04em}.application-heading p{margin:14px auto 0;color:#60748b;font-size:1rem;line-height:1.7}.form-progress{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:0 0 18px;padding:0;list-style:none}.form-progress li{display:flex;align-items:center;gap:10px;min-width:0;padding:13px 14px;border:1px solid #d9e6eb;border-radius:14px;background:#fff;color:#708195}.form-progress li span{display:grid;place-items:center;flex:0 0 34px;height:34px;border-radius:50%;background:#edf4f5;font-size:.72rem;font-weight:800}.form-progress li strong{overflow:hidden;font-size:.76rem;white-space:nowrap;text-overflow:ellipsis}.form-progress li.is-active,.form-progress li.is-complete{border-color:#8fd6ce;color:#075e57}.form-progress li.is-active span,.form-progress li.is-complete span{background:#0c9486;color:#fff}.application-card{padding:clamp(24px,4vw,48px);border:1px solid #d9e6eb;border-radius:24px;background:#fff;box-shadow:0 22px 60px rgba(10,45,75,.08)}.form-alert{display:flex;gap:8px;flex-direction:column;margin-bottom:24px;padding:14px 16px;border:1px solid #f5b8b4;border-radius:12px;background:#fff2f1;color:#9f2118}.form-step{display:none}.form-step.is-active{display:block}.step-heading{display:flex;gap:16px;align-items:flex-start;margin-bottom:30px;padding-bottom:20px;border-bottom:1px solid #e2ecef}.step-heading>span{display:grid;place-items:center;flex:0 0 48px;height:48px;border-radius:14px;background:#e5f5f2;color:#087f73;font-weight:900}.step-heading h2{margin:0 0 5px;font-size:1.55rem;font-weight:800}.step-heading p{margin:0;color:#6a7c90;font-size:.94rem}.form-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:22px 20px}.compact-grid{gap:20px}.field{min-width:0}.field-half{grid-column:span 6}.field-full{grid-column:1/-1}.field-postcode,.field-location{grid-column:span 3}.field label,.choice-row>span{display:block;margin-bottom:8px;color:#173657;font-size:.88rem;font-weight:750}.field label b,.choice-row b{color:#d92d20}.field label span{color:#7a8a9b;font-size:.72rem;font-weight:650}.field input:not([type=radio]):not([type=checkbox]),.field select,.field textarea{width:100%;min-height:48px;padding:11px 13px;border:1px solid #cbdbe2;border-radius:10px;background:#fff;color:#162f4c;font:inherit;outline:none;transition:border-color .2s,box-shadow .2s}.field textarea{resize:vertical}.field input[readonly]{background:#f1f5f7;color:#526579}.field input:focus,.field select:focus,.field textarea:focus{border-color:#12998c;box-shadow:0 0 0 3px rgba(18,153,140,.12)}.field small{display:block;margin-top:6px;color:#6d7e91;font-size:.75rem;line-height:1.5}.field .is-invalid{border-color:#d92d20!important;box-shadow:0 0 0 3px rgba(217,45,32,.08)!important}.field-error,.client-error{margin-top:6px;color:#b42318;font-size:.77rem;font-weight:700;line-height:1.4}.conditional-fields{padding:20px;border:1px solid #dce9ec;border-radius:14px;background:#f7fbfb}.postcode-control{display:grid;grid-template-columns:minmax(0,1fr) 94px;gap:7px}.postcode-control button{border:0;border-radius:10px;background:#0c9486;color:#fff;font-size:.71rem;font-weight:800}.postcode-control button:disabled{opacity:.65}.choice-row{display:flex;align-items:center;gap:22px;flex-wrap:wrap;padding:15px 17px;border:1px solid #dce7eb;border-radius:12px;background:#f9fbfc}.choice-row>span{margin:0 auto 0 0}.choice-row label{display:flex;align-items:center;gap:7px;margin:0}.choice-row input{accent-color:#0c9486}.checkbox-field label{display:flex;gap:10px;align-items:flex-start;padding:16px;border:1px solid #b9ded9;border-radius:12px;background:#f0faf8}.checkbox-field input{margin-top:3px;accent-color:#0c9486}.step-actions{display:flex;justify-content:space-between;gap:14px;margin-top:34px;padding-top:24px;border-top:1px solid #e4ecef}.button-primary,.button-secondary{display:inline-flex;align-items:center;justify-content:center;min-width:160px;min-height:48px;padding:11px 20px;border-radius:10px;font-size:.88rem;font-weight:800;text-decoration:none;cursor:pointer}.button-primary{border:1px solid #0b8d80;background:#0b8d80;color:#fff}.button-primary:hover{background:#08776d;color:#fff}.button-secondary{border:1px solid #b9cbd3;background:#fff;color:#173657}.fee-note{display:flex;justify-content:space-between;gap:20px;margin-top:28px;padding:18px;border-radius:14px;background:#eaf7f5;color:#18554f}.fee-note span{color:#57716e;font-size:.82rem}.fee-note s{color:#72827f}.form-step[hidden],.conditional-fields[hidden],[data-first-use][hidden]{display:none!important}
+        @media(max-width:900px){.uk-application-page{padding:34px 18px 64px}.form-progress{display:flex;overflow-x:auto;padding-bottom:5px}.form-progress li{flex:0 0 155px}.field-postcode,.field-location{grid-column:span 6}.application-card{border-radius:20px}.fee-note{flex-direction:column}}
+        @media(max-width:600px){.uk-application-page{padding:26px 14px 50px}.application-heading{margin-bottom:24px}.application-heading h1{font-size:2rem}.application-card{padding:22px 16px;border-radius:16px}.step-heading{gap:12px}.step-heading>span{flex-basis:42px;height:42px}.step-heading h2{font-size:1.3rem}.form-grid{grid-template-columns:1fr;gap:18px}.field-half,.field-full,.field-postcode,.field-location{grid-column:1}.conditional-fields{padding:15px}.step-actions{flex-direction:column-reverse}.button-primary,.button-secondary{width:100%}.choice-row{align-items:flex-start;gap:13px}.choice-row>span{width:100%}.fee-note{padding:15px}}
     </style>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const form = document.getElementById('multiStepTrademarkForm');
-            const steps = Array.from(document.querySelectorAll('.form-step'));
-            const indicators = Array.from(document.querySelectorAll('[data-step-indicator]'));
-            const trademarkImageInput = document.getElementById('trademark_image');
-            const proofOfUseInput = document.getElementById('proof_of_use');
-            const applicantTypeSelect = document.getElementById('type_of_applicant');
-            const signatoryOwnerNote = document.querySelector('[data-signatory-owner-note]');
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('ukTrademarkForm');
+            const steps = [...form.querySelectorAll('.form-step')];
+            const indicators = [...document.querySelectorAll('[data-step-indicator]')];
+            const ukMobilePattern = /^(?:\+44|0)7\d{9}$/;
+            const ukPostcodePattern = /^(?:GIR\s?0AA|[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2})$/i;
             let currentStep = 1;
-            const MB = 1024 * 1024;
-            const fileRules = [
-                { input: trademarkImageInput, maxBytes: 4 * MB, label: 'Trademark image' },
-                { input: proofOfUseInput, maxBytes: 5 * MB, label: 'Proof of use' },
-            ];
-            const pincodeLookups = ['applicant', 'signatory', 'co_applicant'];
-
-            function uniqueValues(values) {
-                return Array.from(new Set(values.filter(Boolean))).sort();
-            }
-
-            function setSelectOptions(select, values, selectedValue, placeholder) {
-                const selected = selectedValue && values.includes(selectedValue) ? selectedValue : values[0] || '';
-                select.innerHTML = '';
-
-                if (!values.length) {
-                    select.append(new Option(placeholder, ''));
-                    return;
-                }
-
-                values.forEach((value) => {
-                    select.append(new Option(value, value, false, value === selected));
-                });
-            }
-
-            function resetLocationFields(stateSelect, districtSelect, message = 'Enter pincode first') {
-                setSelectOptions(stateSelect, [], '', message);
-                setSelectOptions(districtSelect, [], '', message);
-            }
-
-            function setupPincodeLookup(prefix) {
-                const pincodeInput = document.getElementById(`${prefix}_pincode`);
-                const stateSelect = document.getElementById(`${prefix}_state`);
-                const districtSelect = document.getElementById(`${prefix}_district`);
-                let latestRequest = 0;
-
-                if (!pincodeInput || !stateSelect || !districtSelect) {
-                    return;
-                }
-
-                async function loadLocation() {
-                    const pincode = pincodeInput.value.replace(/\D/g, '').slice(0, 6);
-                    pincodeInput.value = pincode;
-
-                    if (pincode.length !== 6) {
-                        resetLocationFields(stateSelect, districtSelect);
-                        return;
-                    }
-
-                    const requestId = ++latestRequest;
-                    resetLocationFields(stateSelect, districtSelect, 'Loading...');
-
-                    try {
-                        const response = await fetch(`{{ url('/api/indian-postal-codes') }}/${pincode}`, {
-                            headers: {
-                                'Accept': 'application/json'
-                            }
-                        });
-                        const result = await response.json();
-
-                        if (requestId !== latestRequest) {
-                            return;
-                        }
-
-                        const states = result?.status === 'success' ? uniqueValues(result.states || []) : [];
-                        const districts = result?.status === 'success' ? uniqueValues(result.districts || []) : [];
-
-                        if (!states.length || !districts.length) {
-                            resetLocationFields(stateSelect, districtSelect, 'No location found');
-                            return;
-                        }
-
-                        setSelectOptions(stateSelect, states, stateSelect.dataset.selected, 'Select state');
-                        setSelectOptions(districtSelect, districts, districtSelect.dataset.selected, 'Select district');
-                        stateSelect.dataset.selected = stateSelect.value;
-                        districtSelect.dataset.selected = districtSelect.value;
-                    } catch (error) {
-                        resetLocationFields(stateSelect, districtSelect, 'Unable to fetch location');
-                    }
-                }
-
-                pincodeInput.addEventListener('input', loadLocation);
-                pincodeInput.addEventListener('blur', loadLocation);
-
-                if (pincodeInput.value.replace(/\D/g, '').length === 6) {
-                    loadLocation();
-                }
-            }
-
-            function updateStepper(step) {
-                indicators.forEach((indicator, index) => {
-                    const indicatorStep = index + 1;
-                    indicator.classList.remove('active', 'completed');
-
-                    if (indicatorStep < step) {
-                        indicator.classList.add('completed');
-                    } else if (indicatorStep === step) {
-                        indicator.classList.add('active');
-                    }
-                });
-            }
-
-            function showStep(step) {
-                currentStep = step;
-                steps.forEach((section) => {
-                    section.classList.toggle('active', Number(section.dataset.step) === step);
-                });
-                updateStepper(step);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            }
-
-            function validateCurrentStep() {
-                const activeStep = form.querySelector(`.form-step[data-step="${currentStep}"]`);
-                if (!activeStep) {
-                    return true;
-                }
-
-                const fields = Array.from(activeStep.querySelectorAll('input, select, textarea'));
-
-                for (const field of fields) {
-                    if (!field.checkValidity()) {
-                        field.reportValidity();
-                        return false;
-                    }
-                }
-
-                return true;
-            }
-
-            function validateFileSizes() {
-                for (const rule of fileRules) {
-                    const file = rule.input?.files?.[0];
-                    if (file && file.size > rule.maxBytes) {
-                        alert(`${rule.label} must be ${Math.round(rule.maxBytes / MB)} MB or smaller.`);
-                        rule.input.value = '';
-                        rule.input.focus();
-                        return false;
-                    }
-                }
-
-                return true;
-            }
-
-            document.querySelectorAll('.next-step-btn').forEach((button) => {
-                button.addEventListener('click', function() {
-                    if (!validateCurrentStep()) {
-                        return;
-                    }
-
-                    showStep(Number(this.dataset.nextStep));
-                });
-            });
-
-            document.querySelectorAll('.prev-step-btn').forEach((button) => {
-                button.addEventListener('click', function() {
-                    showStep(Number(this.dataset.prevStep));
-                });
-            });
-
-            form.addEventListener('submit', function(event) {
-                if (!validateCurrentStep() || !validateFileSizes()) {
-                    event.preventDefault();
-                }
-            });
-
-            function updateSignatoryOwnerNote() {
-                if (!applicantTypeSelect || !signatoryOwnerNote) {
-                    return;
-                }
-
-                signatoryOwnerNote.classList.toggle('d-none', applicantTypeSelect.value !== 'individual');
-            }
-
-            applicantTypeSelect?.addEventListener('change', updateSignatoryOwnerNote);
-            updateSignatoryOwnerNote();
-
-            pincodeLookups.forEach(setupPincodeLookup);
-            showStep(1);
+            const showStep = step => { currentStep=step; steps.forEach(item=>item.classList.toggle('is-active',Number(item.dataset.step)===step)); indicators.forEach(item=>{const number=Number(item.dataset.stepIndicator);item.classList.toggle('is-active',number===step);item.classList.toggle('is-complete',number<step)}); window.scrollTo({top:Math.max(0,document.querySelector('.application-card').offsetTop-100),behavior:'smooth'}) };
+            const labelFor = field => form.querySelector(`label[for="${field.id}"]`)?.textContent.replace('*','').replace(/Optional/g,'').trim() || 'This field';
+            const clearClientError = field => { field.classList.remove('is-invalid'); field.closest('.field')?.querySelector(`[data-client-error="${field.id}"]`)?.remove() };
+            const showClientError = (field,message) => { clearClientError(field); field.classList.add('is-invalid'); const error=document.createElement('div'); error.className='client-error'; error.dataset.clientError=field.id; error.textContent=message||field.validationMessage||`${labelFor(field)} is required.`; field.closest('.field')?.append(error) };
+            const validateMobile = field => { const compact=field.value.replace(/[\s()-]+/g,''); field.setCustomValidity(!compact||ukMobilePattern.test(compact)?'':'Enter a valid UK mobile number beginning with 07 or +44 7.') };
+            const validateStep = step => { const container=form.querySelector(`[data-step="${step}"]`); const fields=[...container.querySelectorAll('input,select,textarea')].filter(field=>!field.disabled&&!field.closest('[hidden]')); let firstInvalid=null; fields.forEach(field=>{if(field.matches('[data-uk-mobile]'))validateMobile(field);if(!field.checkValidity()){firstInvalid ||= field;showClientError(field,field.validationMessage||`${labelFor(field)} is required.`)}else clearClientError(field)});firstInvalid?.focus();return !firstInvalid };
+            form.querySelectorAll('[data-next]').forEach(button=>button.addEventListener('click',()=>{if(validateStep(currentStep))showStep(Number(button.dataset.next))}));
+            form.querySelectorAll('[data-prev]').forEach(button=>button.addEventListener('click',()=>showStep(Number(button.dataset.prev))));
+            form.querySelectorAll('input,select,textarea').forEach(field=>{field.addEventListener('input',()=>clearClientError(field));field.addEventListener('change',()=>clearClientError(field))});
+            form.querySelectorAll('[data-uk-mobile]').forEach(field=>{field.addEventListener('input',()=>validateMobile(field));field.addEventListener('blur',()=>validateMobile(field))});
+            const companyFields=document.querySelector('[data-company-fields]'); const toggleCompany=()=>{const visible=['limited_company','llp'].includes(document.getElementById('applicant_type').value);companyFields.hidden=!visible;companyFields.querySelectorAll('input').forEach(input=>input.required=visible)};document.getElementById('applicant_type').addEventListener('change',toggleCompany);toggleCompany();
+            const jointFields=document.querySelector('[data-joint-fields]');const jointRequired=['additional_applicant_type','additional_applicant_name','additional_applicant_address','additional_applicant_email','additional_applicant_phone'];const toggleJoint=()=>{const visible=form.querySelector('[name="joint_applicants"]:checked')?.value==='yes';jointFields.hidden=!visible;jointRequired.forEach(id=>document.getElementById(id).required=visible)};form.querySelectorAll('[name="joint_applicants"]').forEach(input=>input.addEventListener('change',toggleJoint));toggleJoint();
+            const priorityFields=document.querySelector('[data-priority-fields]');const priorityRequired=['priority_country','priority_application_number','priority_filing_date','priority_earlier_applicant'];const togglePriority=()=>{const visible=form.querySelector('[name="earlier_foreign_application"]:checked')?.value==='yes';priorityFields.hidden=!visible;priorityRequired.forEach(id=>document.getElementById(id).required=visible)};form.querySelectorAll('[name="earlier_foreign_application"]').forEach(input=>input.addEventListener('change',togglePriority));togglePriority();
+            const firstUse=document.querySelector('[data-first-use]');const toggleUse=()=>firstUse.hidden=form.querySelector('[name="currently_in_use"]:checked')?.value!=='yes';form.querySelectorAll('[name="currently_in_use"]').forEach(input=>input.addEventListener('change',toggleUse));toggleUse();
+            const postcode=document.getElementById('applicant_postcode');const status=document.getElementById('postcode_status');const lookupButton=document.querySelector('[data-postcode-lookup]');const lookupLabel=lookupButton.querySelector('[data-lookup-label]');
+            const loadPostcode=async focusOnError=>{const value=postcode.value.trim().toUpperCase().replace(/\s+/g,' ');postcode.value=value;if(!ukPostcodePattern.test(value)){status.textContent=value?'Enter a valid UK postcode, for example SW1A 1AA.':'Enter a UK postcode.';status.style.color='#b42318';postcode.setCustomValidity('Enter a valid UK postcode.');if(focusOnError)postcode.focus();return}lookupButton.disabled=true;lookupLabel.textContent='Wait';status.textContent='Finding address…';status.style.color='#60748b';try{const response=await fetch(`{{ url('/api/uk-postcodes') }}/${encodeURIComponent(value)}`,{headers:{Accept:'application/json'}});const result=await response.json();if(!response.ok||result.status!=='success')throw new Error(result.message||'Unable to find that postcode.');postcode.value=result.postcode;document.getElementById('applicant_nation').value=result.nation||'';document.getElementById('applicant_region').value=result.region||'';document.getElementById('applicant_town_city').value=result.town_city||'';document.getElementById('applicant_country').value='United Kingdom';postcode.setCustomValidity('');['applicant_nation','applicant_region','applicant_town_city'].forEach(id=>clearClientError(document.getElementById(id)));status.textContent=`Postcode found${result.nation?` · ${result.nation}`:''}${result.region?` · ${result.region}`:''}`;status.style.color='#087f73'}catch(error){postcode.setCustomValidity(error.message||'Unable to find that postcode.');status.textContent=error.message||'Unable to find that postcode.';status.style.color='#b42318'}finally{lookupButton.disabled=false;lookupLabel.textContent='Find address'}};
+            postcode.addEventListener('input',()=>{postcode.setCustomValidity('');['applicant_nation','applicant_region','applicant_town_city'].forEach(id=>document.getElementById(id).value='');status.textContent='UK postcodes only';status.style.color='#6d7e91'});lookupButton.addEventListener('click',()=>loadPostcode(true));postcode.addEventListener('blur',()=>{if(postcode.value.trim())loadPostcode(false)});
+            [['trademark_image',4],['supporting_evidence',5],['priority_document',5]].forEach(([id,maxMb])=>{const input=document.getElementById(id);input?.addEventListener('change',()=>input.setCustomValidity(input.files[0]?.size>maxMb*1024*1024?`File must not exceed ${maxMb} MB.`:''))});
+            form.addEventListener('submit',event=>{for(let step=1;step<=steps.length;step++){if(!validateStep(step)){event.preventDefault();showStep(step);return}}});
+            const firstServerError=form.querySelector('.is-invalid');if(firstServerError)showStep(Number(firstServerError.closest('.form-step')?.dataset.step||1));
         });
     </script>
 @endsection

@@ -47,7 +47,7 @@
                         <p>{{ $featuredPost->excerpt }}</p>
                         <div class="blog-meta">
                             <span><i class="bi bi-person"></i>{{ $featuredPost->author_name }}</span>
-                            <span><i class="bi bi-calendar3"></i>{{ $featuredPost->published_at->timezone('Asia/Kolkata')->format('d M Y') }}</span>
+                            <span><i class="bi bi-calendar3"></i>{{ $featuredPost->published_at->timezone(config('app.timezone', 'Europe/London'))->format('d M Y') }}</span>
                             <span><i class="bi bi-clock"></i>{{ $featuredPost->reading_time }} min read</span>
                         </div>
                     </div>
@@ -76,7 +76,7 @@
                             <h2>{{ $post->title }}</h2>
                             <p>{{ Str::limit($post->excerpt, 130) }}</p>
                             <div class="blog-meta">
-                                <span>{{ $post->published_at->timezone('Asia/Kolkata')->format('d M Y') }}</span>
+                                <span>{{ $post->published_at->timezone(config('app.timezone', 'Europe/London'))->format('d M Y') }}</span>
                                 <span>{{ $post->reading_time }} min read</span>
                             </div>
                         </div>

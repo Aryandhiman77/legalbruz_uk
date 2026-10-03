@@ -22,7 +22,6 @@ use App\Http\Controllers\ExaminationReportReplyController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PaymentController;
-use App\Http\Controllers\PostalCodeLookupController;
 use App\Http\Controllers\PublicPageController;
 use App\Http\Controllers\SeoController;
 use App\Http\Controllers\StuckTrademarkController;
@@ -30,18 +29,26 @@ use App\Http\Controllers\TrademarkController;
 use App\Http\Controllers\TrademarkOppositionController;
 use App\Http\Controllers\TrademarkProbabilityController;
 use App\Http\Controllers\TrademarkScraperController;
+use App\Http\Controllers\UkPostcodeLookupController;
 use App\Http\Controllers\UserDocumentController;
 use App\Http\Controllers\WorkflowController;
 use App\Models\CustomerReview;
+use App\Models\Faq;
 use App\Models\TrademarkPricing;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 Route::get('/', function () {
-    return view('home', [
+    $faqs = Schema::hasTable('faqs')
+        ? Faq::query()->published()->where('category', 'like', 'UK%')->orderBy('sort_order')->orderBy('id')->limit(6)->get()
+        : collect();
+
+    return view('home-uk', [
         'trademarkPricingPlans' => TrademarkPricing::activePlans(),
         'customerReviews' => CustomerReview::homepageReviews(),
+        'faqs' => $faqs,
     ]);
 })->name('landing');
 
@@ -76,11 +83,6 @@ Route::get('/storage/{path}', function (string $path) {
     return response()->file(Storage::disk('public')->path($path));
 })->where('path', '.*')->name('storage.public.view');
 
-// Flow Guide (Public)
-Route::get('/flow-guide', function () {
-    return view('flow-guide');
-})->name('flow-guide');
-
 // Coming Soon (Public)
 Route::get('/comming-soon', function () {
     return view('comming-soon');
@@ -106,11 +108,13 @@ Route::get('/blog/{blog:slug}', [BlogController::class, 'show'])->name('blog.sho
 Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('sitemap');
 Route::get('/robots.txt', [SeoController::class, 'robots'])->name('robots');
 
-Route::get('/services/trademark/filed-and-stuck', [StuckTrademarkController::class, 'landing'])->name('stuck-trademark.landing');
-Route::get('/services/trademark/opposition-management', function () {
-    return view('trademark.opposition-management');
-})->name('trademark.opposition-management');
-Route::get('/services/trademark/examination-report-reply', [ExaminationReportReplyController::class, 'landing'])->name('examination-reply.landing');
+Route::middleware('legacy.services')->group(function () {
+    Route::get('/services/trademark/filed-and-stuck', [StuckTrademarkController::class, 'landing'])->name('stuck-trademark.landing');
+    Route::get('/services/trademark/opposition-management', function () {
+        return view('trademark.opposition-management');
+    })->name('trademark.opposition-management');
+    Route::get('/services/trademark/examination-report-reply', [ExaminationReportReplyController::class, 'landing'])->name('examination-reply.landing');
+});
 
 // ADMIN LOGIN ROUTES (Public)
 Route::get('/admin/login', [AdminAuthController::class, 'showLoginForm'])->name('admin.login');
@@ -152,7 +156,9 @@ Route::middleware(['auth'])->group(function () {
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/dashboard/application/{id}', [DashboardController::class, 'showApplication'])->name('dashboard.application');
-    Route::get('/api/indian-postal-codes/{pincode}', [PostalCodeLookupController::class, 'show'])->name('postal-codes.show');
+    Route::get('/api/uk-postcodes/{postcode}', [UkPostcodeLookupController::class, 'show'])
+        ->middleware('throttle:30,1')
+        ->name('uk-postcodes.show');
 
     // Trademark Application Flow (Single Pre-Payment Form)
     Route::get('/trademark/type-selection', function () {
@@ -222,6 +228,7 @@ Route::middleware(['auth'])->group(function () {
     // Notifications
     Route::post('/api/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notification.mark-read');
 
+    Route::middleware('legacy.services')->group(function () {
     // Trademark Opposition Management - Flow A: Defend My Trademark
     Route::get('/trademark-opposition/defend/create', [TrademarkOppositionController::class, 'create'])->name('trademark-opposition.create');
     Route::post('/trademark-opposition/defend', [TrademarkOppositionController::class, 'storeBasic'])->name('trademark-opposition.store');
@@ -286,6 +293,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/trademark-objection-reply/{case}/payment/invoice', [ExaminationReportReplyController::class, 'viewPaymentInvoice'])->name('examination-reply.payment.invoice');
     Route::get('/trademark-objection-reply/documents/{document}/view', [ExaminationReportReplyController::class, 'viewDocument'])->name('examination-reply.document.view');
     Route::get('/trademark-objection-reply/documents/{document}/download', [ExaminationReportReplyController::class, 'downloadDocument'])->name('examination-reply.document.download');
+    });
 
 });
 
@@ -386,6 +394,7 @@ Route::middleware(['admin'])->prefix('admin')->group(function () {
     Route::post('/application/{id}/post-filing/{stage}', [AdminController::class, 'updatePostFilingStage'])->name('admin.post-filing.update-stage');
 
     // Payment Approval/Rejection
+    Route::get('/payment/{payment}/invoice', [PaymentController::class, 'viewAdminInvoice'])->name('admin.payment.invoice');
     Route::post('/payment/{id}/approve', [AdminController::class, 'approvePayment'])->name('admin.approve-payment');
     Route::post('/payment/{id}/reject', [AdminController::class, 'rejectPayment'])->name('admin.reject-payment');
     Route::get('/trademark/{id}/image/view', [TrademarkController::class, 'viewTrademarkImage'])->name('admin.trademark.image.view');
@@ -393,6 +402,7 @@ Route::middleware(['admin'])->prefix('admin')->group(function () {
     Route::get('/documents/{document}/view', [UserDocumentController::class, 'view'])->name('admin.document.view');
     Route::get('/documents/{document}/download', [UserDocumentController::class, 'download'])->name('admin.document.download');
 
+    Route::middleware('legacy.services')->group(function () {
     // Stuck / Delayed Trademark Recovery
     Route::get('/stuck-trademark-cases', [StuckTrademarkController::class, 'adminIndex'])->name('admin.stuck-trademark.index');
     Route::get('/trademark-opposition-cases', [TrademarkOppositionController::class, 'adminIndex'])->name('admin.trademark-opposition.index');
@@ -461,5 +471,6 @@ Route::middleware(['admin'])->prefix('admin')->group(function () {
     Route::post('/stuck-trademark-cases/{case}/execution/additional-action', [AdminTrademarkExecutionController::class, 'resolveAdditionalAction'])->name('admin.trademark-execution.additional-action');
     Route::post('/stuck-trademark-cases/{case}/monitoring-update', [AdminTrademarkExecutionController::class, 'submitMonitoringUpdate'])->name('admin.trademark-execution.monitoring-update');
     Route::post('/stuck-trademark-cases/{case}/resolution-report', [AdminTrademarkExecutionController::class, 'submitResolutionReport'])->name('admin.trademark-execution.resolution-report');
+    });
 
 });

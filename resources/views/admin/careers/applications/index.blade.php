@@ -48,7 +48,7 @@
                                         <td><strong>{{ $application->full_name }}</strong><br><small class="text-muted">{{ $application->email }}</small></td>
                                         <td>{{ $application->job->title }}</td>
                                         <td>{{ $application->years_experience !== null ? $application->years_experience.' years' : 'Not provided' }}</td>
-                                        <td><small>{{ $application->created_at->timezone('Asia/Kolkata')->format('d M Y, h:i A') }}</small></td>
+                                        <td><small>{{ $application->created_at->timezone(config('app.timezone', 'Europe/London'))->format('d M Y, h:i A T') }}</small></td>
                                         <td>
                                             <x-admin-status :status="$application->status" />
                                         </td>

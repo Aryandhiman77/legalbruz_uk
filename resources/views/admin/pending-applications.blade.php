@@ -89,7 +89,7 @@
                                             <small class="text-muted">{{ $app->user->email ?? 'N/A' }}</small>
                                         </td>
                                         <td>
-                                            <small>{{ $app->created_at->timezone('Asia/Kolkata')->format('M d, Y') }}</small>
+                                            <small>{{ $app->created_at->timezone(config('app.timezone', 'Europe/London'))->format('M d, Y') }}</small>
                                         </td>
                                         <td>
                                             @php

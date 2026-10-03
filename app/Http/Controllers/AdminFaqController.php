@@ -13,6 +13,7 @@ class AdminFaqController extends Controller
     public function index(Request $request): View
     {
         $faqs = Faq::query()
+            ->where('category', 'like', 'UK%')
             ->when($request->filled('status'), fn ($query) => $query->where(
                 'is_active',
                 $request->string('status')->toString() === 'published'
@@ -37,7 +38,7 @@ class AdminFaqController extends Controller
     {
         return view('admin.faqs.create', [
             'faq' => new Faq([
-                'category' => 'General',
+                'category' => 'UK Trade Marks',
                 'sort_order' => (Faq::max('sort_order') ?? 0) + 10,
                 'is_active' => true,
             ]),
@@ -87,6 +88,7 @@ class AdminFaqController extends Controller
         ]);
 
         $data['is_active'] = $request->boolean('is_active');
+        $data['category'] = 'UK Trade Marks';
 
         return $data;
     }

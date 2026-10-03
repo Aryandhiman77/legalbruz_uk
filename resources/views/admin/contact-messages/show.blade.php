@@ -5,7 +5,7 @@
         <div class="d-flex flex-wrap justify-content-between gap-3 mb-4">
             <div>
                 <h1 class="h3 mb-1" style="color:#1D3557;">{{ $contactMessage->service_interested ?: $contactMessage->subject }}</h1>
-                <p class="text-muted mb-0">Received {{ $contactMessage->created_at->timezone('Asia/Kolkata')->format('d M Y, h:i A') }}</p>
+                <p class="text-muted mb-0">Received {{ $contactMessage->created_at->timezone(config('app.timezone', 'Europe/London'))->format('d M Y, h:i A T') }}</p>
             </div>
             <a href="{{ route('admin.contact-messages.index') }}" class="btn btn-outline-secondary btn-sm align-self-start">Back to Inbox</a>
         </div>

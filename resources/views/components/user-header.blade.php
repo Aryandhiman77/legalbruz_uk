@@ -3,7 +3,7 @@
     <div class="container-fluid user-topbar-inner">
         <a class="user-brand" href="{{ route('home') }}">
             <span class="user-brand-logo">
-                <img src="{{ asset('logo.png') }}" alt="Legal Bruz (LLP) logo" class="navbar-logo">
+                <img src="{{ asset('legal-bruz-pvt-ltd-logo.png') }}" alt="Legal Bruz Pvt. Ltd. logo" class="navbar-logo">
             </span>
         </a>
 

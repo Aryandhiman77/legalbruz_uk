@@ -72,7 +72,7 @@
                 <tr>
                     <td>{{ $case->package_name ?: $defaultPackageName }}</td>
                     <td>{{ $case->transaction_id ?: ($case->payment_reference ?: 'N/A') }}</td>
-                    <td>{{ $case->paid_at?->timezone('Asia/Kolkata')->format('d M Y') }}</td>
+                    <td>{{ $case->paid_at?->timezone(config('app.timezone', 'Europe/London'))->format('d M Y') }}</td>
                     <td class="text-right">INR {{ number_format($paidAmount, 2) }}</td>
                 </tr>
             </tbody>

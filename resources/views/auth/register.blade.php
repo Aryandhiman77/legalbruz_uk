@@ -47,15 +47,15 @@
                     </div>
 
                     <div class="auth-field">
-                        <label for="mobile">Indian Mobile Number</label>
+                        <label for="mobile">UK Mobile Number</label>
                         <div class="auth-input-wrap">
                             <i class="bi bi-telephone auth-input-icon" aria-hidden="true"></i>
                             <input id="mobile" type="tel" class="auth-input @error('mobile') is-invalid @enderror"
-                                name="mobile" value="{{ old('mobile') }}" required inputmode="numeric" maxlength="13"
-                                autocomplete="tel-national" pattern="(?:(?:\+?91)|0)?[6-9][0-9]{9}"
-                                placeholder="9876543210" title="Enter a valid Indian mobile number">
+                                name="mobile" value="{{ old('mobile') }}" required inputmode="tel" maxlength="16"
+                                autocomplete="tel" pattern="(?:\+44 ?7|07)(?:[0-9] ?){9}"
+                                placeholder="07123 456789" title="Enter a valid UK mobile number">
                         </div>
-                        <small class="auth-help">Use a 10-digit Indian number beginning with 6, 7, 8, or 9.</small>
+                        <small class="auth-help">Use a UK mobile number beginning with 07 or +44 7.</small>
                         @error('mobile')<span class="auth-error" role="alert">{{ $message }}</span>@enderror
                     </div>
 

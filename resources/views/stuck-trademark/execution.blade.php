@@ -2,7 +2,7 @@
 
 @section('content')
     @php
-        $displayTimezone = 'Asia/Kolkata';
+        $displayTimezone = config('app.timezone', 'Europe/London');
         $visibleFinalReports = $case->executionDocuments
             ->where('document_type', 'Final report')
             ->values();

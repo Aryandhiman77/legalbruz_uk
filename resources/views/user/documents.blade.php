@@ -66,7 +66,7 @@
                             </h5>
                             <small>Trademark Application ID: #{{ $application->id }} • Application No:
                                 {{ $application->application_number ?? 'Awaiting assignment' }} •
-                                {{ $application->created_at->timezone('Asia/Kolkata')->format('d M Y') }}</small>
+                                {{ $application->created_at->timezone(config('app.timezone', 'Europe/London'))->format('d M Y') }}</small>
                         </div>
                         <div class="col-md-6 text-end">
                             <span class="badge bg-light text-dark">{{ $application->documents->count() }} Documents</span>
@@ -201,7 +201,7 @@
 
                                                 @if ($doc->verified_at)
                                                     <div class="alert alert-success alert-sm mt-2 mb-0" role="alert">
-                                                        ✔️ Verified on {{ $doc->verified_at->timezone('Asia/Kolkata')->format('d M Y') }}
+                                                        ✔️ Verified on {{ $doc->verified_at->timezone(config('app.timezone', 'Europe/London'))->format('d M Y') }}
                                                         @if ($doc->verification_notes)
                                                             <br><small>{{ $doc->verification_notes }}</small>
                                                         @endif

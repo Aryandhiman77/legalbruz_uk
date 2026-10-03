@@ -3,7 +3,7 @@
 @section('content')
     @php
         $workflow = \App\Support\TrademarkWorkflow::class;
-        $displayTimezone = 'Asia/Kolkata';
+        $displayTimezone = config('app.timezone', 'Europe/London');
         $formatDateTime = fn ($timestamp, string $format = 'd M Y') => $timestamp
             ? \Illuminate\Support\Carbon::parse($timestamp)->timezone($displayTimezone)->format($format)
             : null;
@@ -11,15 +11,29 @@
         $stageTitle = $stageLabels[$stage] ?? ucwords(strtolower(str_replace('_', ' ', $stage)));
         $details = $application->members_details ?? [];
         $submittedSections = [
-            'Billing Details' => $details['billing_company_details'] ?? [],
-            'Trademark Applicant Details' => $details['trademark_applicant_details'] ?? [],
-            'Signatory Details' => $details['details_of_signatory'] ?? [],
-            'Co-applicant / Partner Details' => $details['details_of_co_applicant_or_partners'] ?? [],
+            'Billing Details' => $details['billing_details'] ?? ($details['billing_company_details'] ?? []),
+            'Applicant Details' => $details['applicant_details'] ?? ($details['trademark_applicant_details'] ?? []),
+            'Authorised Person' => $details['authorised_person'] ?? ($details['details_of_signatory'] ?? []),
+            'Additional Applicants' => $details['additional_applicants'] ?? ($details['details_of_co_applicant_or_partners'] ?? []),
             'Trademark Details' => $details['trademark_details'] ?? [],
+            'Priority Details' => $details['priority_details'] ?? [],
         ];
         $formatSubmittedValue = function ($value) {
+            if (is_bool($value)) {
+                return $value ? 'Yes' : 'No';
+            }
+
             if (is_array($value)) {
-                return implode(', ', array_filter($value, fn ($item) => $item !== null && $item !== '')) ?: 'N/A';
+                return collect($value)->map(function ($item) {
+                    if (!is_array($item)) {
+                        return $item;
+                    }
+
+                    return collect($item)
+                        ->filter(fn ($nested) => $nested !== null && $nested !== '')
+                        ->map(fn ($nested, $key) => ucwords(str_replace('_', ' ', $key)).': '.(is_bool($nested) ? ($nested ? 'Yes' : 'No') : $nested))
+                        ->implode(', ');
+                })->filter()->implode('; ') ?: 'N/A';
             }
 
             return filled($value) ? $value : 'N/A';
@@ -28,10 +42,11 @@
             return match ($type) {
                 'engagement_letter' => 'Engagement Letter',
                 'engagement_letter (Signed)' => 'Signed Engagement Letter',
-                'poa' => 'Power of Attorney',
-                'poa (Signed)' => 'Signed Power of Attorney',
-                'affidavit' => 'Affidavit',
-                'affidavit (Signed)' => 'Affidavit (Signed)',
+                'application_summary' => 'Application Summary',
+                'final_specification' => 'Final Specification',
+                'filing_authority' => 'Filing Authority',
+                'filing_authority (Signed)' => 'Signed Filing Authority',
+                'ukipo_filing_receipt' => 'UKIPO Filing Receipt',
                 'search_report' => 'Search Report',
                 'draft_pdf' => 'Draft PDF',
                 'draft_pdf (Signed)' => 'Signed Draft PDF',
@@ -123,7 +138,7 @@
                                 <div><span>Trademark</span><strong>{{ $application->brand_name ?? 'N/A' }}</strong><em class="summary-mini-badge summary-mini-badge-teal">Mark</em></div>
                                 <div><span>Email</span><strong>{{ $application->email ?? auth()->user()->email }}</strong></div>
                                 <div><span>Phone</span><strong>{{ $application->phone ?? 'N/A' }}</strong></div>
-                                <div><span>Entity</span><strong>{{ $application->entity_type === 'individual' ? 'Individual / Proprietor / Trader' : ucfirst($application->entity_type ?? 'N/A') }}</strong><em class="summary-mini-badge summary-mini-badge-indigo">Type</em></div>
+                                <div><span>Applicant Type</span><strong>{{ ucwords(str_replace('_', ' ', data_get($details, 'applicant_details.applicant_type', $application->entity_type ?? 'N/A'))) }}</strong><em class="summary-mini-badge summary-mini-badge-indigo">Type</em></div>
                                 <div><span>Submitted</span><strong>{{ $formatDateTime($application->created_at) }}</strong></div>
                             </div>
 
@@ -147,10 +162,10 @@
                                                         @foreach ($sectionData as $field => $value)
                                                             <div class="stage-field">
                                                                 <span>{{ ucwords(str_replace('_', ' ', $field)) }}</span>
-                                                                @if ($field === 'image_of_trademark' && $value)
+                                                                @if (in_array($field, ['image_of_trademark', 'logo_mark_file'], true) && $value)
                                                                     <a href="{{ route('trademark.image.view', ['id' => $application->id, 'file' => base64_encode((string) $value)]) }}" target="_blank">View Trademark Image</a>
-                                                                @elseif ($field === 'proof_of_use_of_trademark' && $value)
-                                                                    <a href="{{ route('trademark.proof-of-use.view', ['id' => $application->id, 'file' => base64_encode((string) $value)]) }}" target="_blank">View Proof of Use</a>
+                                                                @elseif (in_array($field, ['proof_of_use_of_trademark', 'supporting_evidence', 'priority_document'], true) && $value)
+                                                                    <a href="{{ route('trademark.proof-of-use.view', ['id' => $application->id, 'file' => base64_encode((string) $value)]) }}" target="_blank">View Supporting Document</a>
                                                                 @else
                                                                     <strong>{{ $formatSubmittedValue($value) }}</strong>
                                                                 @endif

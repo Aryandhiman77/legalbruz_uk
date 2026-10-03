@@ -28,24 +28,132 @@
 @section('content')
     @php
         $workflow = \App\Support\TrademarkWorkflow::class;
-        $displayTimezone = 'Asia/Kolkata';
-        $formatDateTime = fn ($timestamp, string $format = 'd M Y, h:i A') => $timestamp
+        $displayTimezone = config('app.timezone', 'Europe/London');
+        $formatDateTime = fn ($timestamp, string $format = 'd M Y, h:i A T') => $timestamp
             ? \Illuminate\Support\Carbon::parse($timestamp)->timezone($displayTimezone)->format($format)
             : null;
         $details = $application->members_details ?? [];
+        $legacyBilling = $details['billing_company_details'] ?? [];
+        $legacyApplicant = $details['trademark_applicant_details'] ?? [];
+        $legacySignatory = $details['details_of_signatory'] ?? [];
+        $legacyAdditional = $details['details_of_co_applicant_or_partners'] ?? [];
+        $legacyTrademark = $details['trademark_details'] ?? [];
+        $billing = $details['billing_details'] ?? [
+            'billing_name' => data_get($legacyBilling, 'billing_name'),
+            'billing_email' => data_get($legacyBilling, 'billing_email'),
+            'billing_phone' => data_get($legacyBilling, 'billing_mobile'),
+            'billing_address' => data_get($legacyBilling, 'billing_address'),
+        ];
+        $applicant = $details['applicant_details'] ?? [
+            'applicant_type' => data_get($legacyApplicant, 'type_of_applicant', $application->entity_type),
+            'legal_name' => data_get($legacyApplicant, 'applicant_name', $application->applicant_name),
+            'company_registration_number' => null,
+            'company_registration_country' => null,
+            'address_line_1' => data_get($legacyApplicant, 'address_of_applicant'),
+            'address_line_2' => null,
+            'town_city' => data_get($legacyApplicant, 'district'),
+            'county_or_region' => data_get($legacyApplicant, 'region'),
+            'nation' => data_get($legacyApplicant, 'state'),
+            'postcode' => data_get($legacyApplicant, 'pin_code'),
+            'country' => 'United Kingdom',
+            'email' => data_get($legacyApplicant, 'email_id', $application->email),
+            'phone' => data_get($legacyApplicant, 'phone_mobile_number', $application->phone),
+            'uk_address_for_service' => null,
+        ];
+        $authorisedPerson = $details['authorised_person'] ?? [
+            'full_name' => data_get($legacySignatory, 'name_of_signatory'),
+            'position_or_capacity' => data_get($legacySignatory, 'designation_of_signatory'),
+            'email' => data_get($legacySignatory, 'email_id'),
+            'phone' => data_get($legacySignatory, 'phone_mobile_number'),
+            'authority_confirmed' => null,
+            'final_application_approved' => filled($application->client_approved_at),
+            'approval_date' => $application->client_approved_at,
+        ];
+        $additionalApplicants = $details['additional_applicants'] ?? (array_filter($legacyAdditional) ? [$legacyAdditional] : []);
+        $additionalApplicant = $additionalApplicants[0] ?? [];
+        $tradeMark = $details['trademark_details'] ?? [];
+        $priority = $details['priority_details'] ?? data_get($application->workflow_meta, 'priority', []);
+        $ukipo = data_get($application->workflow_meta, 'ukipo', []);
+        $payments = $application->payments->sortByDesc('id')->values();
+        $completedPayments = $payments->filter(fn ($payment) => in_array(strtolower((string) $payment->status), ['completed', 'approved'], true));
+        $paidTotal = (float) $completedPayments->sum('amount');
+        $latestPayment = $payments->first();
+        $latestCompletedPayment = $completedPayments->first();
+        $billing = array_merge($billing, [
+            'invoice_number' => data_get($billing, 'invoice_number') ?: $latestCompletedPayment?->reference_number,
+            'professional_fee' => data_get($billing, 'professional_fee') ?: $latestPayment?->total_amount,
+            'ukipo_official_fee' => data_get($billing, 'ukipo_official_fee'),
+            'total_paid' => data_get($billing, 'total_paid') ?: ($paidTotal ?: null),
+            'payment_status' => $latestPayment?->status ?: data_get($billing, 'payment_status'),
+        ]);
+        $applicant['joint_applicants'] = array_key_exists('joint_applicants', $details)
+            ? (bool) $details['joint_applicants']
+            : ! empty($additionalApplicants);
         $sections = [
-            'Billing Details' => $details['billing_company_details'] ?? [],
-            'Trademark Applicant Details' => $details['trademark_applicant_details'] ?? [],
-            'Signatory Details' => $details['details_of_signatory'] ?? [],
-            'Co-applicant / Partner Details' => $details['details_of_co_applicant_or_partners'] ?? [],
-            'Trademark Details' => $details['trademark_details'] ?? [],
+            'Billing Details' => $billing,
+            'Applicant Details' => $applicant,
+            'Authorised Person' => $authorisedPerson,
+            'Additional Applicant' => $additionalApplicant,
+            'Trade Mark Details' => [
+                'mark_type' => data_get($tradeMark, 'mark_type', data_get($legacyTrademark, 'trademark_type')),
+                'trade_mark_wording' => data_get($tradeMark, 'trade_mark_wording', data_get($legacyTrademark, 'mark_brand_in_words', $application->brand_name)),
+                'logo_mark_file' => data_get($tradeMark, 'logo_mark_file', data_get($legacyTrademark, 'image_of_trademark', $application->logo_path)),
+                'language' => data_get($tradeMark, 'language', data_get($legacyTrademark, 'language_of_trademark')),
+                'translation' => data_get($tradeMark, 'translation'),
+                'business_activities' => data_get($tradeMark, 'business_activities', $application->goods_services),
+                'currently_in_use' => data_get($tradeMark, 'currently_in_use', $application->currently_selling),
+                'first_use_date' => data_get($tradeMark, 'first_use_date', $application->first_use_date),
+                'supporting_evidence' => data_get($tradeMark, 'supporting_evidence', data_get($legacyTrademark, 'proof_of_use_of_trademark')),
+                'proposed_classes' => data_get($tradeMark, 'proposed_classes'),
+                'final_approved_classes' => data_get($tradeMark, 'final_approved_classes', $application->classes),
+                'final_goods_and_services_specification' => data_get($tradeMark, 'final_goods_and_services_specification'),
+                'special_limitations' => data_get($tradeMark, 'special_limitations', data_get($legacyTrademark, 'conditions_or_limitations')),
+                'application_route' => data_get($tradeMark, 'application_route', data_get($application->workflow_meta, 'application_route')),
+            ],
+            'Priority Claim' => $priority,
+            'UKIPO Details' => [
+                'application_number' => data_get($ukipo, 'application_number', $application->application_number),
+                'filing_date' => data_get($ukipo, 'filing_date', $application->filed_at),
+                'examination_deadline' => data_get($ukipo, 'examination_deadline'),
+                'publication_date' => data_get($ukipo, 'publication_date'),
+                'opposition_deadline' => data_get($ukipo, 'opposition_deadline'),
+                'registration_number' => data_get($ukipo, 'registration_number'),
+                'renewal_date' => data_get($ukipo, 'renewal_date'),
+            ],
         ];
         $formatValue = function ($value) {
+            if (is_bool($value)) {
+                return $value ? 'Yes' : 'No';
+            }
+
+            if ($value instanceof \DateTimeInterface) {
+                return $value->format('d M Y');
+            }
+
             if (is_array($value)) {
                 return implode(', ', array_filter($value, fn ($item) => $item !== null && $item !== '')) ?: 'N/A';
             }
 
             return filled($value) ? $value : 'N/A';
+        };
+        $formatMoney = static function ($amount): string {
+            $amount = (float) $amount;
+            $decimals = abs($amount - round($amount)) > 0.00001 ? 2 : 0;
+
+            return '£' . number_format($amount, $decimals);
+        };
+        $paymentTypeLabel = static function ($payment): string {
+            $type = strtolower((string) ($payment->payment_type ?? ''));
+
+            if ($type === 'full') {
+                return 'Full Payment';
+            }
+
+            if ($type === 'final') {
+                return 'Final 50%';
+            }
+
+            return 'Advance 50%';
         };
         $draft = $application->draftVersions->sortByDesc('id')->first();
         $statusLogs = $application->statusLogs->sortByDesc('id')->take(8);
@@ -67,7 +175,7 @@
                 );
         };
         $isAdminOnboardingDocument = function ($doc) {
-            return in_array((string) $doc->document_type, ['engagement_letter', 'poa', 'affidavit', 'other_document'], true)
+            return in_array((string) $doc->document_type, ['engagement_letter', 'application_summary', 'final_specification', 'filing_authority', 'other_document'], true)
                 && (
                     str_contains((string) $doc->file_path, 'workflow/admin/')
                     || str_contains(strtolower((string) $doc->verification_notes), 'uploaded by admin')
@@ -92,10 +200,7 @@
         $placementDocuments = [
             'engagement_letter' => 'Engagement Letter',
         ];
-        $plainUploadDocuments = [
-            'poa' => 'POA',
-            'affidavit' => 'Affidavit',
-        ];
+        $plainUploadDocuments = [];
         $signatureRequiredDocuments = ['engagement_letter'];
         $oppositionApplication = $oppositionApplication ?? $application->oppositionApplication;
         $oppositionDefenceCase = $oppositionDefenceCase ?? $application->oppositionDefenceCase;
@@ -128,10 +233,18 @@
         };
         $bulkReviewableDocuments = $application->documents->filter(function ($doc) {
             $isAlreadyVerified = $doc->status === 'verified' || (bool) $doc->verified_at;
-            $requiresVerification = in_array($doc->document_type, ['engagement_letter (Signed)', 'poa (Signed)', 'affidavit (Signed)'], true);
+            $requiresVerification = in_array($doc->document_type, ['engagement_letter (Signed)', 'filing_authority (Signed)'], true);
 
             return !$isAlreadyVerified && $requiresVerification && in_array($doc->status, ['uploaded', 'reuploaded'], true);
         });
+        $signedEngagementLetterForReview = $application->documents
+            ->where('document_type', 'engagement_letter (Signed)')
+            ->sortByDesc('id')
+            ->first();
+        $engagementLetterAwaitingAdminReview = $signedEngagementLetterForReview
+            && !$signedEngagementLetterForReview->verified_at
+            && $signedEngagementLetterForReview->status !== 'verified'
+            && in_array($signedEngagementLetterForReview->status, ['uploaded', 'reuploaded'], true);
         $placementValue = function (string $documentType, string $fieldType, string $key) use ($application) {
             $storedField = collect(data_get($application->workflow_meta, "signature_fields.$documentType", []))
                 ->firstWhere('type', $fieldType);
@@ -143,7 +256,7 @@
         };
     @endphp
 
-    <div class="container-fluid py-4">
+    <div class="container-fluid py-4 admin-application-review-page">
         <div class="d-flex justify-content-between align-items-start gap-3 mb-4">
             <div>
                 <h1 class="h3 mb-1">Application Review</h1>
@@ -190,19 +303,24 @@
                         <div class="row g-3">
                             <div class="col-md-6"><div class="data-block"><span class="data-label">Trademark</span><div class="data-value">{{ $application->brand_name ?? 'N/A' }}</div></div></div>
                             <div class="col-md-6"><div class="data-block"><span class="data-label">Applicant</span><div class="data-value">{{ $application->applicant_name ?? 'N/A' }}</div></div></div>
-                            <div class="col-md-6"><div class="data-block"><span class="data-label">Entity Type</span><div class="data-value">{{ $application->entity_type === 'individual' ? 'Individual / Proprietor / Trader' : ucfirst($application->entity_type ?? 'N/A') }}</div></div></div>
+                            <div class="col-md-6"><div class="data-block"><span class="data-label">Applicant Type</span><div class="data-value">{{ ucwords(str_replace('_', ' ', data_get($applicant, 'applicant_type', $application->entity_type ?? 'N/A'))) }}</div></div></div>
                             <div class="col-md-6"><div class="data-block"><span class="data-label">Email</span><div class="data-value">{{ $application->email ?? $application->user->email }}</div></div></div>
                             <div class="col-md-6"><div class="data-block"><span class="data-label">Phone</span><div class="data-value">{{ $application->phone ?? 'N/A' }}</div></div></div>
-                            <div class="col-md-6"><div class="data-block"><span class="data-label">Submitted</span><div class="data-value">{{ $formatDateTime($application->created_at, 'M d, Y h:i A') }}</div></div></div>
-                            <div class="col-12"><div class="data-block"><span class="data-label">Goods / Services</span><div class="data-value">{{ $application->goods_services ?? 'N/A' }}</div></div></div>
-                            @if ($application->classes)
-                                <div class="col-12"><div class="data-block"><span class="data-label">Recommended Classes</span><div class="data-value">{{ implode(', ', is_array($application->classes) ? $application->classes : json_decode($application->classes, true) ?? []) }}</div></div></div>
-                            @endif
+                            <div class="col-md-6"><div class="data-block"><span class="data-label">Application Status</span><div class="data-value">{{ $adminStatusLabel }}</div></div></div>
+                            <div class="col-md-6"><div class="data-block"><span class="data-label">Submitted Date</span><div class="data-value">{{ $formatDateTime($application->created_at, 'd M Y, h:i A') }}</div></div></div>
+                            <div class="col-md-6"><div class="data-block"><span class="data-label">Requested Service</span><div class="data-value">UK Trade Mark Application</div></div></div>
+                            <div class="col-12"><div class="data-block"><span class="data-label">Business Activities</span><div class="data-value">{{ data_get($tradeMark, 'business_activities', $application->goods_services ?? 'N/A') }}</div></div></div>
+                            @php
+                                $classValues = data_get($tradeMark, 'final_approved_classes', $application->classes) ?: data_get($tradeMark, 'proposed_classes');
+                                $classList = is_array($classValues) ? array_filter($classValues) : array_filter(preg_split('/\s*,\s*/', (string) $classValues));
+                            @endphp
+                            <div class="col-md-6"><div class="data-block"><span class="data-label">Number of Classes</span><div class="data-value">{{ count($classList) ?: 'Not finalised' }}</div></div></div>
+                            <div class="col-md-6"><div class="data-block"><span class="data-label">Estimated Official Fee</span><div class="data-value">{{ filled(data_get($billing, 'ukipo_official_fee')) ? '£'.number_format((float) data_get($billing, 'ukipo_official_fee'), 2) : 'To be confirmed' }}</div></div></div>
                         </div>
                     </div>
                 </div>
 
-                @if ($oppositionApplication || $oppositionDefenceCase)
+                @if (false && ($oppositionApplication || $oppositionDefenceCase))
                     <div class="card shadow-sm border-0 mb-4">
                         <div class="card-header admin-card-header">
                             <h5 class="mb-0">Opposition Cases</h5>
@@ -271,13 +389,13 @@
                                         <div class="col-md-6">
                                             <div class="data-block h-100">
                                                 <span class="data-label">{{ ucwords(str_replace('_', ' ', $field)) }}</span>
-                                                @if ($field === 'image_of_trademark' && $value)
+                                                @if (in_array($field, ['image_of_trademark', 'logo_mark_file'], true) && $value)
                                                     <div class="data-value">
                                                         <a href="{{ route('admin.trademark.image.view', ['id' => $application->id, 'file' => base64_encode((string) $value)]) }}" target="_blank" class="btn btn-outline-primary btn-sm">
                                                             <i class="fas fa-eye"></i> View Trademark Image
                                                         </a>
                                                     </div>
-                                                @elseif ($field === 'proof_of_use_of_trademark' && $value)
+                                                @elseif (in_array($field, ['proof_of_use_of_trademark', 'supporting_evidence', 'priority_document'], true) && $value)
                                                     <div class="data-value">
                                                         <a href="{{ route('admin.trademark.proof-of-use.view', ['id' => $application->id, 'file' => base64_encode((string) $value)]) }}" target="_blank" class="btn btn-outline-primary btn-sm">
                                                             <i class="fas fa-eye"></i> View Proof of Use
@@ -294,6 +412,77 @@
                         </div>
                     @endif
                 @endforeach
+
+                <div class="card shadow-sm border-0 mb-4" id="application-payments">
+                    <div class="card-header admin-card-header d-flex justify-content-between align-items-center gap-3">
+                        <h5 class="mb-0">Payment Proof &amp; Invoices</h5>
+                        <span class="payment-total-badge">Total paid: {{ $formatMoney($paidTotal) }}</span>
+                    </div>
+                    <div class="card-body">
+                        @if ($payments->isEmpty())
+                            <div class="payment-empty-state">
+                                <i class="bi bi-receipt"></i>
+                                <div>
+                                    <strong>No payment submitted yet.</strong>
+                                    <p class="mb-0">Payment references and invoices will appear here for this application.</p>
+                                </div>
+                            </div>
+                        @else
+                            <div class="table-responsive">
+                                <table class="table align-middle admin-payment-table mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Payment</th>
+                                            <th>Amount</th>
+                                            <th>Status</th>
+                                            <th>Payment Proof</th>
+                                            <th>Date</th>
+                                            <th class="text-end">Invoice</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($payments as $payment)
+                                            @php
+                                                $normalizedPaymentStatus = strtolower((string) $payment->status);
+                                                $hasInvoice = in_array($normalizedPaymentStatus, ['completed', 'approved'], true);
+                                                $paymentStatusClass = match ($normalizedPaymentStatus) {
+                                                    'completed', 'approved' => 'success',
+                                                    'rejected', 'failed' => 'danger',
+                                                    default => 'warning text-dark',
+                                                };
+                                            @endphp
+                                            <tr>
+                                                <td>
+                                                    <strong>{{ $paymentTypeLabel($payment) }}</strong>
+                                                    <div class="small text-muted">{{ ucfirst((string) ($payment->payment_method ?: 'Online')) }}</div>
+                                                </td>
+                                                <td>
+                                                    <strong>{{ $formatMoney($payment->amount) }}</strong>
+                                                    <div class="small text-muted">of {{ $formatMoney($payment->total_amount) }}</div>
+                                                </td>
+                                                <td><span class="badge bg-{{ $paymentStatusClass }}">{{ ucwords(str_replace('_', ' ', $normalizedPaymentStatus)) }}</span></td>
+                                                <td>
+                                                    <div class="payment-proof-line"><span>Transaction</span><code>{{ $payment->transaction_id ?: 'Awaiting payment' }}</code></div>
+                                                    <div class="payment-proof-line"><span>Order / Reference</span><code>{{ $payment->reference_number ?: 'N/A' }}</code></div>
+                                                </td>
+                                                <td>{{ $formatDateTime($payment->paid_at ?: $payment->created_at, 'd M Y, h:i A') }}</td>
+                                                <td class="text-end">
+                                                    @if ($hasInvoice)
+                                                        <a href="{{ route('admin.payment.invoice', $payment) }}" target="_blank" class="btn btn-outline-primary btn-sm">
+                                                            <i class="bi bi-file-earmark-pdf"></i> View Invoice
+                                                        </a>
+                                                    @else
+                                                        <span class="small text-muted">Available after payment</span>
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endif
+                    </div>
+                </div>
 
                 <div class="card shadow-sm border-0 mb-4" id="submitted-documents" data-filing-documents-card>
                     <div class="card-header admin-card-header d-flex justify-content-between align-items-center gap-3">
@@ -328,7 +517,7 @@
                                                 $isAdminSentPostFilingDocument = $isPostFilingAdminDocument($doc);
                                                 $isAdminSentOnboardingDocument = $isAdminOnboardingDocument($doc);
                                                 $normalizedVerificationNote = strtolower((string) $doc->verification_notes);
-                                                $isReuploadedSubmission = in_array((string) $doc->document_type, ['engagement_letter (Signed)', 'poa (Signed)', 'affidavit (Signed)'], true)
+                                                $isReuploadedSubmission = in_array((string) $doc->document_type, ['engagement_letter (Signed)', 'filing_authority (Signed)'], true)
                                                     && in_array((string) $doc->status, ['uploaded', 'reuploaded'], true)
                                                     && (
                                                         str_contains($normalizedVerificationNote, 'reuploaded')
@@ -338,7 +527,7 @@
                                                     ? 'verified'
                                                     : ($isReuploadedSubmission ? 'reuploaded' : $doc->status);
                                                 $isReviewable = !$isAlreadyVerified && in_array($doc->status, ['uploaded', 'reuploaded'], true);
-                                                $requiresVerification = in_array($doc->document_type, ['engagement_letter (Signed)', 'poa (Signed)', 'affidavit (Signed)'], true);
+                                                $requiresVerification = in_array($doc->document_type, ['engagement_letter (Signed)', 'filing_authority (Signed)'], true);
                                                 $isReuploadRequested = $displayStatus === 'reupload_requested';
                                                 $statusLabel = $isAdminSentOnboardingDocument
                                                     ? 'Admin Sent'
@@ -356,7 +545,7 @@
                                             <tr>
                                                 <td>
                                                     @if ($isReviewable && $requiresVerification)
-                                                        <input class="form-check-input me-2 filing-doc-select d-none" type="checkbox" name="document_ids[]" value="{{ $doc->id }}" form="filingDocReviewForm" data-filing-doc-checkbox>
+                                                        <input class="form-check-input me-2 filing-doc-select d-none" type="checkbox" name="document_ids[]" value="{{ $doc->id }}" form="filingDocReviewForm" data-filing-doc-checkbox data-document-type="{{ $doc->document_type }}">
                                                     @endif
                                                     {{ ucwords(str_replace(['_', '(signed)'], [' ', ' (Signed)'], $doc->document_type)) }}
                                                     @if ($isAdminSentPostFilingDocument || $isAdminSentOnboardingDocument)
@@ -424,7 +613,7 @@
                                     <textarea id="bulkDocumentReviewNote" class="form-control" rows="4" minlength="10" maxlength="1000" placeholder="Explain what the applicant must correct before uploading again..." data-filing-doc-review-note-textarea></textarea>
                                     <div class="form-text">This note will be sent to the applicant.</div>
                                 </div>
-                                <p class="mb-0 text-muted" data-filing-doc-review-approve-copy hidden>Selected signed onboarding documents will be accepted and verified.</p>
+                                <p class="mb-0 text-muted" data-filing-doc-review-approve-copy hidden>Selected signed approval documents will be accepted and verified.</p>
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -477,7 +666,7 @@
                         @if ($application->current_status === $workflow::APPLICATION_SUBMITTED)
                             <div class="alert alert-info">
                                 <div class="fw-semibold mb-1">Application received and waiting for admin review.</div>
-                                <small>Start the review to unlock the approval, onboarding, and change-request actions.</small>
+                                <small>Start the review to unlock the UK search, specification and information-request actions.</small>
                             </div>
                             <form action="{{ route('admin.start-review', $application->id) }}" method="POST" data-swal-confirm data-swal-title="Start reviewing this application?" data-swal-text="The client will be notified that their application is under review." data-swal-icon="question" data-swal-confirm-text="Yes, start review">
                                 @csrf
@@ -486,23 +675,18 @@
                                 </button>
                             </form>
                         @elseif ($application->current_status === $workflow::UNDER_REVIEW)
-                            <form action="{{ route('admin.approve', $application->id) }}" method="POST" class="mb-4" enctype="multipart/form-data" data-swal-confirm data-swal-title="Approve application?" data-swal-text="This will issue the onboarding package to the applicant." data-swal-icon="question" data-swal-confirm-text="Yes, approve">
+                            <form action="{{ route('admin.approve', $application->id) }}" method="POST" class="mb-4" enctype="multipart/form-data" data-swal-confirm data-swal-title="Complete the initial review?" data-swal-text="This will send the Engagement Letter to the client for electronic signing." data-swal-icon="question" data-swal-confirm-text="Yes, send letter">
                                 @csrf
-                                <label class="form-label fw-semibold">Approval Note</label>
-                                <textarea name="notes" class="form-control" rows="4" placeholder="Share onboarding instructions or review notes...">{{ old('notes') }}</textarea>
+                                <label class="form-label fw-semibold">Review Note</label>
+                                <textarea name="notes" class="form-control" rows="4" placeholder="Share signing or review instructions with the client...">{{ old('notes') }}</textarea>
                                 @include('admin.partials.signing-field-placement', [
                                     'placementDocuments' => $placementDocuments,
                                     'plainUploadDocuments' => $plainUploadDocuments,
                                     'signatureRequiredDocuments' => $signatureRequiredDocuments,
                                     'placementValue' => $placementValue,
                                 ])
-
-                                <button type="submit" class="btn btn-success w-100 mt-3">Approve and Issue Onboarding</button>
+                                <button type="submit" class="btn btn-success w-100 mt-3">Send Engagement Letter for Signing</button>
                             </form>
-
-                            <button type="button" class="btn btn-outline-success w-100 mb-4" data-bs-toggle="modal" data-bs-target="#manualOnboardingUploadModal">
-                                <i class="bi bi-upload me-2"></i>Approve and Upload Documents Manually
-                            </button>
 
                             <form action="{{ route('admin.request-changes', $application->id) }}" method="POST" data-swal-confirm data-swal-title="Request application changes?" data-swal-text="The applicant will be notified and can recheck/edit the application before submitting again." data-swal-icon="warning" data-swal-confirm-text="Yes, request changes">
                                 @csrf
@@ -511,34 +695,64 @@
                                 <button type="submit" class="btn btn-warning w-100 mt-3">Request Changes</button>
                             </form>
                         @elseif ($application->current_status === $workflow::ONBOARDING_PENDING)
-                            <div class="alert alert-info">
-                                <small>
-                                    Resend the onboarding package if the applicant needs fresh documents. This replaces the existing Engagement Letter, POA, and Affidavit. The applicant must electronically sign the latest Engagement Letter and upload physically signed POA and Signed Affidavit.
-                                </small>
-                            </div>
-                            <form action="{{ route('admin.resend-onboarding-package', $application->id) }}" method="POST" enctype="multipart/form-data" data-swal-confirm data-swal-title="Resend onboarding package?" data-swal-text="This replaces the current onboarding documents and resets the applicant's latest onboarding submission." data-swal-icon="warning" data-swal-confirm-text="Yes, resend package">
-                                @csrf
-                                <label class="form-label fw-semibold">Resend Note <span class="text-muted fw-normal">(optional)</span></label>
-                                <textarea name="notes" class="form-control" rows="3" placeholder="Optional note for the applicant">{{ old('notes') }}</textarea>
+                            @if ($engagementLetterAwaitingAdminReview)
+                                <div class="engagement-review-ready">
+                                    <div class="engagement-review-ready-icon" aria-hidden="true">
+                                        <i class="bi bi-file-earmark-check"></i>
+                                    </div>
+                                    <div class="engagement-review-ready-copy">
+                                        <span>Awaiting admin verification</span>
+                                        <h6>Signed Engagement Letter received</h6>
+                                        <p>The client has completed the signature. Review and approve the signed document to continue.</p>
+                                    </div>
+                                    <a href="#submitted-documents" class="btn btn-success w-100" data-scroll-to-documents data-document-type="engagement_letter (Signed)">
+                                        <i class="bi bi-arrow-down-circle me-2"></i>Review signed document
+                                    </a>
+                                </div>
 
-                                @include('admin.partials.signing-field-placement', [
-                                    'placementDocuments' => $placementDocuments,
-                                    'plainUploadDocuments' => $plainUploadDocuments,
-                                    'signatureRequiredDocuments' => $signatureRequiredDocuments,
-                                    'placementValue' => $placementValue,
-                                ])
-
-                                <button type="submit" class="btn btn-warning w-100 mt-3">Resend Onboarding Package</button>
-                            </form>
-
-                            <button type="button" class="btn btn-outline-success w-100 mt-3" data-bs-toggle="modal" data-bs-target="#manualOnboardingUploadModal">
-                                <i class="bi bi-upload me-2"></i>Upload Documents Manually
-                            </button>
+                                <details class="engagement-resend-options mt-3">
+                                    <summary>Replace or resend the Engagement Letter</summary>
+                                    <div class="pt-3">
+                                        <form action="{{ route('admin.resend-onboarding-package', $application->id) }}" method="POST" enctype="multipart/form-data" data-swal-confirm data-swal-title="Resend Engagement Letter?" data-swal-text="This replaces the current letter and resets the client's latest signature submission." data-swal-icon="warning" data-swal-confirm-text="Yes, resend letter">
+                                            @csrf
+                                            <label class="form-label fw-semibold">Resend Note <span class="text-muted fw-normal">(optional)</span></label>
+                                            <textarea name="notes" class="form-control" rows="3" placeholder="Optional note for the client">{{ old('notes') }}</textarea>
+                                            @include('admin.partials.signing-field-placement', [
+                                                'placementDocuments' => $placementDocuments,
+                                                'plainUploadDocuments' => $plainUploadDocuments,
+                                                'signatureRequiredDocuments' => $signatureRequiredDocuments,
+                                                'placementValue' => $placementValue,
+                                            ])
+                                            <button type="submit" class="btn btn-warning w-100 mt-3">Resend Engagement Letter</button>
+                                        </form>
+                                    </div>
+                                </details>
+                            @else
+                                <div class="alert alert-info">
+                                    <div class="fw-semibold">Engagement Letter signing pending</div>
+                                    <small>Resend the letter if the client needs a corrected copy. POA and Affidavit are not required for UK applications.</small>
+                                </div>
+                                <form action="{{ route('admin.resend-onboarding-package', $application->id) }}" method="POST" enctype="multipart/form-data" data-swal-confirm data-swal-title="Resend Engagement Letter?" data-swal-text="This replaces the current letter and resets the client's latest signature submission." data-swal-icon="warning" data-swal-confirm-text="Yes, resend letter">
+                                    @csrf
+                                    <label class="form-label fw-semibold">Resend Note <span class="text-muted fw-normal">(optional)</span></label>
+                                    <textarea name="notes" class="form-control" rows="3" placeholder="Optional note for the client">{{ old('notes') }}</textarea>
+                                    @include('admin.partials.signing-field-placement', [
+                                        'placementDocuments' => $placementDocuments,
+                                        'plainUploadDocuments' => $plainUploadDocuments,
+                                        'signatureRequiredDocuments' => $signatureRequiredDocuments,
+                                        'placementValue' => $placementValue,
+                                    ])
+                                    <button type="submit" class="btn btn-warning w-100 mt-3">Resend Engagement Letter</button>
+                                </form>
+                                <button type="button" class="btn btn-outline-success w-100 mt-3" data-bs-toggle="modal" data-bs-target="#manualOnboardingUploadModal">
+                                    <i class="bi bi-upload me-2"></i>Upload Signed Letter Manually
+                                </button>
+                            @endif
                         @elseif ($application->current_status === $workflow::STRATEGY_IN_PROGRESS)
-                            <form action="{{ route('admin.strategy-complete', $application->id) }}" method="POST" class="mb-4" data-swal-confirm data-swal-title="Complete strategy?" data-swal-text="This moves the matter to draft preparation." data-swal-icon="question" data-swal-confirm-text="Yes, complete">
+                            <form action="{{ route('admin.strategy-complete', $application->id) }}" method="POST" class="mb-4" data-swal-confirm data-swal-title="Complete search and specification?" data-swal-text="This moves the matter to application preparation." data-swal-icon="question" data-swal-confirm-text="Yes, complete">
                                 @csrf
                                 <input type="hidden" name="quick_complete" value="1">
-                                <button type="submit" class="btn btn-success w-100">Complete Strategy Directly</button>
+                                <button type="submit" class="btn btn-success w-100">Mark Search and Specification Complete</button>
                             </form>
                             <!-- <hr> -->
                             <p style="text-align:center;">or</p>
@@ -548,26 +762,57 @@
                                 <input type="file" name="search_report" class="form-control" accept=".pdf" required>
                                 <label class="form-label fw-semibold mt-3">Report Note</label>
                                 <textarea name="search_report_note" class="form-control" rows="3" placeholder="Optional note to send with the manual search report">{{ old('search_report_note') }}</textarea>
-                                <button type="submit" class="btn btn-outline-primary w-100 mt-3">Send Search Report PDF to User and Complete Strategy</button>
+                                <button type="submit" class="btn btn-outline-primary w-100 mt-3">Send Search Report and Complete Review</button>
                             </form>
                         @elseif (in_array($application->current_status, [$workflow::STRATEGY_COMPLETED, $workflow::CHANGES_REQUESTED]))
-                            <form action="{{ route('admin.publish-draft', $application->id) }}" method="POST" enctype="multipart/form-data" data-swal-confirm data-swal-title="Send draft to applicant?" data-swal-text="The applicant will be asked to review, approve, or request changes." data-swal-icon="question" data-swal-confirm-text="Yes, send draft">
+                            <form action="{{ route('admin.publish-draft', $application->id) }}" method="POST" enctype="multipart/form-data" data-swal-confirm data-swal-title="Send application for approval?" data-swal-text="The applicant will be asked to approve the applicant, mark, classes, specification and filing authority." data-swal-icon="question" data-swal-confirm-text="Yes, send for approval">
                                 @csrf
-                                <label class="form-label fw-semibold">Draft PDF</label>
+                                <label class="form-label fw-semibold">Application Summary PDF</label>
                                 <input type="file" name="draft_file" class="form-control" accept=".pdf" required>
-                                <div class="form-text">Upload the draft PDF for applicant review and approval.</div>
-                                <label class="form-label fw-semibold mt-3">Draft Note</label>
+                                <div class="form-text">Include the final classes and goods and services specification for client approval.</div>
+                                <label class="form-label fw-semibold mt-3">Final Specification PDF</label>
+                                <input type="file" name="final_specification_file" class="form-control" accept=".pdf" required>
+                                <label class="form-label fw-semibold mt-3">Filing Authority PDF</label>
+                                <input type="file" name="filing_authority_file" class="form-control" accept=".pdf" required>
+                                <label class="form-label fw-semibold mt-3">Final Classes</label>
+                                <input type="text" name="final_classes" class="form-control" value="{{ old('final_classes', is_array($application->classes) ? implode(', ', $application->classes) : '') }}" placeholder="e.g. 9, 35, 42" required>
+                                <label class="form-label fw-semibold mt-3">Final Goods and Services Specification</label>
+                                <textarea name="final_specification" class="form-control" rows="6" maxlength="10000" required placeholder="Enter the complete UKIPO-ready specification...">{{ old('final_specification', data_get($tradeMark, 'final_goods_and_services_specification')) }}</textarea>
+                                @if (data_get($priority, 'priority_claim_required'))
+                                    <label class="form-label fw-semibold mt-3">Priority Deadline <span class="text-muted fw-normal">(optional)</span></label>
+                                    <input type="date" name="priority_deadline" class="form-control" value="{{ old('priority_deadline', data_get($priority, 'priority_deadline')) }}">
+                                    <label class="form-check mt-3">
+                                        <input type="checkbox" name="priority_approved" value="1" class="form-check-input" required @checked(old('priority_approved', data_get($priority, 'approved_by_admin')))>
+                                        <span class="form-check-label">I have checked and approved the priority claim.</span>
+                                    </label>
+                                    @error('priority_approved')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                                @endif
+                                <label class="form-label fw-semibold mt-3">Approval Note</label>
                                 <textarea name="draft_note" class="form-control" rows="4" placeholder="Optional note to send with the draft">{{ old('draft_note', $draft?->goods_services) }}</textarea>
-                                <button type="submit" class="btn btn-success w-100 mt-3">Send Draft to Applicant</button>
+                                <button type="submit" class="btn btn-success w-100 mt-3">Send Application for Approval</button>
                             </form>
                         @elseif ($application->current_status === $workflow::PAYMENT_COMPLETED)
-                            <form action="{{ route('admin.file', $application->id) }}" method="POST" data-swal-confirm data-swal-title="Mark application as filed?" data-swal-text="This records the filing step and moves the application forward." data-swal-icon="question" data-swal-confirm-text="Yes, mark filed">
+                            <form action="{{ route('admin.file', $application->id) }}" method="POST" enctype="multipart/form-data" data-swal-confirm data-swal-title="Record UKIPO filing?" data-swal-text="This records the filing details and receipt." data-swal-icon="question" data-swal-confirm-text="Yes, record filing">
                                 @csrf
-                                <label class="form-label fw-semibold">Application Number</label>
-                                <input type="text" name="application_number" class="form-control" value="{{ $application->application_number }}" placeholder="TM-2026-12345">
+                                <label class="form-label fw-semibold">UKIPO Application Number</label>
+                                <input type="text" name="application_number" class="form-control" value="{{ old('application_number', $application->application_number) }}" placeholder="UK0000..." required>
+                                <label class="form-label fw-semibold mt-3">UKIPO Filing Date</label>
+                                <input type="date" name="filing_date" class="form-control" value="{{ old('filing_date', now()->toDateString()) }}" max="{{ now()->toDateString() }}" required>
+                                <label class="form-label fw-semibold mt-3">UKIPO Filing Receipt</label>
+                                <input type="file" name="filing_receipt" class="form-control" accept=".pdf" required>
+                                <label class="form-label fw-semibold mt-3">Examination Deadline <span class="text-muted fw-normal">(optional)</span></label>
+                                <input type="date" name="examination_deadline" class="form-control" value="{{ old('examination_deadline') }}">
+                                <label class="form-label fw-semibold mt-3">Publication Date <span class="text-muted fw-normal">(optional)</span></label>
+                                <input type="date" name="publication_date" class="form-control" value="{{ old('publication_date') }}">
+                                <label class="form-label fw-semibold mt-3">Opposition Deadline <span class="text-muted fw-normal">(optional)</span></label>
+                                <input type="date" name="opposition_deadline" class="form-control" value="{{ old('opposition_deadline') }}">
+                                <label class="form-label fw-semibold mt-3">Registration Number <span class="text-muted fw-normal">(optional)</span></label>
+                                <input type="text" name="registration_number" class="form-control" value="{{ old('registration_number') }}">
+                                <label class="form-label fw-semibold mt-3">Renewal Date <span class="text-muted fw-normal">(optional)</span></label>
+                                <input type="date" name="renewal_date" class="form-control" value="{{ old('renewal_date') }}">
                                 <label class="form-label fw-semibold mt-3">Admin Note <span class="text-muted fw-normal">(optional)</span></label>
                                 <textarea name="filing_note" class="form-control" rows="3" maxlength="1000" placeholder="Optional note to show to the applicant and include in the filing email">{{ old('filing_note') }}</textarea>
-                                <button type="submit" class="btn btn-success w-100 mt-3">Mark as Filed</button>
+                                <button type="submit" class="btn btn-success w-100 mt-3">Record UKIPO Filing</button>
                             </form>
                         @elseif ($application->current_status === $workflow::FILED)
                             <div class="alert alert-info">
@@ -776,9 +1021,6 @@
                             </div>
                         @endif
 
-                        @if (in_array($application->current_status, [$workflow::UNDER_REVIEW, $workflow::ONBOARDING_PENDING], true))
-                            @include('admin.partials.manual-onboarding-upload-modal')
-                        @endif
                     </div>
                 </div>
             </div>
@@ -828,6 +1070,65 @@
             color: #1d3557;
             font-weight: 600;
             word-break: break-word;
+        }
+
+        .admin-card-header .payment-total-badge {
+            display: inline-flex;
+            align-items: center;
+            min-height: 30px;
+            padding: 0.35rem 0.75rem;
+            border: 1px solid rgba(255, 255, 255, 0.45);
+            border-radius: 999px;
+            background: #ffffff !important;
+            color: #123d66 !important;
+            font-size: 0.78rem;
+            font-weight: 800;
+            line-height: 1.2;
+            white-space: nowrap;
+            box-shadow: 0 5px 14px rgba(7, 31, 72, 0.15);
+        }
+
+        .payment-empty-state {
+            align-items: center;
+            background: #f8fafc;
+            border: 1px dashed #cbd8e5;
+            border-radius: 14px;
+            color: #64748b;
+            display: flex;
+            gap: 0.9rem;
+            padding: 1rem;
+        }
+
+        .payment-empty-state > i {
+            color: #2a9d8f;
+            font-size: 1.5rem;
+        }
+
+        .payment-proof-line {
+            display: grid;
+            gap: 0.15rem;
+            margin-bottom: 0.35rem;
+            min-width: 190px;
+        }
+
+        .payment-proof-line span {
+            color: #6c757d;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .payment-proof-line code {
+            color: #1d3557;
+            font-size: 0.78rem;
+            overflow-wrap: anywhere;
+            white-space: normal;
+        }
+
+        @media (max-width: 767.98px) {
+            .admin-payment-table {
+                min-width: 850px;
+            }
         }
 
         body.modal-open .admin-manual-upload-modal {
@@ -910,6 +1211,139 @@
             box-shadow: 0 10px 24px rgba(20, 100, 246, 0.1);
         }
 
+        #submitted-documents {
+            scroll-margin-top: 1.5rem;
+            transition: box-shadow 0.3s ease, transform 0.3s ease;
+        }
+
+        #submitted-documents.document-review-focus {
+            box-shadow: 0 0 0 4px rgba(20, 157, 139, 0.18), 0 18px 42px rgba(12, 46, 82, 0.14) !important;
+            transform: translateY(-2px);
+        }
+
+        .engagement-review-ready {
+            display: grid;
+            grid-template-columns: 3rem 1fr;
+            gap: 0.9rem;
+            padding: 1rem;
+            border: 1px solid #a9ded5;
+            border-left: 4px solid #149d8b;
+            border-radius: 0.9rem;
+            background: linear-gradient(145deg, #f3fbf9 0%, #e9f7f5 100%);
+        }
+
+        .engagement-review-ready-icon {
+            display: grid;
+            place-items: center;
+            width: 3rem;
+            height: 3rem;
+            border-radius: 50%;
+            background: #d8f2ed;
+            color: #087f70;
+            font-size: 1.3rem;
+        }
+
+        .engagement-review-ready-copy span {
+            display: inline-flex;
+            margin-bottom: 0.45rem;
+            padding: 0.24rem 0.55rem;
+            border-radius: 999px;
+            background: #d8f2ed;
+            color: #076b60;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.035em;
+            text-transform: uppercase;
+        }
+
+        .engagement-review-ready-copy h6 {
+            margin-bottom: 0.35rem;
+            color: #17375f;
+            font-weight: 700;
+        }
+
+        .engagement-review-ready-copy p {
+            margin-bottom: 0;
+            color: #5c6f82;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .engagement-review-ready > .btn {
+            grid-column: 1 / -1;
+        }
+
+        .engagement-resend-options {
+            padding: 0.85rem 1rem;
+            border: 1px solid #dce4ec;
+            border-radius: 0.8rem;
+            background: #fff;
+        }
+
+        .engagement-resend-options summary {
+            color: #40566f;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        @media (max-width: 767.98px) {
+            .admin-application-review-page {
+                font-size: 18px;
+            }
+
+            .admin-application-review-page .form-control,
+            .admin-application-review-page .form-select,
+            .admin-application-review-page .btn,
+            .admin-application-review-page .table,
+            .admin-application-review-page .form-label,
+            .admin-application-review-page .data-value {
+                font-size: calc(1rem + 2px);
+            }
+
+            .admin-application-review-page .small,
+            .admin-application-review-page small,
+            .admin-application-review-page .data-label,
+            .admin-application-review-page .form-text {
+                font-size: calc(0.875rem + 2px);
+            }
+
+            .admin-application-review-page .badge {
+                font-size: calc(0.75rem + 2px);
+            }
+
+            .admin-application-review-page h1.h3,
+            .admin-application-review-page .h3 {
+                font-size: calc(1.75rem + 2px);
+            }
+
+            .admin-application-review-page h5,
+            .admin-application-review-page .h5 {
+                font-size: calc(1.25rem + 2px);
+            }
+
+            .admin-application-review-page h6,
+            .admin-application-review-page .h6 {
+                font-size: calc(1rem + 2px);
+            }
+
+            .engagement-review-ready-copy span {
+                font-size: calc(0.72rem + 2px);
+            }
+
+            .engagement-review-ready-copy h6 {
+                font-size: calc(1rem + 2px);
+            }
+
+            .engagement-review-ready-copy p {
+                font-size: calc(0.9rem + 2px);
+            }
+
+            .engagement-review-ready > .btn,
+            .engagement-resend-options summary {
+                font-size: calc(1rem + 2px);
+            }
+        }
+
         body.modal-open .modal-backdrop {
             z-index: 2147482990 !important;
         }
@@ -954,6 +1388,23 @@
                     });
                     filingDocSelectToggle.textContent = enabled ? 'Cancel' : 'Select';
                 };
+
+                document.querySelectorAll('[data-scroll-to-documents]').forEach((button) => {
+                    button.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        setSelecting(true);
+
+                        const targetType = button.dataset.documentType;
+                        const targetCheckbox = checkboxes.find((checkbox) => checkbox.dataset.documentType === targetType);
+                        if (targetCheckbox) {
+                            targetCheckbox.checked = true;
+                        }
+
+                        filingDocCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        filingDocCard.classList.add('document-review-focus');
+                        window.setTimeout(() => filingDocCard.classList.remove('document-review-focus'), 1800);
+                    });
+                });
 
                 filingDocSelectToggle.addEventListener('click', () => {
                     setSelecting(!filingDocCard.classList.contains('is-selecting-documents'));

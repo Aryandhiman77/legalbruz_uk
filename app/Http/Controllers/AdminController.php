@@ -50,7 +50,6 @@ class AdminController extends Controller
                 ->orWhereNotNull('registered_at');
         })->count();
         $leads = User::count();
-        $recoveryCases = StuckTrademarkCase::count();
         $websiteVisitors = Schema::hasTable('website_visitors') ? WebsiteVisitor::count() : 0;
         $serviceLeads = Schema::hasTable('website_visitors')
             ? WebsiteVisitor::whereNotNull('service_first_visited_at')->count()
@@ -74,7 +73,6 @@ class AdminController extends Controller
             'filedCount' => $filedApplications,
             'registeredCount' => $registeredApplications,
             'leadsCount' => $leads,
-            'recoveryCases' => $recoveryCases,
             'websiteVisitors' => $websiteVisitors,
             'serviceLeads' => $serviceLeads,
             'reviewsCount' => $reviewsCount,
@@ -223,10 +221,8 @@ class AdminController extends Controller
         $this->storePendingOnboardingUploads($application, $request);
 
         $validated = Validator::make($request->all(), [
-            'notes' => 'nullable|string',
+            'notes' => 'nullable|string|max:1000',
             'engagement_letter_file' => 'nullable|file|mimes:pdf|max:15360',
-            'poa_file' => 'nullable|file|mimes:pdf|max:15360',
-            'affidavit_file' => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:15360',
             'other_document_files' => 'nullable|array',
             'other_document_files.*' => 'file|mimes:pdf,jpg,jpeg,png,doc,docx|max:15360',
             'signature_fields' => 'nullable|array',
@@ -235,20 +231,14 @@ class AdminController extends Controller
             'signature_fields.engagement_letter.signature.y' => 'required|numeric|min:0',
             'signature_fields.engagement_letter.signature.width' => 'required|numeric|min:10',
             'signature_fields.engagement_letter.signature.height' => 'required|numeric|min:5',
-            'signature_fields.*.date.page' => 'nullable|integer|min:1',
-            'signature_fields.*.date.x' => 'nullable|numeric|min:0',
-            'signature_fields.*.date.y' => 'nullable|numeric|min:0',
-            'signature_fields.*.date.width' => 'nullable|numeric|min:10',
-            'signature_fields.*.date.height' => 'nullable|numeric|min:5',
+            'signature_fields.engagement_letter.date.page' => 'nullable|integer|min:1',
+            'signature_fields.engagement_letter.date.x' => 'nullable|numeric|min:0',
+            'signature_fields.engagement_letter.date.y' => 'nullable|numeric|min:0',
+            'signature_fields.engagement_letter.date.width' => 'nullable|numeric|min:10',
+            'signature_fields.engagement_letter.date.height' => 'nullable|numeric|min:5',
         ])->validate();
 
         $this->ensureRequiredOnboardingDocumentsPresent($application, $request);
-
-        // Generate application number if not already generated
-        if (!$application->application_number) {
-            $applicationNumber = 'TM-' . now()->format('Y') . '-' . $application->id;
-            $application->update(['application_number' => $applicationNumber]);
-        }
 
         $applicationUpdateData = [
             'rejection_reason' => null,
@@ -259,9 +249,7 @@ class AdminController extends Controller
         }
 
         $application->update($applicationUpdateData);
-        $this->storeAdminWorkflowDocumentFromPending($application, 'engagement_letter', 'Engagement letter uploaded by admin.');
-        $this->storeAdminWorkflowDocumentFromPending($application, 'poa', 'Power of attorney uploaded by admin.');
-        $this->storeAdminWorkflowDocumentFromPending($application, 'affidavit', 'Affidavit uploaded by admin.');
+        $this->storeAdminWorkflowDocumentFromPending($application, 'engagement_letter', 'Engagement Letter uploaded by admin.');
         $this->storeAdditionalOnboardingDocumentsFromPending($application, 'Document sent by admin.');
         $this->storeOnboardingFieldPlacements($application, $request);
         $workflow->approveReview($application->fresh(), $validated['notes'] ?? null);
@@ -277,13 +265,8 @@ class AdminController extends Controller
 
             if (config('queue.default') !== 'sync') {
                 Mail::to($user->email)->queue($approvalNotification);
-            } elseif (config('mail.default') !== 'smtp') {
-                Mail::to($user->email)->send($approvalNotification);
             } else {
-                Log::warning('Skipped synchronous application approval email to avoid request timeout.', [
-                    'application_id' => $application->id,
-                    'user_id' => $user->id,
-                ]);
+                Mail::to($user->email)->send($approvalNotification);
             }
         } catch (Throwable $exception) {
             Log::warning('Application approval email failed.', [
@@ -296,15 +279,15 @@ class AdminController extends Controller
         \App\Models\Notification::create([
             'user_id' => $user->id,
             'type' => 'application_approved',
-            'title' => '✅ Application Approved',
-            'message' => 'Your trademark application has been approved by the administrator.',
+            'title' => 'Engagement Letter Ready',
+            'message' => 'Your initial review is complete. Please review and electronically sign the Engagement Letter.',
             'data' => [
                 'application_id' => $application->id,
                 'note' => $validated['notes'] ?? null,
             ],
         ]);
 
-        return redirect()->back()->with('success', 'Application approved! The user has been notified by email and in-app notification.');
+        return redirect()->back()->with('success', 'Initial review completed and the Engagement Letter was sent to the client for signing.');
     }
 
     public function resendOnboardingPackage(Request $request, $applicationId, TrademarkWorkflowService $workflow)
@@ -321,8 +304,6 @@ class AdminController extends Controller
         $validated = Validator::make($request->all(), [
             'notes' => 'nullable|string|max:1000',
             'engagement_letter_file' => 'nullable|file|mimes:pdf|max:15360',
-            'poa_file' => 'nullable|file|mimes:pdf|max:15360',
-            'affidavit_file' => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:15360',
             'other_document_files' => 'nullable|array',
             'other_document_files.*' => 'file|mimes:pdf,jpg,jpeg,png,doc,docx|max:15360',
             'signature_fields' => 'nullable|array',
@@ -342,12 +323,9 @@ class AdminController extends Controller
 
         $this->deleteWorkflowDocuments($application, [
             'engagement_letter (Signed)',
-            'poa (Signed)',
         ]);
 
         $this->storeAdminWorkflowDocumentFromPending($application, 'engagement_letter', 'Engagement letter resent by admin.');
-        $this->storeAdminWorkflowDocumentFromPending($application, 'poa', 'Power of attorney resent by admin.');
-        $this->storeAdminWorkflowDocumentFromPending($application, 'affidavit', 'Affidavit resent by admin.');
         $this->storeAdditionalOnboardingDocumentsFromPending($application, 'Document sent by admin.');
         $this->storeOnboardingFieldPlacements($application, $request);
         $this->resetOnboardingTasks($application);
@@ -373,7 +351,7 @@ class AdminController extends Controller
                 'to_status' => $application->current_status,
                 'actor_type' => 'admin',
                 'actor_id' => Auth::guard('admin')->id(),
-                'reason' => $validated['notes'] ?: 'Onboarding package resent. Applicant must electronically sign the latest Engagement Letter and upload physically signed POA and Affidavit copies.',
+                'reason' => $validated['notes'] ?: 'Engagement Letter resent for the applicant to review and electronically sign.',
                 'metadata' => [
                     'event' => 'onboarding_package_resent',
                     'title' => 'Onboarding Package Resent',
@@ -385,14 +363,14 @@ class AdminController extends Controller
             'user_id' => $user->id,
             'type' => 'onboarding_package_resent',
             'title' => 'Onboarding Package Updated',
-            'message' => 'Your onboarding package has been updated. Please review the latest documents, electronically sign the Engagement Letter, and upload physically signed POA and Affidavit copies.',
+            'message' => 'Your Engagement Letter has been updated. Please review and electronically sign the latest copy.',
             'data' => [
                 'application_id' => $application->id,
             ],
         ]);
 
         try {
-            $message = 'Your onboarding package has been updated. Please log in, review the latest documents, electronically sign the Engagement Letter, and upload physically signed POA and Affidavit copies.';
+            $message = 'Your Engagement Letter has been updated. Please log in, review the latest copy, and electronically sign it.';
 
             if (!empty($validated['notes'])) {
                 $message .= "\n\nAdmin note: " . $validated['notes'];
@@ -403,7 +381,7 @@ class AdminController extends Controller
                 'Onboarding package updated',
                 $message,
                 $this->mailAttachmentsForDocuments($application->documents()
-                    ->whereIn('document_type', ['engagement_letter', 'poa', 'affidavit', 'other_document'])
+                    ->whereIn('document_type', ['engagement_letter', 'other_document'])
                     ->latest('id')
                     ->get()
                     ->all()),
@@ -412,13 +390,8 @@ class AdminController extends Controller
 
             if (config('queue.default') !== 'sync') {
                 Mail::to($user->email)->queue($notification);
-            } elseif (config('mail.default') !== 'smtp') {
-                Mail::to($user->email)->send($notification);
             } else {
-                Log::warning('Skipped synchronous onboarding resend email to avoid request timeout.', [
-                    'application_id' => $application->id,
-                    'user_id' => $user->id,
-                ]);
+                Mail::to($user->email)->send($notification);
             }
         } catch (\Throwable $e) {
             Log::warning('Onboarding resend email notification failed.', [
@@ -430,7 +403,7 @@ class AdminController extends Controller
 
         $workflow->ensureOnboardingPackage($application->fresh());
 
-        return redirect()->back()->with('success', 'Onboarding package resent successfully. The user has been notified.');
+        return redirect()->back()->with('success', 'Engagement Letter resent successfully. The client has been notified.');
     }
 
     public function uploadManualOnboardingPackage(Request $request, $applicationId, TrademarkWorkflowService $workflow)
@@ -443,8 +416,6 @@ class AdminController extends Controller
 
         $validated = $request->validate([
             'manual_engagement_letter_file' => 'required|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:15360',
-            'manual_poa_file' => 'required|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:15360',
-            'manual_affidavit_file' => 'required|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:15360',
             'manual_other_document_files' => 'nullable|array',
             'manual_other_document_files.*' => 'file|mimes:pdf,jpg,jpeg,png,doc,docx|max:15360',
             'manual_onboarding_note' => 'nullable|string|max:1000',
@@ -472,22 +443,8 @@ class AdminController extends Controller
             $request->file('manual_engagement_letter_file'),
             $note
         );
-        $signedPoa = $this->storeManualSignedOnboardingDocument(
-            $application,
-            'poa (Signed)',
-            $request->file('manual_poa_file'),
-            $note
-        );
-        $signedAffidavit = $this->storeManualSignedOnboardingDocument(
-            $application,
-            'affidavit (Signed)',
-            $request->file('manual_affidavit_file'),
-            $note
-        );
         $manualUploadedDocuments = collect([
             $signedEngagementLetter,
-            $signedPoa,
-            $signedAffidavit,
         ]);
 
         foreach ($request->file('manual_other_document_files', []) as $file) {
@@ -501,7 +458,6 @@ class AdminController extends Controller
         }
 
         $workflow->completeTask($application, 'engagement_letter_signed');
-        $workflow->completeTask($application, 'poa_signed');
         $workflow->completeTask($application, 'signature_submitted');
 
         if (Schema::hasColumn('applications', 'workflow_meta')) {
@@ -525,8 +481,6 @@ class AdminController extends Controller
                     'event' => 'manual_onboarding_package_uploaded',
                     'title' => 'Manual Onboarding Package Uploaded',
                     'engagement_letter_document_id' => $signedEngagementLetter->id,
-                    'poa_document_id' => $signedPoa->id,
-                    'affidavit_document_id' => $signedAffidavit->id,
                     'other_document_ids' => $manualUploadedDocuments
                         ->filter(fn ($document) => $document->document_type === 'other_document')
                         ->pluck('id')
@@ -539,8 +493,8 @@ class AdminController extends Controller
         \App\Models\Notification::create([
             'user_id' => $application->user_id,
             'type' => 'manual_onboarding_uploaded',
-            'title' => 'Signed onboarding documents uploaded',
-            'message' => 'Your physically signed onboarding documents have been uploaded by the admin team.',
+            'title' => 'Signed Engagement Letter uploaded',
+            'message' => 'Your signed Engagement Letter has been uploaded by the admin team.',
             'data' => [
                 'application_id' => $application->id,
             ],
@@ -549,8 +503,8 @@ class AdminController extends Controller
         try {
             Mail::to($application->user->email)->send(new EventNotification(
                 $application->user,
-                'Signed onboarding documents submitted and approved',
-                'Your signed onboarding documents have been submitted and approved by the admin team. The approved documents are attached to this email for your records.',
+                'Signed Engagement Letter submitted and approved',
+                'Your signed Engagement Letter has been submitted and approved by the admin team. The approved document is attached to this email for your records.',
                 $this->mailAttachmentsForDocuments($manualUploadedDocuments->all()),
                 $this->applicationActionCenterUrl($application)
             ));
@@ -560,7 +514,7 @@ class AdminController extends Controller
 
         $workflow->refreshOnboardingStatus($application->fresh());
 
-        return redirect()->back()->with('success', 'Physically signed onboarding package uploaded successfully.');
+        return redirect()->back()->with('success', 'Signed Engagement Letter uploaded successfully.');
     }
 
     /**
@@ -712,16 +666,46 @@ class AdminController extends Controller
         }
 
         $validated = $request->validate([
-            'application_number' => 'nullable|string|max:255',
+            'application_number' => 'required|string|max:255',
+            'filing_date' => 'required|date|before_or_equal:today',
+            'examination_deadline' => 'nullable|date|after_or_equal:filing_date',
+            'publication_date' => 'nullable|date|after_or_equal:filing_date',
+            'opposition_deadline' => 'nullable|date|after_or_equal:publication_date',
+            'registration_number' => 'nullable|string|max:255',
+            'renewal_date' => 'nullable|date|after:filing_date',
+            'filing_receipt' => 'required|file|mimes:pdf|max:15360',
             'filing_note' => 'nullable|string|max:1000',
         ]);
 
+        $receipt = $request->file('filing_receipt');
+        $receiptName = 'ukipo-filing-receipt-' . $application->id . '-' . now()->timestamp . '.pdf';
+        $receiptPath = 'documents/ukipo/' . $receiptName;
+        Storage::disk('public')->put($receiptPath, file_get_contents($receipt));
+        Document::create([
+            'application_id' => $application->id,
+            'user_id' => $application->user_id,
+            'document_type' => 'ukipo_filing_receipt',
+            'file_path' => $receiptPath,
+            'file_name' => $receiptName,
+            'file_type' => 'pdf',
+            'file_size' => $receipt->getSize(),
+            'status' => 'approved',
+            'verification_notes' => 'UKIPO filing receipt uploaded by admin.',
+        ]);
+
         $workflow->markFiled($application, [
-            'application_number' => $validated['application_number'] ?? null,
+            'application_number' => $validated['application_number'],
+            'filing_date' => $validated['filing_date'],
+            'examination_deadline' => $validated['examination_deadline'] ?? null,
+            'publication_date' => $validated['publication_date'] ?? null,
+            'opposition_deadline' => $validated['opposition_deadline'] ?? null,
+            'registration_number' => $validated['registration_number'] ?? null,
+            'renewal_date' => $validated['renewal_date'] ?? null,
+            'filing_receipt_path' => $receiptPath,
             'filing_note' => $validated['filing_note'] ?? null,
         ]);
 
-        return redirect()->back()->with('success', 'Application filed successfully!');
+        return redirect()->back()->with('success', 'UKIPO filing recorded successfully.');
     }
 
     public function completeFiledStage(Request $request, $applicationId, TrademarkWorkflowService $workflow)
@@ -1011,7 +995,31 @@ class AdminController extends Controller
 
         $application->update($statusUpdate);
 
-        // TODO: Send status update email
+        $registryStatusLabel = ucwords(strtolower(str_replace('_', ' ', $validated['status'])));
+        $title = 'Trade mark status updated: ' . $validated['trademark_status'];
+        $message = implode("\n", [
+            'The registry status for ' . ($application->brand_name ?: 'your trade mark') . ' has been updated.',
+            '',
+            'Trade mark status: ' . $validated['trademark_status'],
+            'Registry status: ' . $registryStatusLabel,
+        ]);
+
+        if (Schema::hasTable('notifications')) {
+            \App\Models\Notification::create([
+                'user_id' => $application->user_id,
+                'type' => 'registry_status_updated',
+                'title' => $title,
+                'message' => $message,
+                'data' => [
+                    'application_id' => $application->id,
+                    'trademark_status' => $validated['trademark_status'],
+                    'registry_status' => $validated['status'],
+                    'action_url' => $this->applicationActionCenterUrl($application),
+                ],
+            ]);
+        }
+
+        $this->sendClientStageActionEmail($application, $title, $message);
 
         return response()->json(['success' => true]);
     }
@@ -1023,16 +1031,9 @@ class AdminController extends Controller
             ->where('document_type', 'engagement_letter (Signed)')
             ->latest('id')
             ->first();
-        $signedPoa = $application->documents()
-            ->where('document_type', 'poa (Signed)')
-            ->latest('id')
-            ->first();
 
-        if (
-            !$signedEngagementLetter || $signedEngagementLetter->status !== 'verified' ||
-            !$signedPoa || $signedPoa->status !== 'verified'
-        ) {
-            return redirect()->back()->with('error', 'The signed engagement letter and signed POA must be verified before KYC can be completed.');
+        if (!$signedEngagementLetter || $signedEngagementLetter->status !== 'verified') {
+            return redirect()->back()->with('error', 'The signed Engagement Letter must be verified before this step can be completed.');
         }
 
         $validated = $request->validate([
@@ -1173,9 +1174,21 @@ class AdminController extends Controller
     public function publishDraft(Request $request, $applicationId, TrademarkWorkflowService $workflow)
     {
         $application = Application::findOrFail($applicationId);
+        $priorityClaimed = (bool) data_get($application->members_details, 'priority_details.priority_claim_required', false);
+
+        if ($priorityClaimed && !$request->boolean('priority_approved')) {
+            return redirect()->back()->withInput()->withErrors([
+                'priority_approved' => 'Confirm the priority claim before sending the application for client approval.',
+            ]);
+        }
 
         $validated = $request->validate([
             'draft_file' => 'required|file|mimes:pdf|max:15360',
+            'final_specification_file' => 'required|file|mimes:pdf|max:15360',
+            'filing_authority_file' => 'required|file|mimes:pdf|max:15360',
+            'final_classes' => 'required|string|max:500',
+            'final_specification' => 'required|string|max:10000',
+            'priority_deadline' => 'nullable|date',
             'draft_note' => 'nullable|string|max:2000',
         ]);
 
@@ -1202,14 +1215,62 @@ class AdminController extends Controller
             'verification_notes' => $validated['draft_note'] ?: 'Draft PDF sent by admin for applicant approval.',
         ]);
 
+        Document::create([
+            'application_id' => $application->id,
+            'user_id' => $application->user_id,
+            'document_type' => 'application_summary',
+            'file_path' => $path,
+            'file_name' => $filename,
+            'file_type' => 'pdf',
+            'file_size' => $file->getSize(),
+            'status' => 'approved',
+            'verification_notes' => 'Application summary sent by admin for client approval.',
+        ]);
+
+        foreach ([
+            'final_specification_file' => ['final_specification', 'final-specification'],
+            'filing_authority_file' => ['filing_authority', 'filing-authority'],
+        ] as $field => [$documentType, $slug]) {
+            $approvalFile = $request->file($field);
+            $approvalFilename = $slug . '-' . $application->id . '-' . now()->timestamp . '.pdf';
+            $approvalPath = 'documents/client-approval/' . $approvalFilename;
+            Storage::disk('public')->put($approvalPath, file_get_contents($approvalFile));
+            Document::create([
+                'application_id' => $application->id,
+                'user_id' => $application->user_id,
+                'document_type' => $documentType,
+                'file_path' => $approvalPath,
+                'file_name' => $approvalFilename,
+                'file_type' => 'pdf',
+                'file_size' => $approvalFile->getSize(),
+                'status' => 'approved',
+                'verification_notes' => 'Document sent by admin for client approval.',
+            ]);
+        }
+
+        $details = $application->members_details ?? [];
+        $tradeMarkDetails = $details['trademark_details'] ?? [];
+        $finalClasses = array_values(array_filter(array_map('trim', explode(',', $validated['final_classes']))));
+        $tradeMarkDetails['final_approved_classes'] = $finalClasses;
+        $tradeMarkDetails['final_goods_and_services_specification'] = $validated['final_specification'];
+        $details['trademark_details'] = $tradeMarkDetails;
+        if ($priorityClaimed) {
+            $details['priority_details']['priority_deadline'] = $validated['priority_deadline'] ?? null;
+            $details['priority_details']['approved_by_admin'] = true;
+        }
+        $application->forceFill([
+            'classes' => $finalClasses,
+            'members_details' => $details,
+        ])->save();
+
         $workflow->publishDraft($application, [
-            'classes' => $application->classes ?? [],
-            'goods_services' => $validated['draft_note'] ?: $application->goods_services,
+            'classes' => $finalClasses,
+            'goods_services' => $validated['final_specification'],
             'tm_a_draft_path' => $path,
             'draft_note' => $validated['draft_note'] ?? null,
         ]);
 
-        return redirect()->back()->with('success', 'Draft published to the client for approval.');
+        return redirect()->back()->with('success', 'Application and approval documents sent to the client.');
     }
 
     /**
@@ -1257,8 +1318,7 @@ class AdminController extends Controller
             'applications' => $applications,
             'applicationStats' => $applicationStats,
             'applicationStatuses' => [
-                ...TrademarkWorkflow::labels(),
-                TrademarkWorkflow::REGISTRY_REGISTERED => 'Registered',
+                ...TrademarkWorkflow::statusOptions(),
             ],
         ]);
     }
@@ -1422,6 +1482,12 @@ class AdminController extends Controller
                 ],
             ]);
 
+            $this->sendClientStageActionEmail(
+                $application,
+                'Documents verified: ' . ($application->brand_name ?: 'Trade mark application'),
+                'The following document(s) have been verified by our team: ' . $labels->join(', ') . ".\n\nYour application will now continue to the next applicable stage."
+            );
+
             $workflow->refreshOnboardingStatus($application->fresh());
 
             return redirect()->back()->with('success', 'Selected document(s) accepted and verified successfully.');
@@ -1447,15 +1513,51 @@ class AdminController extends Controller
             ],
         ]);
 
+        $this->sendClientStageActionEmail(
+            $application,
+            'Action required: reupload application documents',
+            'Please reupload the following document(s): ' . $labels->join(', ') . ".\n\nAdmin note: " . $validated['note']
+        );
+
         return redirect()->back()->with('success', 'Reupload requested for selected document(s).');
+    }
+
+    private function sendClientStageActionEmail(
+        Application $application,
+        string $title,
+        string $message,
+        array $attachments = [],
+        string $actionText = 'Open Application Status'
+    ): void {
+        try {
+            $notification = new EventNotification(
+                $application->user,
+                $title,
+                $message,
+                $attachments,
+                $this->applicationActionCenterUrl($application),
+                $actionText
+            );
+
+            if (config('queue.default') !== 'sync') {
+                Mail::to($application->user->email)->queue($notification);
+            } else {
+                Mail::to($application->user->email)->send($notification);
+            }
+        } catch (\Throwable $exception) {
+            Log::warning('Client stage-action email could not be dispatched.', [
+                'application_id' => $application->id,
+                'title' => $title,
+                'error' => $exception->getMessage(),
+            ]);
+        }
     }
 
     private function requiresAdminVerification(Document $document): bool
     {
         return in_array($document->document_type, [
             'engagement_letter (Signed)',
-            'poa (Signed)',
-            'affidavit (Signed)',
+            'filing_authority (Signed)',
         ], true);
     }
 
@@ -1636,8 +1738,6 @@ class AdminController extends Controller
     {
         $requiredDocuments = [
             'engagement_letter' => ['field' => 'engagement_letter_file', 'label' => 'Engagement Letter'],
-            'poa' => ['field' => 'poa_file', 'label' => 'POA'],
-            'affidavit' => ['field' => 'affidavit_file', 'label' => 'Affidavit'],
         ];
         $errors = [];
 
@@ -1670,15 +1770,13 @@ class AdminController extends Controller
     {
         Validator::make($request->all(), [
             'engagement_letter_file' => 'nullable|file|mimes:pdf|max:15360',
-            'poa_file' => 'nullable|file|mimes:pdf|max:15360',
-            'affidavit_file' => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:15360',
             'other_document_files' => 'nullable|array',
             'other_document_files.*' => 'file|mimes:pdf,jpg,jpeg,png,doc,docx|max:15360',
         ])->validate();
 
         $uploads = $this->pendingOnboardingUploads($application);
 
-        foreach (['engagement_letter_file' => 'engagement_letter', 'poa_file' => 'poa', 'affidavit_file' => 'affidavit'] as $field => $documentType) {
+        foreach (['engagement_letter_file' => 'engagement_letter'] as $field => $documentType) {
             if (!$request->hasFile($field)) {
                 continue;
             }
@@ -1878,7 +1976,7 @@ class AdminController extends Controller
         $fields = [];
         $input = $request->input('signature_fields', []);
 
-        foreach (['engagement_letter', 'poa', 'affidavit'] as $documentType) {
+        foreach (['engagement_letter'] as $documentType) {
             foreach (['signature', 'date'] as $fieldType) {
                 $field = data_get($input, $documentType . '.' . $fieldType, []);
                 $fieldEnabled = (string) ($field['enabled'] ?? '0') === '1';
@@ -1942,7 +2040,7 @@ class AdminController extends Controller
         }
 
         $application->tasks()
-            ->whereIn('task_code', ['engagement_letter_signed', 'poa_signed', 'signature_submitted'])
+            ->whereIn('task_code', ['engagement_letter_signed', 'signature_submitted'])
             ->update([
                 'status' => 'pending',
                 'completed_at' => null,
@@ -1964,7 +2062,7 @@ class AdminController extends Controller
     private function approvedStatus(): string
     {
         return $this->statusColumn() === 'service_status'
-            ? TrademarkWorkflow::ONBOARDING_PENDING
+            ? TrademarkWorkflow::APPROVED_FOR_FILING
             : 'approved';
     }
 

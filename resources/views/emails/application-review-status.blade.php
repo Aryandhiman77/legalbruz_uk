@@ -26,9 +26,9 @@
     <p>Dear {{ $user->name }},</p>
 
     @if ($decision === 'approved')
-        <p>Your trademark application for <strong>{{ $application->brand_name ?? 'your mark' }}</strong> has been approved by our administrator. Please review the onboarding documents and complete the required actions from your application status page.</p>
+        <p>The initial review of your trade mark application for <strong>{{ $application->brand_name ?? 'your mark' }}</strong> is complete. Please review and electronically sign the Engagement Letter from your application status page.</p>
         <div class="info-box">
-            The onboarding documents shared by the admin team are attached to this email for your review.
+            The Engagement Letter shared by the admin team is attached to this email for your review. POA and Affidavit are not required for this UK application.
         </div>
     @else
         <p>Our team has requested changes for your trademark application for <strong>{{ $application->brand_name ?? 'your mark' }}</strong>. Please review the note below and submit the corrected details.</p>

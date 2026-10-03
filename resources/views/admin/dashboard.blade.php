@@ -6,7 +6,7 @@
             <div>
                 <span class="admin-welcome-eyebrow">Admin workspace</span>
                 <h1>Welcome back, {{ Auth::guard('admin')->user()?->name ?? 'Admin' }}</h1>
-                <p>Use the sidebar to manage trademark matters, client submissions, website content, and incoming enquiries.</p>
+                <p>Manage UK trade mark filing applications, pricing, discounts, website content, and incoming enquiries.</p>
             </div>
             <div class="admin-welcome-mark"><i class="bi bi-command"></i></div>
         </section>

@@ -1,11 +1,7 @@
 <aside class="auth-panel">
     <a class="auth-brand" href="{{ route('landing') }}" aria-label="Legal Bruz home">
-        <span class="auth-brand-mark" aria-hidden="true">
-            <img src="{{ asset('logo4.png') }}" alt="">
-        </span>
-        <span class="auth-brand-copy">
-            <strong>Legal Bruz LLP</strong>
-            <small>Built for brands. Backed by law.</small>
+        <span class="auth-brand-mark">
+            <img src="{{ asset('legal-bruz-pvt-ltd-logo.png') }}" alt="Legal Bruz Pvt. Ltd. emblem" width="82" height="82">
         </span>
     </a>
 

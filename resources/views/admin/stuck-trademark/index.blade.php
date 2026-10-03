@@ -293,7 +293,7 @@
                                         </td>
                                         <td><x-admin-status :status="$case->status_label" class="recovery-status-badge" /></td>
                                         <td><x-admin-status :status="$case->audit_payment_status" /></td>
-                                        <td><span class="recovery-date">{{ $case->updated_at->timezone('Asia/Kolkata')->format('d M Y') }}</span></td>
+                                        <td><span class="recovery-date">{{ $case->updated_at->timezone(config('app.timezone', 'Europe/London'))->format('d M Y') }}</span></td>
                                         <td class="text-end">
                                             <a href="{{ route('admin.stuck-trademark.show', $case) }}" class="btn btn-sm btn-primary">Manage</a>
                                         </td>
@@ -332,7 +332,7 @@
                                     </div>
                                     <div class="recovery-admin-meta-item">
                                         <span>Updated</span>
-                                        <strong>{{ $case->updated_at->timezone('Asia/Kolkata')->format('d M Y') }}</strong>
+                                        <strong>{{ $case->updated_at->timezone(config('app.timezone', 'Europe/London'))->format('d M Y') }}</strong>
                                     </div>
                                 </div>
                                 <div class="recovery-admin-actions">

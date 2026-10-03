@@ -18,7 +18,7 @@
                 '@type' => 'Organization',
                 'name' => 'Legal Bruz',
                 'sameAs' => route('landing'),
-                'logo' => asset('logo.png'),
+                'logo' => asset('legal-bruz-pvt-ltd-logo.png'),
             ],
             'jobLocationType' => $job->workplace_type === 'Remote' ? 'TELECOMMUTE' : null,
             'jobLocation' => $job->workplace_type !== 'Remote' ? [

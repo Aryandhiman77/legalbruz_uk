@@ -14,21 +14,35 @@
         $clientActionUrl = fn (string $routeName, $parameters = []) => $isAdminPreview ? '#' : route($routeName, $parameters);
         $currentStatus = $application->current_status;
         $stageActionOnly = request()->boolean('stage_action');
-        $displayTimezone = 'Asia/Kolkata';
-        $formatDateTime = fn ($timestamp, string $format = 'd M Y, h:i A') => $timestamp
+        $displayTimezone = config('app.timezone', 'Europe/London');
+        $formatDateTime = fn ($timestamp, string $format = 'd M Y, h:i A T') => $timestamp
             ? \Illuminate\Support\Carbon::parse($timestamp)->timezone($displayTimezone)->format($format)
             : null;
         $details = $application->members_details ?? [];
         $submittedSections = [
-            'Billing Details' => $details['billing_company_details'] ?? [],
-            'Trademark Applicant Details' => $details['trademark_applicant_details'] ?? [],
-            'Signatory Details' => $details['details_of_signatory'] ?? [],
-            'Co-applicant / Partner Details' => $details['details_of_co_applicant_or_partners'] ?? [],
+            'Billing Details' => $details['billing_details'] ?? ($details['billing_company_details'] ?? []),
+            'Applicant Details' => $details['applicant_details'] ?? ($details['trademark_applicant_details'] ?? []),
+            'Authorised Person' => $details['authorised_person'] ?? ($details['details_of_signatory'] ?? []),
+            'Additional Applicants' => $details['additional_applicants'] ?? ($details['details_of_co_applicant_or_partners'] ?? []),
             'Trademark Details' => $details['trademark_details'] ?? [],
+            'Priority Details' => $details['priority_details'] ?? [],
         ];
         $formatSubmittedValue = function ($value) {
+            if (is_bool($value)) {
+                return $value ? 'Yes' : 'No';
+            }
+
             if (is_array($value)) {
-                return implode(', ', array_filter($value, fn ($item) => $item !== null && $item !== '')) ?: 'N/A';
+                return collect($value)->map(function ($item) {
+                    if (!is_array($item)) {
+                        return $item;
+                    }
+
+                    return collect($item)
+                        ->filter(fn ($nested) => $nested !== null && $nested !== '')
+                        ->map(fn ($nested, $key) => ucwords(str_replace('_', ' ', $key)).': '.(is_bool($nested) ? ($nested ? 'Yes' : 'No') : $nested))
+                        ->implode(', ');
+                })->filter()->implode('; ') ?: 'N/A';
             }
 
             return filled($value) ? $value : 'N/A';
@@ -37,10 +51,11 @@
             return match ($type) {
                 'engagement_letter' => 'Engagement Letter',
                 'engagement_letter (Signed)' => 'Signed Engagement Letter',
-                'poa' => 'Power of Attorney',
-                'poa (Signed)' => 'Signed Power of Attorney',
-                'affidavit' => 'Affidavit',
-                'affidavit (Signed)' => 'Affidavit (Signed)',
+                'application_summary' => 'Application Summary',
+                'final_specification' => 'Final Specification',
+                'filing_authority' => 'Filing Authority',
+                'filing_authority (Signed)' => 'Signed Filing Authority',
+                'ukipo_filing_receipt' => 'UKIPO Filing Receipt',
                 'search_report' => 'Search Report',
                 'draft_pdf' => 'Draft PDF',
                 'draft_pdf (Signed)' => 'Signed Draft PDF',
@@ -66,7 +81,7 @@
             };
         };
         $isAdminOnboardingDocument = function ($doc) {
-            return in_array((string) $doc->document_type, ['engagement_letter', 'poa', 'affidavit', 'other_document'], true)
+            return in_array((string) $doc->document_type, ['engagement_letter', 'other_document'], true)
                 && (
                     str_contains((string) $doc->file_path, 'workflow/admin/')
                     || str_contains(strtolower((string) $doc->verification_notes), 'uploaded by admin')
@@ -86,7 +101,7 @@
         $timeline = [
             $workflow::APPLICATION_SUBMITTED => ['title' => 'Application', 'icon' => 'file-signature', 'copy' => 'Application created and advance payment received.'],
             $workflow::UNDER_REVIEW => ['title' => 'Admin Review', 'icon' => 'user-check', 'copy' => 'Our team is reviewing the intake and filing fit.'],
-            $workflow::ONBOARDING_PENDING => ['title' => 'Onboarding Package', 'icon' => 'package-check', 'copy' => 'Review the admin-uploaded documents, sign the required documents, and complete onboarding tasks.'],
+            $workflow::ONBOARDING_PENDING => ['title' => 'Engagement Letter', 'icon' => 'file-signature', 'copy' => 'Review and electronically sign the Engagement Letter.'],
             $workflow::STRATEGY_IN_PROGRESS => ['title' => 'Strategy', 'icon' => 'search-check', 'copy' => 'Trademark search, risk review, classes, and goods/services drafting.'],
             $workflow::DRAFT_READY => ['title' => 'Draft Preparation', 'icon' => 'file-pen', 'copy' => 'TM-A draft and filing details are being prepared.'],
             $workflow::AWAITING_APPROVAL => ['title' => 'Client Approval', 'icon' => 'badge-check', 'copy' => 'Review the draft, request changes, or approve it for filing.'],
@@ -138,7 +153,7 @@
         $searchReportDocument = $application->documents->where('document_type', 'search_report')->sortByDesc('id')->first();
         $affidavitDocument = $application->documents->where('document_type', 'affidavit')->sortByDesc('id')->first();
         $affidavitSigned = $application->documents->where('document_type', 'affidavit (Signed)')->sortByDesc('id')->first();
-        $verifiedSignedOnboardingDocuments = collect([$engagementLetterSigned, $poaSigned, $affidavitSigned])
+        $verifiedSignedOnboardingDocuments = collect([$engagementLetterSigned])
             ->filter(fn ($doc) => $doc && $doc->status === 'verified')
             ->values();
         $otherOnboardingDocuments = $application->documents->where('document_type', 'other_document')->sortByDesc('id')->values();
@@ -146,7 +161,7 @@
         $visibleDocuments = $application->documents
             ->reject(fn ($doc) => $doc->status === 'archived')
             ->sortByDesc('id');
-        $requiredOnboardingSignedDocuments = collect([$engagementLetterSigned, $poaSigned, $affidavitSigned]);
+        $requiredOnboardingSignedDocuments = collect([$engagementLetterSigned]);
         $onboardingSubmittedDocuments = $requiredOnboardingSignedDocuments->filter();
         $hasDraftOnboardingDocuments = $onboardingSubmittedDocuments->contains(fn ($doc) => $doc->status === 'draft');
         $draftOnboardingDocumentTypes = $onboardingSubmittedDocuments
@@ -281,10 +296,10 @@
                 'steps' => ['No action is needed right now.', 'Watch for email or dashboard updates.'],
             ],
             $currentStatus === $workflow::ONBOARDING_PENDING => [
-                'icon' => 'clipboard-check',
-                'title' => 'Complete onboarding documents',
-                'copy' => 'Review the documents, sign where required, and submit the completed onboarding package.',
-                'steps' => ['View or download the admin-uploaded documents.', 'Apply your E-Sign where shown.', 'Submit the onboarding package for verification.'],
+                'icon' => 'file-signature',
+                'title' => 'Sign the Engagement Letter',
+                'copy' => 'Review the Engagement Letter, apply your electronic signature, and submit it for verification.',
+                'steps' => ['Open and review the Engagement Letter.', 'Apply your E-Sign where shown.', 'Submit the signed letter for verification.'],
             ],
             $currentStatus === $workflow::STRATEGY_IN_PROGRESS => [
                 'icon' => 'search',
@@ -405,16 +420,6 @@
         $pushActivity($workflow::FILED, $application->filed_at, 'Trademark application filed.');
         $pushActivity($workflow::POST_FILING, $application->post_filing_started_at ?? ($currentStatus === $workflow::POST_FILING ? $application->current_stage_started_at : null), 'Post-filing care started.');
 
-        if ($affidavitGeneratedAt = data_get($application->workflow_meta, 'affidavit_generated_at')) {
-            $workflowActivity->push([
-                'status' => 'event_affidavit_generated',
-                'title' => 'Affidavit Generated',
-                'timestamp' => \Illuminate\Support\Carbon::parse($affidavitGeneratedAt),
-                'reason' => 'Affidavit generated and shared with the client for reference.',
-                'source' => 'workflow_meta',
-            ]);
-        }
-
         $workflowActivity = $workflowActivity
             ->filter(fn ($item) => !empty($item['timestamp']))
             ->sortByDesc('timestamp')
@@ -459,10 +464,7 @@
         $storedFinalOppositionResult = $application->final_opposition_result
             ?: data_get($acceptedAdvertisedStageMeta, 'final_opposition_result');
         $postFilingIsOpposed = $currentStatus === $workflow::POST_FILING
-            && (
-                $acceptedAdvertisedStageStatus === $postFilingJourney::OPPOSED
-                || filled(data_get($acceptedAdvertisedStageMeta, 'opposed_at'))
-            );
+            && $acceptedAdvertisedStageStatus === $postFilingJourney::OPPOSED;
         $oppositionDefenceCase = \App\Models\TrademarkOppositionCase::query()
             ->where('user_id', $application->user_id)
             ->where('flow_type', \App\Support\TrademarkOppositionWorkflow::FLOW_DEFEND)
@@ -485,7 +487,7 @@
         $finalOppositionResult = match (true) {
             $oppositionDefenceSucceeded => \App\Support\TrademarkOppositionWorkflow::APPLICATION_FINAL_RESULT_DEFENCE_SUCCESSFUL,
             $oppositionDefenceFailed => \App\Support\TrademarkOppositionWorkflow::APPLICATION_FINAL_RESULT_OPPOSITION_SUCCESSFUL,
-            $oppositionDefenceCase?->current_admin_status === \App\Support\TrademarkOppositionWorkflow::ADMIN_MATTER_CLOSED && filled($storedFinalOppositionResult) => $storedFinalOppositionResult,
+            filled($storedFinalOppositionResult) => $storedFinalOppositionResult,
             default => null,
         };
         $finalOppositionResultLabel = \App\Support\TrademarkOppositionWorkflow::applicationFinalOppositionResultLabel($finalOppositionResult);
@@ -497,6 +499,44 @@
             \App\Support\TrademarkOppositionWorkflow::APPLICATION_FINAL_RESULT_APPLICATION_WITHDRAWN => 'The trademark application was withdrawn.',
             \App\Support\TrademarkOppositionWorkflow::APPLICATION_FINAL_RESULT_OTHER => 'The matter has been closed with a custom final result.',
             default => null,
+        };
+        $postFilingHasOppositionHistory = $currentStatus === $workflow::POST_FILING
+            && (
+                $acceptedAdvertisedStageStatus === $postFilingJourney::OPPOSED
+                || filled(data_get($acceptedAdvertisedStageMeta, 'opposed_at'))
+                || filled($storedFinalOppositionResult)
+                || $oppositionDefenceCase
+            );
+        $oppositionJourneyOutcome = match (true) {
+            in_array($finalOppositionResult, [
+                \App\Support\TrademarkOppositionWorkflow::APPLICATION_FINAL_RESULT_DEFENCE_SUCCESSFUL,
+                \App\Support\TrademarkOppositionWorkflow::APPLICATION_FINAL_RESULT_OPPOSITION_WITHDRAWN,
+            ], true),
+            $oppositionDefenceSucceeded => 'victory',
+            in_array($finalOppositionResult, [
+                \App\Support\TrademarkOppositionWorkflow::APPLICATION_FINAL_RESULT_OPPOSITION_SUCCESSFUL,
+                \App\Support\TrademarkOppositionWorkflow::APPLICATION_FINAL_RESULT_APPLICATION_WITHDRAWN,
+            ], true),
+            $oppositionDefenceFailed => 'lost',
+            in_array($finalOppositionResult, [
+                \App\Support\TrademarkOppositionWorkflow::APPLICATION_FINAL_RESULT_SETTLEMENT_CLOSED,
+                \App\Support\TrademarkOppositionWorkflow::APPLICATION_FINAL_RESULT_OTHER,
+            ], true) => 'closed',
+            $acceptedAdvertisedStageStatus === $postFilingJourney::COMPLETED
+                && filled(data_get($acceptedAdvertisedStageMeta, 'opposed_at')) => 'victory',
+            default => 'opposed',
+        };
+        $oppositionJourneyOutcomeLabel = match ($oppositionJourneyOutcome) {
+            'victory' => 'Victory',
+            'lost' => 'Lost',
+            'closed' => 'Closed',
+            default => 'Opposed',
+        };
+        $oppositionJourneyVisualStatus = match ($oppositionJourneyOutcome) {
+            'victory' => 'case-victory',
+            'lost' => 'case-lost',
+            'closed' => 'case-closed',
+            default => 'opposed',
         };
         $oppositionDefenceCreateUrl = route('trademark-opposition.create', array_filter([
             'applicant_name' => $application->applicant_name,
@@ -656,18 +696,13 @@
                                                         @php
                                                             $postStageKey = $postFilingStage['key'];
                                                             $postStageStatus = $postFilingJourney::statusFor($application, $postStageKey);
+                                                            $postStageMeta = data_get($application->workflow_meta, "post_filing_journey.stages.$postStageKey", []);
                                                             $postStageVisualStatus = $postStageStatus;
                                                             $postStageStatusLabel = ucwords($postStageStatus);
-                                                            if ($postStageStatus === 'opposed' && $postStageKey === 'accepted_advertised') {
-                                                                if (filled($finalOppositionResultLabel)) {
-                                                                    $postStageVisualStatus = $finalOppositionResult;
-                                                                    $postStageStatusLabel = $finalOppositionResultLabel;
-                                                                } elseif ($oppositionDefenceSucceeded) {
-                                                                    $postStageVisualStatus = 'case-victory';
-                                                                    $postStageStatusLabel = 'Case Victory';
-                                                                }
+                                                            if ($postStageKey === 'accepted_advertised' && filled(data_get($postStageMeta ?? [], 'opposed_at'))) {
+                                                                $postStageVisualStatus = $oppositionJourneyVisualStatus;
+                                                                $postStageStatusLabel = $oppositionJourneyOutcomeLabel;
                                                             }
-                                                            $postStageMeta = data_get($application->workflow_meta, "post_filing_journey.stages.$postStageKey", []);
                                                             $postStageDocuments = $postFilingDocumentsByType->get($postFilingJourney::documentType($postStageKey), collect());
                                                             $postStageAdminDocuments = $postStageDocuments->filter(fn ($doc) => $isPostFilingAdminDocument($doc));
                                                             $postStageApplicantDocuments = $postStageDocuments->reject(fn ($doc) => $postStageAdminDocuments->contains('id', $doc->id))->filter(function ($doc) {
@@ -817,7 +852,7 @@
                                 <span><i class="bi bi-clipboard-check"></i></span>
                                 <div>
                                     <h5 class="mb-1">Action Center</h5>
-                                    <p class="mb-0">Complete every onboarding item before strategy can begin.</p>
+                                    <p class="mb-0">Review and sign the Engagement Letter before search and specification work begins.</p>
                                 </div>
                             </div>
                         @else
@@ -844,7 +879,13 @@
                             </div>
                         @endunless
 
-                        @if ($currentStatus === $workflow::ONBOARDING_PENDING)
+                        @if ($currentStatus === $workflow::DRAFT)
+                            <div class="alert alert-info mb-3">
+                                Pay 50% of the professional fee now. The remaining 50% is requested only after you approve the filing draft.
+                            </div>
+                            @include('partials.government-fee-notice')
+                            <a href="{{ route('payment.show', $application->id) }}" class="btn btn-primary">Pay 50% Advance</a>
+                        @elseif ($currentStatus === $workflow::ONBOARDING_PENDING)
                             @if ($onboardingPackageSubmitted && !$pendingOnboardingReupload)
                                 <div class="action-empty-state">
                                     <div class="action-empty-icon">
@@ -864,14 +905,14 @@
                                         </div>
                                     @endif
 
-                                    <form id="onboardingPackageForm" action="{{ $clientActionUrl('workflow.onboarding.submit', $application->id) }}" method="POST" enctype="multipart/form-data" data-swal-confirm data-swal-title="Submit onboarding package?" data-swal-text="Please confirm that you have reviewed the documents and applied the required signatures." data-swal-icon="question" data-swal-confirm-text="Yes, submit">
+                                    <form id="onboardingPackageForm" action="{{ $clientActionUrl('workflow.onboarding.submit', $application->id) }}" method="POST" enctype="multipart/form-data" data-swal-confirm data-swal-title="Submit signed Engagement Letter?" data-swal-text="Please confirm that you have reviewed the letter and applied your signature." data-swal-icon="question" data-swal-confirm-text="Yes, submit">
                                         @csrf
                                         <section class="onboarding-section-card onboarding-upload-section">
                                             <div class="onboarding-section-heading">
                                                 <span><i class="bi bi-cloud-arrow-up"></i></span>
                                                 <div class="onboarding-section-copy">
-                                                    <h5>Upload Signed Documents</h5>
-                                                    <p>Download, sign physically if required, and upload the signed copies.</p>
+                                                    <h5>Review and Sign</h5>
+                                                    <p>Review the Engagement Letter and apply your electronic signature.</p>
                                                 </div>
                                             </div>
                                         @if ($showEngagementSigner)
@@ -990,7 +1031,7 @@
                                         </div>
                                         @endif
 
-                                        @if (!$pendingOnboardingReupload || $poaNeedsReupload || $poaDraftAttached)
+                                        @if ($showPoaSigner && (!$pendingOnboardingReupload || $poaNeedsReupload || $poaDraftAttached))
                                         <div class="onboarding-signature-card physical-upload-card">
                                             <div class="signature-card-heading">
                                                 <div class="signature-card-icon green"><i class="bi bi-upload"></i></div>
@@ -1050,7 +1091,7 @@
                                         </div>
                                         @endif
 
-                                        @if (!$pendingOnboardingReupload || $affidavitNeedsReupload || $affidavitDraftAttached)
+                                        @if ($showAffidavitSigner && (!$pendingOnboardingReupload || $affidavitNeedsReupload || $affidavitDraftAttached))
                                         <div class="onboarding-signature-card physical-upload-card">
                                             <div class="signature-card-heading">
                                                 <div class="signature-card-icon purple"><i class="bi bi-upload"></i></div>
@@ -1336,9 +1377,9 @@
                                                 Use the form above to submit your electronic signature for the Engagement Letter and upload physically signed POA and Affidavit copies. The application will move to strategy after the signed versions are verified by the admin.
                                             </div> -->
                                             <button type="submit" class="btn btn-primary w-100" id="onboardingPackageSubmitBtn" disabled>
-                                                <i class="bi bi-cloud-arrow-up-fill me-2"></i> Submit Onboarding Package
+                                                <i class="bi bi-cloud-arrow-up-fill me-2"></i> Submit Signed Engagement Letter
                                             </button>
-                                            <div class="small text-muted mt-2 text-center"><i class="bi bi-lock-fill me-1"></i> Apply all required signatures to enable submission. Uploaded documents are secure and encrypted.</div>
+                                            <div class="small text-muted mt-2 text-center"><i class="bi bi-lock-fill me-1"></i> Apply the required signature to enable submission.</div>
                                         </div>
                                     </form>
 
@@ -1438,7 +1479,7 @@
                                     <div class="draft-decision-row">
                                         <button type="button" class="draft-decision-btn draft-decision-approve" data-bs-toggle="modal" data-bs-target="#approveDraftModal">
                                             <i class="bi bi-check2-circle"></i>
-                                            Approve Draft
+                                            Approve Application
                                         </button>
                                         <button type="button" class="draft-decision-btn draft-decision-reject" data-bs-toggle="modal" data-bs-target="#requestDraftChangesModal">
                                             <i class="bi bi-chat-left-text"></i>
@@ -1484,7 +1525,7 @@
                                     <div class="modal fade draft-review-modal" id="approveDraftModal" tabindex="-1" aria-labelledby="approveDraftModalLabel" aria-hidden="true">
                                         <div class="modal-dialog modal-lg modal-dialog-centered">
                                             <div class="modal-content draft-action-modal">
-                                                <form id="draftApprovalForm" action="{{ $clientActionUrl('workflow.draft.approve', $application->id) }}" method="POST" data-swal-confirm data-swal-title="Approve draft?" data-swal-text="By continuing, you confirm that you reviewed the draft and approve it for filing." data-swal-icon="question" data-swal-confirm-text="Yes, approve draft">
+                                                <form id="draftApprovalForm" action="{{ $clientActionUrl('workflow.draft.approve', $application->id) }}" method="POST" enctype="multipart/form-data" data-swal-confirm data-swal-title="Approve application?" data-swal-text="By continuing, you confirm the applicant, mark, classes, specification and filing authority." data-swal-icon="question" data-swal-confirm-text="Yes, approve application">
                                                     @csrf
                                                     <div class="modal-header">
                                                         <div class="draft-section-heading mb-0">
@@ -1492,24 +1533,38 @@
                                                                 <i class="bi bi-pencil-square"></i>
                                                             </div>
                                                             <div>
-                                                                <h5 id="approveDraftModalLabel">Approve Draft</h5>
-                                                                <p>Add optional notes for the filing team.</p>
+                                                                <h5 id="approveDraftModalLabel">Approve Application</h5>
+                                                                <p>Confirm every item before authorising UKIPO filing.</p>
                                                             </div>
                                                         </div>
                                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                     </div>
                                                     <div class="modal-body">
+                                                        <div class="d-grid gap-2 mb-4">
+                                                            <label class="form-check"><input class="form-check-input" type="checkbox" name="approve_applicant" value="1" required><span class="form-check-label ms-2">I approve the applicant details.</span></label>
+                                                            <label class="form-check"><input class="form-check-input" type="checkbox" name="approve_mark" value="1" required><span class="form-check-label ms-2">I approve the trade mark wording and/or logo.</span></label>
+                                                            <label class="form-check"><input class="form-check-input" type="checkbox" name="approve_classes_specification" value="1" required><span class="form-check-label ms-2">I approve the final classes and goods and services specification.</span></label>
+                                                            <label class="form-check"><input class="form-check-input" type="checkbox" name="confirm_genuine_use" value="1" required><span class="form-check-label ms-2">I confirm genuine current use or a genuine intention to use the mark.</span></label>
+                                                            <label class="form-check"><input class="form-check-input" type="checkbox" name="authorise_filing" value="1" required><span class="form-check-label ms-2">I authorise Legal Bruz Pvt. Ltd. to submit the approved application.</span></label>
+                                                        </div>
+                                                        <div class="row g-3 mb-4">
+                                                            <div class="col-12">
+                                                                <label class="form-label fw-semibold">Signed Filing Authority <span class="text-danger">*</span></label>
+                                                                <input type="file" name="signed_filing_authority" class="form-control" accept=".pdf,.jpg,.jpeg,.png" required>
+                                                            </div>
+                                                            <div class="col-12"><small class="text-muted">Your Engagement Letter was signed during onboarding. Upload only the completed Filing Authority supplied by the filing team. PDF, JPG or PNG, maximum 15 MB.</small></div>
+                                                        </div>
                                                         <div class="draft-textarea-wrap">
                                                             <textarea name="approval_notes" rows="5" class="form-control draft-review-textarea js-counted-textarea" maxlength="1000" placeholder="Optional: add a note for the filing team...">{{ old('approval_notes') }}</textarea>
                                                             <span class="draft-counter">0/1000</span>
                                                         </div>
-                                                        <p class="draft-confirmation mb-0 mt-3"><i class="bi bi-shield-check"></i> By approving, you confirm that you reviewed the draft and approve it for filing.</p>
+                                                        <p class="draft-confirmation mb-0 mt-3"><i class="bi bi-shield-check"></i> Nothing will be filed until these approvals are recorded and payment is complete.</p>
                                                     </div>
                                                     <div class="modal-footer">
                                                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
                                                         <button type="submit" class="draft-approve-btn">
                                                             <i class="bi bi-check2-circle"></i>
-                                                            Approve Draft
+                                                            Approve Application
                                                         </button>
                                                     </div>
                                                 </form>
@@ -1589,8 +1644,8 @@
                             <div class="strategy-active-highlight">
                                 <span><i class="bi bi-search-heart"></i></span>
                                 <div>
-                                    <strong>Strategy stage is active.</strong>
-                                    <p>Our team is preparing your trademark strategy. We will notify you within <b>24-48 hours</b> for further actions.</p>
+                                    <strong>Search and specification review is active.</strong>
+                                    <p>Our team is reviewing the UK register and preparing the classes and goods and services specification. We will notify you when the application is ready for approval.</p>
                                 </div>
                             </div>
                         @else
@@ -1657,10 +1712,10 @@
                         <div class="card-body">
                             <div class="payment-status-row {{ $isCompletedPayment($advancePayment) ? 'completed' : 'pending' }}">
                                 <div class="d-flex justify-content-between align-items-start gap-3">
-                                    <div class="payment-icon"><i class="bi bi-currency-rupee"></i></div>
+                                    <div class="payment-icon"><i class="bi bi-currency-pound"></i></div>
                                     <div>
                                         <div class="fw-semibold">{{ $hasFullPayment ? 'Application Payment' : '50% Advance Payment' }}</div>
-                                        <div class="small text-muted">₹{{ number_format($advanceDisplayAmount, 2) }}</div>
+                                        <div class="small text-muted">£{{ number_format($advanceDisplayAmount, 2) }}</div>
                                     </div>
                                     <span class="badge bg-{{ $isCompletedPayment($advancePayment) ? 'success' : (strtolower((string) ($advancePayment->status ?? $advancePaymentStatus)) === 'rejected' ? 'danger' : 'warning text-dark') }}">
                                         {{ $advancePaymentStatus }}
@@ -1679,10 +1734,10 @@
                             @unless ($hasFullPayment)
                                 <div class="payment-status-row {{ $isCompletedPayment($finalPayment) ? 'completed' : 'pending' }}">
                                     <div class="d-flex justify-content-between align-items-start gap-3">
-                                        <div class="payment-icon"><i class="bi bi-currency-rupee"></i></div>
+                                        <div class="payment-icon"><i class="bi bi-currency-pound"></i></div>
                                         <div>
                                             <div class="fw-semibold">Next 50% Payment</div>
-                                            <div class="small text-muted">₹{{ number_format($halfPaymentAmount, 2) }}</div>
+                                            <div class="small text-muted">£{{ number_format($halfPaymentAmount, 2) }}</div>
                                         </div>
                                         <span class="badge bg-{{ $isCompletedPayment($finalPayment) ? 'success' : (strtolower((string) ($finalPayment->status ?? $finalPaymentStatus)) === 'rejected' ? 'danger' : 'warning text-dark') }}">
                                             {{ $finalPaymentStatus }}
@@ -1701,39 +1756,24 @@
 
                             @include('partials.government-fee-notice')
 
-                            @if (!$hasFullPayment && $currentStatus === $workflow::PAYMENT_PENDING_FINAL && !$isCompletedPayment($finalPayment))
+                            @if ($currentStatus === $workflow::DRAFT && !$isCompletedPayment($advancePayment))
+                                <a href="{{ route('payment.show', $application->id) }}" class="btn btn-primary w-100 mt-2">Pay 50% Advance</a>
+                            @elseif (!$hasFullPayment && $currentStatus === $workflow::PAYMENT_PENDING_FINAL && !$isCompletedPayment($finalPayment))
                                 <a href="{{ route('payment.show', $application->id) }}" class="btn btn-primary w-100 mt-2">Complete Final Payment</a>
                             @endif
                         </div>
                     </div>
 
-                    @if ($oppositionDefenceSucceeded && $oppositionDefenceCase)
-                        <div class="card status-side-card mt-4">
-                            <div class="card-header section-card-header side-card-header">
-                                <h5 class="mb-0">Opposition Defence Successful</h5>
-                                <i class="bi bi-shield-check"></i>
-                            </div>
-                            <div class="card-body">
-                                <div class="alert alert-success mb-3">
-                                    <strong>Opposition defence successful.</strong>
-                                    <div class="mt-1">Your trademark application has successfully overcome the opposition proceedings.</div>
-                                </div>
-                                <div class="small text-muted mb-3">
-                                    This result belongs to application
-                                    <strong>{{ $application->application_number ?: 'Awaiting assignment' }}</strong>.
-                                </div>
-                                <a href="{{ route('trademark-opposition.show', $oppositionDefenceCase) }}" class="btn btn-primary w-100">
-                                    <i class="bi bi-shield-check"></i> View Opposition Defence Case
-                                </a>
-                            </div>
-                        </div>
-                    @endif
-
-                    @if (!$postFilingIsFullyCompleted && $postFilingIsOpposed)
+                    @if ($postFilingHasOppositionHistory)
                         @php
                             $oppositionReceivedOn = data_get($acceptedAdvertisedStageMeta, 'opposition_received_on');
                             $counterStatementDueOn = data_get($acceptedAdvertisedStageMeta, 'counter_statement_due_on');
                             $opposedAdminNote = data_get($acceptedAdvertisedStageMeta, 'admin_note');
+                            $oppositionAlertClass = match ($oppositionJourneyOutcome) {
+                                'victory' => 'alert-success',
+                                'closed' => 'alert-secondary',
+                                default => 'alert-danger',
+                            };
                         @endphp
                         <div class="card status-side-card mt-4">
                             <div class="card-header section-card-header side-card-header">
@@ -1741,8 +1781,8 @@
                                 <i class="bi bi-shield-exclamation"></i>
                             </div>
                             <div class="card-body">
-                                <div class="alert {{ $oppositionDefenceSucceeded ? 'alert-success' : 'alert-danger' }} mb-3">
-                                    <strong>{{ $finalOppositionResultLabel ?: ($oppositionDefenceSucceeded ? 'Case Victory' : 'Opposition Notice Received') }}</strong>
+                                <div class="alert {{ $oppositionAlertClass }} mb-3" data-opposition-outcome="{{ $oppositionJourneyOutcome }}">
+                                    <strong>{{ $oppositionJourneyOutcomeLabel }}</strong>
                                     <div class="mt-2"><strong>Trademark:</strong> {{ $application->brand_name ?: 'N/A' }}</div>
                                     <div><strong>Application No.:</strong> {{ $application->application_number ?: 'Awaiting assignment' }}</div>
                                     <div><strong>Opposition received on:</strong> {{ $oppositionReceivedOn ? $formatDateTime($oppositionReceivedOn, 'd M Y') : 'N/A' }}</div>
@@ -1775,16 +1815,32 @@
 
                                 @if ($acceptedAdvertisedAdminDocuments->isNotEmpty())
                                     <div class="post-filing-opposed-documents mb-3">
-                                        <div class="fw-semibold mb-2">Documents Sent By Admin</div>
+                                        <div class="post-filing-opposed-documents-title">
+                                            <span><i class="bi bi-folder2-open"></i></span>
+                                            <div>
+                                                <strong>Documents Sent By Admin</strong>
+                                                <small>{{ $acceptedAdvertisedAdminDocuments->count() }} {{ \Illuminate\Support\Str::plural('document', $acceptedAdvertisedAdminDocuments->count()) }}</small>
+                                            </div>
+                                        </div>
                                         @foreach ($acceptedAdvertisedAdminDocuments as $document)
                                             <div class="post-filing-opposed-document-row">
-                                                <div>
-                                                    <strong>{{ $document->file_name }}</strong>
+                                                <div class="post-filing-opposed-document-icon">
+                                                    <i class="bi bi-file-earmark-text"></i>
+                                                </div>
+                                                <div class="post-filing-opposed-document-info">
+                                                    <strong title="{{ $document->file_name }}">{{ $document->file_name }}</strong>
                                                     <small>
                                                         Sent {{ $document->created_at ? $formatDateTime($document->created_at) : '-' }}
                                                     </small>
                                                 </div>
-                                                <a href="{{ route($documentViewRoute, $document->id) }}" target="_blank">View</a>
+                                                <div class="post-filing-opposed-document-actions">
+                                                    <a href="{{ route($documentViewRoute, $document->id) }}" target="_blank" rel="noopener">
+                                                        <i class="bi bi-eye"></i> View
+                                                    </a>
+                                                    <a href="{{ route($documentDownloadRoute, $document->id) }}">
+                                                        <i class="bi bi-download"></i> Download
+                                                    </a>
+                                                </div>
                                             </div>
                                         @endforeach
                                     </div>
@@ -1794,7 +1850,7 @@
                                     <a href="{{ route('trademark-opposition.show', $oppositionDefenceCase) }}" class="btn btn-primary w-100">
                                         <i class="bi bi-shield-check"></i> View Opposition Defence Case
                                     </a>
-                                @else
+                                @elseif ($oppositionJourneyOutcome === 'opposed')
                                     <a href="{{ $oppositionDefenceCreateUrl }}" class="btn btn-primary w-100">
                                         <i class="bi bi-plus-circle"></i> Create Opposition Defence Case
                                     </a>
@@ -1807,6 +1863,7 @@
         </div>
     </div>
 
+    @if ($engagementLetter || $engagementLetterSigned || $otherOnboardingDocuments->isNotEmpty())
     <div class="modal fade onboarding-documents-modal" id="onboardingDocumentsModal" tabindex="-1" aria-labelledby="onboardingDocumentsModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
@@ -1846,36 +1903,6 @@
                                             @if ($engagementLetter)
                                                 <a href="{{ route($documentViewRoute, $engagementLetter->id) }}" target="_blank"><i class="bi bi-eye"></i> View</a>
                                                 <a href="{{ route($documentDownloadRoute, $engagementLetter->id) }}"><i class="bi bi-download"></i> Download</a>
-                                            @else
-                                                <span>Awaiting issue</span>
-                                            @endif
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="onboarding-document-tile">
-                                    <div class="document-tile-icon green"><i class="bi bi-file-earmark-text"></i></div>
-                                    <div>
-                                        <h6>POA</h6>
-                                        <p>PDF Document</p>
-                                        <div class="document-tile-actions">
-                                            @if ($poaDocument)
-                                                <a href="{{ route($documentViewRoute, $poaDocument->id) }}" target="_blank"><i class="bi bi-eye"></i> View</a>
-                                                <a href="{{ route($documentDownloadRoute, $poaDocument->id) }}"><i class="bi bi-download"></i> Download</a>
-                                            @else
-                                                <span>Awaiting issue</span>
-                                            @endif
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="onboarding-document-tile">
-                                    <div class="document-tile-icon purple"><i class="bi bi-file-earmark"></i></div>
-                                    <div>
-                                        <h6>Affidavit</h6>
-                                        <p>PDF Document</p>
-                                        <div class="document-tile-actions">
-                                            @if ($affidavitDocument)
-                                                <a href="{{ route($documentViewRoute, $affidavitDocument->id) }}" target="_blank"><i class="bi bi-eye"></i> View</a>
-                                                <a href="{{ route($documentDownloadRoute, $affidavitDocument->id) }}"><i class="bi bi-download"></i> Download</a>
                                             @else
                                                 <span>Awaiting issue</span>
                                             @endif
@@ -1935,6 +1962,7 @@
             </div>
         </div>
     </div>
+    @endif
 
     <div class="modal fade stage-common-modal" id="applicationDetailsModal" tabindex="-1" aria-labelledby="applicationDetailsModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
@@ -1963,7 +1991,7 @@
                                 <div><span>Trademark</span><strong>{{ $application->brand_name ?? 'N/A' }}</strong><em class="summary-mini-badge summary-mini-badge-teal">Mark</em></div>
                                 <div><span>Email</span><strong>{{ $application->email ?? $client->email }}</strong></div>
                                 <div><span>Phone</span><strong>{{ $application->phone ?? 'N/A' }}</strong></div>
-                                <div><span>Entity</span><strong>{{ $application->entity_type === 'individual' ? 'Individual / Proprietor / Trader' : ucfirst($application->entity_type ?? 'N/A') }}</strong><em class="summary-mini-badge summary-mini-badge-indigo">Type</em></div>
+                                <div><span>Applicant Type</span><strong>{{ ucwords(str_replace('_', ' ', data_get($details, 'applicant_details.applicant_type', $application->entity_type ?? 'N/A'))) }}</strong><em class="summary-mini-badge summary-mini-badge-indigo">Type</em></div>
                                 <div><span>Submitted</span><strong>{{ $formatDateTime($application->created_at, 'd M Y') }}</strong></div>
                             </div>
 
@@ -1987,10 +2015,10 @@
                                                         @foreach ($sectionData as $field => $value)
                                                             <div class="stage-field">
                                                                 <span>{{ ucwords(str_replace('_', ' ', $field)) }}</span>
-                                                                @if ($field === 'image_of_trademark' && $value)
+                                                                @if (in_array($field, ['image_of_trademark', 'logo_mark_file'], true) && $value)
                                                                     <a href="{{ route($trademarkImageViewRoute, ['id' => $application->id, 'file' => base64_encode((string) $value)]) }}" target="_blank">View Trademark Image</a>
-                                                                @elseif ($field === 'proof_of_use_of_trademark' && $value)
-                                                                    <a href="{{ route($trademarkProofOfUseViewRoute, ['id' => $application->id, 'file' => base64_encode((string) $value)]) }}" target="_blank">View Proof of Use</a>
+                                                                @elseif (in_array($field, ['proof_of_use_of_trademark', 'supporting_evidence', 'priority_document'], true) && $value)
+                                                                    <a href="{{ route($trademarkProofOfUseViewRoute, ['id' => $application->id, 'file' => base64_encode((string) $value)]) }}" target="_blank">View Supporting Document</a>
                                                                 @else
                                                                     <strong>{{ $formatSubmittedValue($value) }}</strong>
                                                                 @endif
@@ -3264,6 +3292,18 @@
             background: #e7f8ef;
             border-color: #9fe4be;
             color: #15804e;
+        }
+
+        .timeline-post-filing-stage.case-lost .timeline-post-stage-number {
+            background: #fff1f2;
+            border-color: #f5a3ab;
+            color: #c2293d;
+        }
+
+        .timeline-post-filing-stage.case-closed .timeline-post-stage-number {
+            background: #f3f4f6;
+            border-color: #d5d9e1;
+            color: #556074;
         }
 
         .timeline-post-filing-stage.opposition_successful .timeline-post-stage-number,
@@ -6195,6 +6235,16 @@
             color: #15804e;
         }
 
+        .post-filing-status-badge.case-lost {
+            background: #fff1f2;
+            color: #c2293d;
+        }
+
+        .post-filing-status-badge.case-closed {
+            background: #f3f4f6;
+            color: #556074;
+        }
+
         .post-filing-status-badge.opposition_successful,
         .post-filing-status-badge.application_withdrawn {
             background: #fff1f2;
@@ -6214,35 +6264,140 @@
         }
 
         .post-filing-opposed-documents {
-            border: 1px solid #f0d7dc;
-            border-radius: 16px;
-            background: #fffafb;
-            padding: 1rem 1.1rem;
+            overflow: hidden;
+            border: 1px solid #e1e8f0;
+            border-radius: 18px;
+            background: #ffffff;
+            box-shadow: 0 10px 26px rgba(16, 42, 75, 0.07);
+        }
+
+        .post-filing-opposed-documents-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.9rem 1rem;
+            border-bottom: 1px solid #e7edf3;
+            background: linear-gradient(135deg, #f5fbfa 0%, #f8fafc 100%);
+            color: #123d66;
+        }
+
+        .post-filing-opposed-documents-title > span {
+            display: grid;
+            flex: 0 0 38px;
+            width: 38px;
+            height: 38px;
+            place-items: center;
+            border-radius: 11px;
+            background: #ddf5ef;
+            color: #078575;
+            font-size: 1rem;
+        }
+
+        .post-filing-opposed-documents-title strong,
+        .post-filing-opposed-documents-title small {
+            display: block;
+        }
+
+        .post-filing-opposed-documents-title strong {
+            font-size: 0.9rem;
+            line-height: 1.25;
+        }
+
+        .post-filing-opposed-documents-title small {
+            margin-top: 0.15rem;
+            color: #6b7c90;
+            font-size: 0.72rem;
         }
 
         .post-filing-opposed-document-row {
-            display: flex;
+            display: grid;
+            grid-template-columns: 40px minmax(0, 1fr);
             align-items: center;
-            justify-content: space-between;
-            gap: 1rem;
-            padding: 0.85rem 0;
+            gap: 0.7rem 0.8rem;
+            min-width: 0;
+            padding: 1rem;
         }
 
         .post-filing-opposed-document-row + .post-filing-opposed-document-row {
-            border-top: 1px solid #f0d7dc;
+            border-top: 1px solid #e7edf3;
+        }
+
+        .post-filing-opposed-document-icon {
+            display: grid;
+            width: 40px;
+            height: 40px;
+            place-items: center;
+            border: 1px solid #cce9e4;
+            border-radius: 12px;
+            background: #eefaf7;
+            color: #078575;
+            font-size: 1.05rem;
+        }
+
+        .post-filing-opposed-document-info {
+            min-width: 0;
+        }
+
+        .post-filing-opposed-document-info strong {
+            display: -webkit-box;
+            overflow: hidden;
+            color: #17385f;
+            font-size: 0.86rem;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
         }
 
         .post-filing-opposed-document-row small {
             display: block;
             margin-top: 0.2rem;
             color: #6b7280;
+            font-size: 0.73rem;
         }
 
-        .post-filing-opposed-document-row a {
+        .post-filing-opposed-document-actions {
+            display: grid;
+            grid-column: 1 / -1;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.55rem;
+        }
+
+        .post-filing-opposed-document-actions a {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+            min-width: 0;
+            min-height: 38px;
+            padding: 0.5rem 0.65rem;
+            border: 1px solid #cbdce8;
+            border-radius: 10px;
+            background: #ffffff;
             font-weight: 800;
-            color: #0d62d6;
+            color: #123d66;
+            font-size: 0.75rem;
             text-decoration: none;
             white-space: nowrap;
+            transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+        }
+
+        .post-filing-opposed-document-actions a:hover {
+            border-color: #078575;
+            background: #eefaf7;
+            color: #06766a;
+            transform: translateY(-1px);
+        }
+
+        @media (max-width: 420px) {
+            .post-filing-opposed-documents-title,
+            .post-filing-opposed-document-row {
+                padding: 0.8rem;
+            }
+
+            .post-filing-opposed-document-actions {
+                grid-template-columns: 1fr;
+            }
         }
 
         .post-filing-request-note {

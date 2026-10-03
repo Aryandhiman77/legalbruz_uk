@@ -28,12 +28,12 @@ class RegisterController extends Controller
         return Validator::make($data, [
             'name' => ['required', 'string', 'min:2', 'max:100', "regex:/^[\pL\pM .'-]+$/u"],
             'email' => ['required', 'string', 'email:rfc', 'max:255', 'unique:users,email'],
-            'mobile' => ['required', 'string', 'regex:/^(?:(?:\+?91)|0)?[6-9][0-9]{9}$/'],
+            'mobile' => ['required', 'string', 'regex:/^(?:\+44|0)7[0-9]{9}$/'],
             'password' => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
         ], [
             'name.regex' => 'The name may only contain letters, spaces, apostrophes, periods, and hyphens.',
-            'mobile.required' => 'An Indian mobile number is required.',
-            'mobile.regex' => 'Enter a valid Indian mobile number starting with 6, 7, 8, or 9.',
+            'mobile.required' => 'A UK mobile number is required.',
+            'mobile.regex' => 'Enter a valid UK mobile number beginning with 07 or +44 7.',
         ]);
     }
 
@@ -76,23 +76,19 @@ class RegisterController extends Controller
         return User::create([
             'name' => $data['name'],
             'email' => $data['email'],
-            'mobile' => $this->normalizeIndianMobile($data['mobile']),
+            'mobile' => $this->normalizeUkMobile($data['mobile']),
             'password' => Hash::make($data['password']),
         ]);
     }
 
-    private function normalizeIndianMobile(string $mobile): string
+    private function normalizeUkMobile(string $mobile): string
     {
-        $digits = preg_replace('/\D+/', '', $mobile);
+        $normalized = preg_replace('/[\s()-]+/', '', $mobile);
 
-        if (strlen($digits) === 12 && str_starts_with($digits, '91')) {
-            return substr($digits, 2);
+        if (str_starts_with($normalized, '07')) {
+            return '+44' . substr($normalized, 1);
         }
 
-        if (strlen($digits) === 11 && str_starts_with($digits, '0')) {
-            return substr($digits, 1);
-        }
-
-        return $digits;
+        return $normalized;
     }
 }

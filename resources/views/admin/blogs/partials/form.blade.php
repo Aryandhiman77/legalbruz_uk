@@ -159,9 +159,8 @@
                         <div class="mb-3">
                             <label for="published_at" class="form-label fw-bold">Publish date and time</label>
                             <input id="published_at" name="published_at" type="datetime-local" class="form-control"
-                                value="{{ old('published_at', $blog->published_at?->timezone('Asia/Kolkata')->format('Y-m-d\TH:i')) }}"
-                                @if (! $blog->exists && ! session()->hasOldInput('published_at')) data-default-current="true" @endif>
-                            <div class="form-text">Set a future time to schedule publication.</div>
+                                value="{{ old('published_at', $blog->published_at?->timezone(config('app.timezone', 'Europe/London'))->format('Y-m-d\TH:i')) }}">
+                            <div class="form-text">Set a future time to schedule publication. Times use UK local time (GMT/BST).</div>
                         </div>
                         <div class="form-check form-switch">
                             <input type="hidden" name="is_featured" value="0">
@@ -288,13 +287,6 @@
 </style>
 <script src="https://cdn.ckeditor.com/ckeditor5/41.4.2/classic/ckeditor.js"></script>
 <script>
-    const publishDateField = document.querySelector('#published_at[data-default-current="true"]');
-    if (publishDateField) {
-        const current = new Date();
-        const offsetAdjusted = new Date(current.getTime() - current.getTimezoneOffset() * 60000);
-        publishDateField.value = offsetAdjusted.toISOString().slice(0, 16);
-    }
-
     const blogEditorForm = document.getElementById('blogEditorForm');
     const articleContentField = document.getElementById('content');
     let articleEditor = null;

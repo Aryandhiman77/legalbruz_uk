@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'Legal Bruz (LLP)'),
+    'name' => env('APP_NAME', 'Legal Bruz Pvt. Ltd.'),
 
     /*
     |--------------------------------------------------------------------------
@@ -65,7 +65,7 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => env('APP_TIMEZONE', 'Europe/London'),
 
     /*
     |--------------------------------------------------------------------------

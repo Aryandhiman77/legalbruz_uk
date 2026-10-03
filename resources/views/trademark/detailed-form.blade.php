@@ -671,17 +671,6 @@
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
                                     </div>
-                                    <div class="col-md-6">
-                                        <label for="gst_number" class="form-label">GST Number</label>
-                                        <input type="text" id="gst_number" name="gst_number"
-                                            class="form-control @error('gst_number') is-invalid @enderror"
-                                            value="{{ old('gst_number', $billing['gst_number'] ?? '') }}" maxlength="15"
-                                            pattern="[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}"
-                                            title="Enter a valid GST number" oninput="this.value = this.value.toUpperCase()">
-                                        @error('gst_number')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
                                 </div>
 
                                 <div class="step-actions">

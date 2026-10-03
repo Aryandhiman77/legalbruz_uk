@@ -12,6 +12,9 @@ class TrademarkPricing extends Model
 {
     public const INDIVIDUAL = 'individual';
     public const COMPANY = 'company';
+    public const SEARCH = 'uk_search';
+    public const APPLICATION = 'uk_application';
+    public const EXAMINATION_RESPONSE = 'uk_examination_response';
 
     private const CACHE_KEY = 'trademark_pricing.active_plans';
 
@@ -31,19 +34,40 @@ class TrademarkPricing extends Model
     public static function defaults(): array
     {
         return [
+            self::SEARCH => [
+                'key' => self::SEARCH,
+                'label' => 'UK Trade Mark Search',
+                'amount' => 149.00,
+                'is_active' => true,
+                'sort_order' => 1,
+            ],
+            self::APPLICATION => [
+                'key' => self::APPLICATION,
+                'label' => 'UK Trade Mark Application',
+                'amount' => 399.00,
+                'is_active' => true,
+                'sort_order' => 2,
+            ],
+            self::EXAMINATION_RESPONSE => [
+                'key' => self::EXAMINATION_RESPONSE,
+                'label' => 'Examination Response',
+                'amount' => 249.00,
+                'is_active' => true,
+                'sort_order' => 3,
+            ],
             self::INDIVIDUAL => [
                 'key' => self::INDIVIDUAL,
                 'label' => 'Individual / Proprietor / Trader',
                 'amount' => 7000.00,
                 'is_active' => true,
-                'sort_order' => 1,
+                'sort_order' => 90,
             ],
             self::COMPANY => [
                 'key' => self::COMPANY,
                 'label' => 'Company / LLP / Partnership / NGO',
                 'amount' => 9000.00,
                 'is_active' => true,
-                'sort_order' => 2,
+                'sort_order' => 91,
             ],
         ];
     }
@@ -87,7 +111,7 @@ class TrademarkPricing extends Model
         try {
             return Cache::rememberForever(self::CACHE_KEY, function (): array {
                 $plans = self::query()
-                    ->whereIn('key', [self::INDIVIDUAL, self::COMPANY])
+                    ->whereIn('key', array_keys(self::defaults()))
                     ->orderBy('sort_order')
                     ->get()
                     ->keyBy('key')
@@ -116,7 +140,7 @@ class TrademarkPricing extends Model
 
     public static function amountForApplicantType(?string $applicantType): float
     {
-        return self::amountFor($applicantType === self::INDIVIDUAL ? self::INDIVIDUAL : self::COMPANY);
+        return self::amountFor(self::APPLICATION);
     }
 
     public static function allEditablePlans(): Collection
@@ -128,7 +152,7 @@ class TrademarkPricing extends Model
         }
 
         return self::query()
-            ->whereIn('key', [self::INDIVIDUAL, self::COMPANY])
+            ->where('key', self::APPLICATION)
             ->orderBy('sort_order')
             ->get();
     }

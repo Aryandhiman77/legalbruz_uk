@@ -13,16 +13,7 @@ return [
         'items' => [
             ['label' => 'All Applications', 'description' => 'View every trademark application', 'icon' => 'bi-journal-text', 'route' => 'admin.all-applications', 'active' => ['admin.all-applications', 'admin.view-application', 'admin.review-application']],
             ['label' => 'Pending Review', 'description' => 'Review new and pending submissions', 'icon' => 'bi-hourglass-split', 'route' => 'admin.applications', 'active' => ['admin.applications']],
-            ['label' => 'Recovery Cases', 'description' => 'Manage stuck trademark matters', 'icon' => 'bi-arrow-repeat', 'route' => 'admin.stuck-trademark.index', 'active' => ['admin.stuck-trademark.*', 'admin.trademark-execution.*']],
-            ['label' => 'Pricing Settings', 'description' => 'Set trademark service prices', 'icon' => 'bi-currency-rupee', 'route' => 'admin.trademark-pricing.edit', 'active' => ['admin.trademark-pricing.*']],
-        ],
-    ],
-    [
-        'label' => 'Opposition & Objections',
-        'items' => [
-            ['label' => 'Defence Cases', 'description' => 'Defend trademarks under opposition', 'icon' => 'bi-shield-check', 'route' => 'admin.trademark-opposition.index', 'active' => ['admin.trademark-opposition.index', 'admin.trademark-opposition.show']],
-            ['label' => 'Oppose Cases', 'description' => 'Manage trademark opposition filings', 'icon' => 'bi-bank', 'route' => 'admin.trademark-opposition.oppose.index', 'active' => ['admin.trademark-opposition.oppose.*']],
-            ['label' => 'Objection Replies', 'description' => 'Handle examination report replies', 'icon' => 'bi-file-earmark-check', 'route' => 'admin.examination-reply.index', 'active' => ['admin.examination-reply.*']],
+            ['label' => 'Pricing Settings', 'description' => 'Set UK trade mark prices', 'icon' => 'bi-currency-pound', 'route' => 'admin.trademark-pricing.edit', 'active' => ['admin.trademark-pricing.*']],
         ],
     ],
     [

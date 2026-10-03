@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\TrademarkOppositionCase;
+use App\Support\PostFilingJourney;
 use App\Support\TrademarkWorkflow;
 
 class Application extends Model
@@ -128,6 +129,29 @@ class Application extends Model
 
     public function getStatusLabelAttribute(): string
     {
+        if ($this->is_registered) {
+            return 'Registered';
+        }
+
+        $oppositionStageStatus = data_get(
+            $this->workflow_meta,
+            'post_filing_journey.stages.accepted_advertised.status'
+        );
+
+        if (
+            $this->current_status === TrademarkWorkflow::POST_FILING
+            && $oppositionStageStatus === PostFilingJourney::OPPOSED
+        ) {
+            return 'Opposed';
+        }
+
         return TrademarkWorkflow::label($this->current_status);
+    }
+
+    public function getIsRegisteredAttribute(): bool
+    {
+        return $this->registry_status === TrademarkWorkflow::REGISTRY_REGISTERED
+            || filled($this->registered_at)
+            || $this->current_status === TrademarkWorkflow::REGISTERED;
     }
 }

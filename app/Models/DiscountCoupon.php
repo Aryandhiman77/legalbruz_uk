@@ -70,7 +70,7 @@ class DiscountCoupon extends Model
     public function getDiscountLabelAttribute(): string
     {
         if ($this->discount_type === 'flat') {
-            return '₹' . number_format((float) $this->discount_value, 2);
+            return '£' . number_format((float) $this->discount_value, 2);
         }
 
         return rtrim(rtrim(number_format((float) $this->discount_value, 2), '0'), '.') . '% OFF';
@@ -80,12 +80,8 @@ class DiscountCoupon extends Model
     {
         return match ($this->applies_to) {
             'trademark_filing' => 'Trademark Filing',
-            'audit_package_purchase' => 'Audit Package Purchase',
-            'execution_package_purchase' => 'Execution Package Purchase',
-            'opposition_defence_package' => 'Opposition Defence',
-            'opposition_filing' => 'Opposition Filing',
-            'objection_reply' => 'Objection Reply',
-            'recovery_cases' => 'Recovery Cases',
+            'uk_search' => 'UK Trade Mark Search',
+            'uk_examination_response' => 'UK Examination Response',
             default => 'All Services',
         };
     }
@@ -182,7 +178,7 @@ class DiscountCoupon extends Model
 
     private function currentCouponDateTime(): string
     {
-        return now('Asia/Kolkata')->format('Y-m-d H:i:s');
+        return now(config('app.timezone', 'Europe/London'))->format('Y-m-d H:i:s');
     }
 
     private function dateTimeValue($dateTime): string

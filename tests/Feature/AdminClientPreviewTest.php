@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Admin;
 use App\Models\Application;
+use App\Models\Document;
 use App\Models\User;
 use App\Support\TrademarkWorkflow;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -33,7 +34,7 @@ class AdminClientPreviewTest extends TestCase
             'email' => $client->email,
             'brand_name' => 'Preview Mark',
             'status' => 'pending_admin',
-            'service_status' => TrademarkWorkflow::ONBOARDING_PENDING,
+            'service_status' => TrademarkWorkflow::STRATEGY_IN_PROGRESS,
         ]);
         $originalUpdatedAt = $application->updated_at;
 
@@ -61,13 +62,13 @@ class AdminClientPreviewTest extends TestCase
             ->assertOk()
             ->assertSee('Read-only client action center')
             ->assertSee('Inputs and client actions are disabled')
-            ->assertSee('Action Center')
-            ->assertSee('action="#"', false);
+            ->assertSee('Search in Progress')
+            ->assertDontSee('Power of Attorney');
 
         $application->refresh();
 
         $this->assertTrue($application->updated_at->equalTo($originalUpdatedAt));
-        $this->assertSame(TrademarkWorkflow::ONBOARDING_PENDING, $application->service_status);
+        $this->assertSame(TrademarkWorkflow::STRATEGY_IN_PROGRESS, $application->service_status);
     }
 
     public function test_client_preview_routes_require_admin_authentication(): void
@@ -107,7 +108,7 @@ class AdminClientPreviewTest extends TestCase
             'email' => $client->email,
             'brand_name' => 'Interactive Mark',
             'status' => 'approved',
-            'service_status' => TrademarkWorkflow::ONBOARDING_PENDING,
+            'service_status' => TrademarkWorkflow::STRATEGY_IN_PROGRESS,
         ]);
 
         $this->actingAs($client)
@@ -117,7 +118,67 @@ class AdminClientPreviewTest extends TestCase
             ]))
             ->assertOk()
             ->assertDontSee('Read-only client action center')
+            ->assertSee('Search and specification review is active.')
+            ->assertDontSee('Power of Attorney')
+            ->assertDontSee('Affidavit');
+    }
+
+    public function test_client_can_see_the_engagement_letter_signing_action_without_poa_or_affidavit(): void
+    {
+        $client = User::factory()->create();
+        $application = Application::create([
+            'user_id' => $client->id,
+            'type' => 'trademark',
+            'entity_type' => 'individual',
+            'applicant_name' => $client->name,
+            'phone' => '+447123456789',
+            'email' => $client->email,
+            'brand_name' => 'Signing Flow Mark',
+            'status' => TrademarkWorkflow::ONBOARDING_PENDING,
+            'service_status' => TrademarkWorkflow::ONBOARDING_PENDING,
+            'workflow_meta' => [
+                'signature_fields' => [
+                    'engagement_letter' => [[
+                        'type' => 'signature',
+                        'page' => 1,
+                        'x' => 20,
+                        'y' => 220,
+                        'width' => 60,
+                        'height' => 20,
+                    ]],
+                ],
+            ],
+        ]);
+        Document::create([
+            'application_id' => $application->id,
+            'user_id' => $client->id,
+            'document_type' => 'engagement_letter',
+            'file_path' => 'workflow/admin/'.$application->id.'/engagement-letter.pdf',
+            'file_name' => 'engagement-letter.pdf',
+            'file_type' => 'pdf',
+            'file_size' => 1024,
+            'status' => 'approved',
+        ]);
+        Document::create([
+            'application_id' => $application->id,
+            'user_id' => $client->id,
+            'document_type' => 'other_document',
+            'file_path' => 'workflow/admin/'.$application->id.'/filing-guidance.pdf',
+            'file_name' => 'filing-guidance.pdf',
+            'file_type' => 'pdf',
+            'file_size' => 1024,
+            'status' => 'approved',
+            'verification_notes' => 'Document sent by admin.',
+        ]);
+
+        $this->actingAs($client)
+            ->get(route('trademark.status', ['id' => $application->id, 'stage_action' => 1]))
+            ->assertOk()
+            ->assertSee('Engagement Letter Signature')
+            ->assertSee('E-Sign')
             ->assertSee('action="'.route('workflow.onboarding.submit', $application->id).'"', false)
-            ->assertDontSee('action="#"', false);
+            ->assertSee('filing-guidance.pdf')
+            ->assertDontSee('Signed POA')
+            ->assertDontSee('Signed Affidavit');
     }
 }

@@ -21,7 +21,7 @@ return [
     |--------------------------------------------------------------------------
     */
 
-    'currency' => 'INR',
+    'currency' => env('PAYMENT_CURRENCY', 'GBP'),
     'timeout' => 30,
 
     /*
@@ -30,8 +30,8 @@ return [
     |--------------------------------------------------------------------------
     */
 
-    'app_name' => 'TrademarkVakil',
-    'app_description' => 'Trademark Registration & IP Services',
+    'app_name' => 'Legal Bruz UK',
+    'app_description' => 'UK Trade Mark Application Services',
 
     /*
     |--------------------------------------------------------------------------
@@ -54,7 +54,7 @@ return [
 
     'custom_payments' => [
         'enabled' => true,
-        'min_amount' => 1,       // Minimum ₹1
-        'max_amount' => 100000,  // Maximum ₹1,00,000
+        'min_amount' => 1,
+        'max_amount' => 100000,
     ],
 ];

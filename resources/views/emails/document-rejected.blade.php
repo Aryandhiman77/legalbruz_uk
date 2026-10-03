@@ -32,7 +32,7 @@
             </tr>
             <tr>
                 <th>Updated On</th>
-                <td>{{ $document->updated_at->timezone('Asia/Kolkata')->format('d M Y, h:i A') }}</td>
+                <td>{{ $document->updated_at->timezone(config('app.timezone', 'Europe/London'))->format('d M Y, h:i A T') }}</td>
             </tr>
             <tr>
                 <th>Status</th>

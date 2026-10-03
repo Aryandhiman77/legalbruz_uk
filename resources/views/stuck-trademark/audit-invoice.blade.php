@@ -109,7 +109,7 @@
                 <tr>
                     <td>Stuck / delayed trademark recovery audit package</td>
                     <td>{{ $case->audit_transaction_id ?: ($case->audit_payment_reference ?: 'N/A') }}</td>
-                    <td>{{ $case->audit_paid_at?->timezone('Asia/Kolkata')->format('d M Y') }}</td>
+                    <td>{{ $case->audit_paid_at?->timezone(config('app.timezone', 'Europe/London'))->format('d M Y') }}</td>
                     <td class="text-right">INR {{ number_format($auditPaidAmount, 2) }}</td>
                 </tr>
             </tbody>

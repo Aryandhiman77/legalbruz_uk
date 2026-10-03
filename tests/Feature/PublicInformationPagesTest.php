@@ -22,25 +22,25 @@ class PublicInformationPagesTest extends TestCase
             ->assertSee('anshul-sharma-founder.png', false);
         $this->get(route('terms'))->assertOk()->assertSee('Terms &amp; Conditions', false);
         $this->get(route('privacy'))->assertOk()->assertSee('Privacy Policy');
-        $this->get(route('flow-guide'))
-            ->assertOk()
-            ->assertSee('Detailed Step-by-Step Guide')
-            ->assertSee('complete-timeline-section', false)
-            ->assertSee('timeline-item-right', false)
-            ->assertSee('timeline-item-left', false)
-            ->assertDontSee('View Complete Flow Guide');
+        $this->get('/flow-guide')->assertNotFound();
         $this->get(route('contact'))
             ->assertOk()
             ->assertSee("Let's Protect Your Brand", false)
             ->assertSee('Business Name')
             ->assertSee('Service Interested In')
+            ->assertSee('<option value="Examination Response"', false)
             ->assertSee('info@legalbruz.com')
             ->assertDontSee('support@legalbruz.com')
             ->assertSee('34 Krishna Nagar, Ambala Cantt, Haryana -133001')
             ->assertSee('Top Floor Chamber no.98 Ambala District court, Haryana')
             ->assertSee('506-508 woodfield court, Honeypot lane, stanmore- HA7 1JR')
             ->assertSee('Mon to Friday - 10AM to 5PM');
-        $this->get(route('faq'))->assertOk()->assertSee('Frequently Asked Questions');
+        $this->get(route('faq'))
+            ->assertOk()
+            ->assertSee('Frequently Asked Questions')
+            ->assertSee('--faq-search-control-height: 48px', false)
+            ->assertSee('top: calc(var(--faq-search-control-height) / 2)', false)
+            ->assertSee('.faq-search-shortcut { display: none; }', false);
     }
 
     public function test_legal_pages_render_content_saved_in_the_admin_cms(): void
@@ -160,7 +160,7 @@ class PublicInformationPagesTest extends TestCase
             'email' => 'asha@example.com',
             'phone' => '+91 99999 99999',
             'business_name' => 'Asha Brands',
-            'service_interested' => 'Trademark Registration',
+            'service_interested' => 'UK Trade Mark Filing',
             'message' => 'I would like help filing a trademark application.',
         ]);
 
@@ -171,9 +171,29 @@ class PublicInformationPagesTest extends TestCase
             'email' => 'asha@example.com',
             'phone' => '+91 99999 99999',
             'business_name' => 'Asha Brands',
-            'service_interested' => 'Trademark Registration',
-            'subject' => 'Trademark Registration',
+            'service_interested' => 'UK Trade Mark Filing',
+            'subject' => 'UK Trade Mark Filing',
             'status' => 'new',
+        ]);
+    }
+
+    public function test_contact_form_accepts_examination_response_as_a_service(): void
+    {
+        $this->post(route('contact.submit'), [
+            'name' => 'Jamie Carter',
+            'email' => 'jamie@example.co.uk',
+            'phone' => '+44 7123 456789',
+            'business_name' => 'Carter Brands Ltd',
+            'service_interested' => 'Examination Response',
+            'message' => 'I need help responding to a UKIPO examination report.',
+        ])
+            ->assertRedirect(route('contact'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas(ContactMessage::class, [
+            'email' => 'jamie@example.co.uk',
+            'service_interested' => 'Examination Response',
+            'subject' => 'Examination Response',
         ]);
     }
 
@@ -226,7 +246,7 @@ class PublicInformationPagesTest extends TestCase
         $this->assertDatabaseHas('faqs', [
             'id' => $faq->id,
             'question' => 'Can an admin publish this?',
-            'category' => 'Support',
+            'category' => 'UK Trade Marks',
         ]);
 
         $this->actingAs($admin, 'admin')

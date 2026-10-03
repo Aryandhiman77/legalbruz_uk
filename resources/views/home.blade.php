@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Legal Bruz (LLP) - IPR & Trademark Registration | India's Fastest Platform</title>
-    <link rel="icon" type="image/png" href="{{ asset('logo4.png') }}">
+    <title>Legal Bruz Pvt. Ltd. - IPR & Trademark Registration | India's Fastest Platform</title>
+    <link rel="icon" type="image/png" href="{{ asset('legal-bruz-pvt-ltd-logo.png') }}">
     <meta name="description" content="Protect your brand with Legal Bruz. Search trademarks, file applications, respond to objections, and manage intellectual property matters online.">
     <meta name="robots" content="index, follow, max-image-preview:large">
     <link rel="canonical" href="{{ route('landing') }}">
@@ -15,18 +15,18 @@
     <meta property="og:title" content="Legal Bruz - Trademark & Intellectual Property Services">
     <meta property="og:description" content="Trademark registration and intellectual property support made clear, accessible, and easy to manage.">
     <meta property="og:url" content="{{ route('landing') }}">
-    <meta property="og:image" content="{{ asset('logo.png') }}">
+    <meta property="og:image" content="{{ asset('legal-bruz-pvt-ltd-logo.png') }}">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Legal Bruz - Trademark & Intellectual Property Services">
     <meta name="twitter:description" content="Trademark registration and intellectual property support made clear and accessible.">
-    <meta name="twitter:image" content="{{ asset('logo.png') }}">
+    <meta name="twitter:image" content="{{ asset('legal-bruz-pvt-ltd-logo.png') }}">
     <script type="application/ld+json">
         {!! json_encode([
             '@context' => 'https://schema.org',
             '@type' => 'Organization',
             'name' => 'Legal Bruz',
             'url' => route('landing'),
-            'logo' => asset('logo.png'),
+            'logo' => asset('legal-bruz-pvt-ltd-logo.png'),
             'email' => 'info@legalbruz.com',
             'sameAs' => collect(config('social_links'))->pluck('url')->values()->all(),
             'address' => [
@@ -53,6 +53,7 @@
     @endphp
     <link rel="stylesheet" href="{{ asset('css/RegistrationGuide.css') }}?v={{ $registrationGuideCssVersion }}">
     <link rel="stylesheet" href="{{ asset('css/home.css') }}?v={{ $homeCssVersion }}">
+    <link rel="stylesheet" href="{{ asset('css/site-footer.css') }}?v={{ filemtime(public_path('css/site-footer.css')) }}">
     @if (!empty($searchPage))
         @vite('resources/js/trademark-probability.js')
     @endif
@@ -98,7 +99,7 @@
         </style>
     @endif
     <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap"
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap"
         rel="stylesheet">
 
     <style>
@@ -403,29 +404,6 @@
             margin-bottom: 26px;
             color: #4f545c;
             font-size: 1.02rem;
-        }
-
-        .flow-guide-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 9px;
-            min-width: min(100%, 340px);
-            padding: 15px 30px;
-            border-radius: 9px;
-            background: linear-gradient(135deg, #10b7a5 0%, #079987 100%);
-            color: #ffffff;
-            font-size: 1.05rem;
-            font-weight: 900;
-            text-decoration: none;
-            box-shadow: 0 16px 34px rgba(7, 153, 135, 0.28);
-            transition: transform 0.25s ease, box-shadow 0.25s ease;
-        }
-
-        .flow-guide-btn:hover {
-            color: #ffffff;
-            transform: translateY(-2px);
-            box-shadow: 0 20px 40px rgba(7, 153, 135, 0.34);
         }
 
         @media (max-width: 1199px) {
@@ -759,7 +737,7 @@
         }
 
         .services-section .service-icon--text {
-            font-family: "Plus Jakarta Sans", sans-serif;
+            font-family: "Manrope", sans-serif;
             font-size: 2.15rem;
             font-weight: 900;
         }
@@ -985,7 +963,10 @@
             : \App\Models\DiscountCoupon::autoApplyForPublicService('trademark_filing');
         $showCouponRibbon = $trademarkPricingCoupon && $trademarkPricingCoupon->ends_at;
         $couponRibbonEndsAt = $showCouponRibbon
-            ? $trademarkPricingCoupon->ends_at->format('Y-m-d\TH:i:s') . '+05:30'
+            ? $trademarkPricingCoupon->ends_at
+                ->copy()
+                ->timezone(config('app.timezone', 'Europe/London'))
+                ->toIso8601String()
             : null;
     @endphp
 
@@ -1005,8 +986,8 @@
     <nav class="navbar navbar-expand-lg">
         <div class="container">
             <a class="navbar-brand" href="/">
-                <img src="{{ asset('logo.png') }}" alt="Legal Bruz (LLP) logo" sizes="(max-width: 768px) 100vw, 50px"
-                    srcset="{{ asset('logo.png') }} 1x, {{ asset('logo.png') }} 2x">
+                <img src="{{ asset('legal-bruz-pvt-ltd-logo.png') }}" alt="Legal Bruz Pvt. Ltd. logo"
+                    class="navbar-logo" width="106" height="79">
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
                 aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
@@ -1037,30 +1018,6 @@
                                             </div>
                                             <h3 class="services-card-title">File Trademark</h3>
                                             <p class="services-card-text">Protect your brand name, logo, and slogan with our full trademark filing service.</p>
-                                        </a>
-                                        <a class="services-card" href="{{ route('stuck-trademark.landing') }}">
-                                            <div class="services-card-head">
-                                                <span class="services-card-icon"><i class="bi bi-archive"></i></span>
-                                                <span class="services-card-arrow"><i class="bi bi-arrow-right"></i></span>
-                                            </div>
-                                            <h3 class="services-card-title">Filed and Stuck</h3>
-                                            <p class="services-card-text">Unlock stuck trademark cases quickly with expert review and action.</p>
-                                        </a>
-                                        <a class="services-card" href="{{ route('trademark.opposition-management') }}">
-                                            <div class="services-card-head">
-                                                <span class="services-card-icon"><i class="bi bi-shield-lock"></i></span>
-                                                <span class="services-card-arrow"><i class="bi bi-arrow-right"></i></span>
-                                            </div>
-                                            <h3 class="services-card-title">Opposition Management</h3>
-                                            <p class="services-card-text">Manage trademark opposition proceedings from notice to resolution.</p>
-                                        </a>
-                                        <a class="services-card" href="{{ route('examination-reply.landing') }}">
-                                            <div class="services-card-head">
-                                                <span class="services-card-icon"><i class="bi bi-file-earmark-check"></i></span>
-                                                <span class="services-card-arrow"><i class="bi bi-arrow-right"></i></span>
-                                            </div>
-                                            <h3 class="services-card-title">Examination Report Reply</h3>
-                                            <p class="services-card-text">Reply to Trademark Examination Report for objected trademark applications.</p>
                                         </a>
                                     </div>
                                     <div class="services-mega-footer">
@@ -1112,21 +1069,6 @@
                         <h3 class="services-offcanvas-title">File Trademark</h3>
                         <p class="services-offcanvas-text">Protect your brand name, logo, and slogan with our full trademark filing service.</p>
                     </a>
-                    <hr>
-                    <a href="{{ route('stuck-trademark.landing') }}" class="services-offcanvas-item">
-                        <h3 class="services-offcanvas-title">Filed and Stuck</h3>
-                        <p class="services-offcanvas-text">Unlock stuck trademark cases quickly with expert review and action.</p>
-                    </a>
-                    <hr>
-                    <a href="{{ route('trademark.opposition-management') }}" class="services-offcanvas-item">
-                        <h3 class="services-offcanvas-title">Trademark Opposition Management</h3>
-                        <p class="services-offcanvas-text">Manage trademark opposition proceedings from notice to resolution.</p>
-                    </a>
-                    <hr>
-                    <a href="{{ route('examination-reply.landing') }}" class="services-offcanvas-item">
-                        <h3 class="services-offcanvas-title">Examination Report Reply</h3>
-                        <p class="services-offcanvas-text">Reply to Trademark Examination Report for objected trademark applications.</p>
-                    </a>
                 </div>
             </div>
         </div>
@@ -1165,7 +1107,7 @@
                                 <i class="bi bi-arrow-right" style="margin-right: 8px;"></i>Get Started Free
                             </a>
                         @endauth
-                        <a href="{{ route('flow-guide') }}" class="btn-hero btn-hero-secondary">
+                        <a href="#flow" class="btn-hero btn-hero-secondary">
                             <i class="bi bi-play-circle" style="margin-right: 8px;"></i>See How It Works
                         </a>
                     </div>
@@ -1702,9 +1644,6 @@
                     <div class="flow-action-icon"><i class="bi bi-shield-check"></i></div>
                     <h3>Simple. Transparent. Hassle-free.</h3>
                     <p>From application to registration, we make it easy.</p>
-                    <a href="{{ route('flow-guide') }}" class="flow-guide-btn">
-                        View Complete Flow Guide <i class="bi bi-arrow-right"></i>
-                    </a>
                 </div>
             </div>
         </div>
@@ -1714,7 +1653,7 @@
     <section class="benefits-section" id="why-us">
         <div class="container">
             <div class="section-header">
-                <h2>Why Choose Legal Bruz LLP?</h2>
+                <h2>Why Choose Legal Bruz Pvt. Ltd.?</h2>
                 <p>We make trademark registration simple and affordable.</p>
             </div>
 
@@ -2206,82 +2145,7 @@
     </section>
 
     <!-- ============ FOOTER ============ -->
-    <footer>
-        <div class="container">
-            <h1 style="margin-bottom:50px;margin-left:auto;margin-right:auto;padding:5px; color:#fff; ">
-                <span
-                    style="border:2px solid #fff;padding-left:20px;padding-right:20px;padding-top:5px;padding-bottom:5px;">Legal
-                    Bruz LLP</span>
-            </h1>
-            <div class="footer-content">
-                <div class="footer-section">
-                    <p>India's fastest IPR platform. Trademark, Copyright & Patent registration made simple.</p>
-                    <div class="social-links">
-                        @foreach (config('social_links') as $social)
-                            <a href="{{ $social['url'] }}" class="social-icon" target="_blank" rel="noopener noreferrer"
-                                title="{{ $social['label'] }}" aria-label="Legal Bruz on {{ $social['label'] }}">
-                                <i class="bi {{ $social['icon'] }}" aria-hidden="true"></i>
-                            </a>
-                        @endforeach
-                    </div>
-                </div>
-
-                <div class="footer-section">
-                    <h6>Quick Links</h6>
-                    <ul>
-                        <li><a href="#services">Services</a></li>
-                        <li><a href="#pricing">Pricing</a></li>
-                        <li><a href="#testimonials">Reviews</a></li>
-                        <li><a href="{{ route('blog.index') }}">Blog</a></li>
-                        <li><a href="{{ route('faq') }}">FAQ</a></li>
-                    </ul>
-                </div>
-
-                <div class="footer-section">
-                    <h6>Company</h6>
-                    <ul>
-                        <li><a href="{{ route('about') }}">About Us</a></li>
-                        <li><a href="{{ route('contact') }}">Contact</a></li>
-                        <li><a href="{{ route('careers.index') }}">Careers</a></li>
-                        <li><a href="{{ route('privacy') }}">Privacy Policy</a></li>
-                        <li><a href="{{ route('refund') }}">Refund Policy</a></li>
-                        <li><a href="{{ route('terms') }}">Terms & Conditions</a></li>
-                    </ul>
-                </div>
-
-                <div class="footer-section">
-                    <h6>Get In Touch</h6>
-                    <p>
-                        <strong>Email:</strong><br>
-                        <a href="mailto:info@legalbruz.com">info@legalbruz.com</a>
-                    </p>
-                    <p style="margin-top: 15px;">
-                        <strong>Ambala Office:</strong><br>
-                        34 Krishna Nagar, Ambala Cantt,<br>
-                        Haryana -133001
-                    </p>
-                    <p style="margin-top: 15px;">
-                        <strong>Ambala District Court Office:</strong><br>
-                        Top Floor Chamber no.98<br>
-                        Ambala District court, Haryana
-                    </p>
-                    <p style="margin-top: 15px;">
-                        <strong>London Office:</strong><br>
-                        506-508 woodfield court, Honeypot lane,<br>
-                        stanmore- HA7 1JR
-                    </p>
-                    <p style="margin-top: 15px;">
-                        <strong>Business Hours:</strong><br>
-                        Mon to Friday - 10AM to 5PM
-                    </p>
-                </div>
-            </div>
-
-            <div class="footer-bottom">
-                <p>&copy; {{ now()->year }} Legal Bruz (LLP). All rights reserved.</p>
-            </div>
-        </div>
-    </footer>
+    @include('partials.site-footer')
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -2950,7 +2814,15 @@
             const warnings = Array.isArray(insights.warnings) ? insights.warnings : [];
             const factors = Array.isArray(analysis.factors) ? analysis.factors : [];
             const records = tmSearchState.results.slice(0, 25);
-            const generatedAt = new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+            const generatedAt = new Intl.DateTimeFormat('en-GB', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                timeZone: 'Europe/London',
+                timeZoneName: 'short',
+            }).format(new Date());
             const overviewChart = document.getElementById('tm-probability-doughnut')?.toDataURL('image/png') || '';
             const factorsChart = document.getElementById('tm-probability-factors')?.toDataURL('image/png') || '';
 
@@ -2961,7 +2833,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(analysis.keyword)} - Trademark Probability Report</title>
 <style>
-body{margin:0;background:#f4f8fb;color:#1d3557;font-family:Inter,Arial,sans-serif;line-height:1.55}
+body{margin:0;background:#f4f8fb;color:#1d3557;font-family:"DM Sans",Arial,sans-serif;line-height:1.55}
 .page{max-width:1040px;margin:0 auto;padding:34px 24px 48px}
 .hero,.card{background:#fff;border:1px solid #dfe8f1;border-radius:18px;box-shadow:0 16px 42px rgba(29,53,87,.08)}
 .hero{padding:34px;margin-bottom:22px}
@@ -2979,7 +2851,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px;bord
 <body>
 <main class="page">
 <section class="hero">
-<div class="kicker">Legal Bruz LLP · Trademark Registration Probability</div>
+<div class="kicker">Legal Bruz Pvt. Ltd. · Trademark Registration Probability</div>
 <h1>${escapeHtml(analysis.keyword)}</h1>
 <p class="muted">Generated on ${escapeHtml(generatedAt)} from ${tmSearchState.results.length} searched trademark record${tmSearchState.results.length === 1 ? '' : 's'}.</p>
 <div class="grid">

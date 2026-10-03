@@ -1,0 +1,132 @@
+:root {
+    --uk-navy: #102f54;
+    --uk-navy-deep: #092541;
+    --uk-ink: #102033;
+    --uk-slate: #58697b;
+    --uk-teal: #0f927f;
+    --uk-teal-dark: #087565;
+    --uk-teal-soft: #e8f7f3;
+    --uk-line: #dce7eb;
+    --uk-surface: #f7fafb;
+}
+
+.uk-site-body {
+    color: var(--uk-ink);
+    background: var(--uk-surface);
+    font-family: "DM Sans", sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+}
+
+.uk-site-body button,
+.uk-site-body input,
+.uk-site-body select,
+.uk-site-body textarea {
+    font: inherit;
+}
+
+.uk-site-body h1,
+.uk-site-body h2,
+.uk-site-body h3,
+.uk-site-body h4,
+.uk-site-body h5,
+.uk-site-body h6 {
+    font-family: "Manrope", sans-serif;
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: -.03em;
+}
+
+/* Dark feature panels own their foreground colours. Keep these explicit so
+   generic page typography can never reduce contrast on a dark background. */
+.uk-site-body .auth-panel,
+.uk-site-body .about-hero,
+.uk-site-body .about-cta-inner {
+    color: #fff;
+}
+
+.uk-site-body .auth-panel h1,
+.uk-site-body .about-hero h1,
+.uk-site-body .about-cta-inner h2 {
+    color: #fff;
+}
+
+.uk-site-body nav.navbar {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(220, 231, 235, .85);
+    background: rgba(255, 255, 255, .96);
+    box-shadow: 0 8px 28px rgba(13, 44, 72, .07);
+    backdrop-filter: blur(16px);
+}
+
+.uk-site-body .nav-link {
+    color: #344d64 !important;
+    font-size: .875rem;
+    font-weight: 700;
+}
+
+.uk-site-body .nav-link:hover,
+.uk-site-body .nav-link.active {
+    color: var(--uk-teal-dark) !important;
+}
+
+.uk-site-body .btn,
+.uk-site-body button[type="submit"] {
+    border-radius: 10px;
+    font-weight: 800;
+}
+
+.uk-site-body .btn-nav-logout,
+.uk-site-body .btn-primary {
+    border-color: var(--uk-teal);
+    background: var(--uk-teal);
+    box-shadow: 0 10px 24px rgba(15, 146, 127, .18);
+}
+
+.uk-site-body .btn-nav-logout:hover,
+.uk-site-body .btn-primary:hover {
+    border-color: var(--uk-teal-dark);
+    background: var(--uk-teal-dark);
+}
+
+.uk-site-body .card,
+.uk-site-body .auth-shell {
+    border-color: var(--uk-line);
+    border-radius: 20px;
+    box-shadow: 0 22px 60px rgba(13, 44, 72, .1);
+}
+
+.uk-site-body .form-control,
+.uk-site-body .form-select,
+.uk-site-body .auth-input {
+    border-color: #cddbe1;
+    border-radius: 10px;
+}
+
+.uk-site-body .form-control:focus,
+.uk-site-body .form-select:focus,
+.uk-site-body .auth-input:focus {
+    border-color: var(--uk-teal);
+    box-shadow: 0 0 0 .2rem rgba(15, 146, 127, .12);
+}
+
+.uk-site-body > #app > footer {
+    border-top: 0;
+    background: var(--uk-navy-deep);
+    color: #c2d0dc;
+}
+
+.uk-site-body > #app > footer a {
+    color: #6ed9ca !important;
+}
+
+@media (max-width: 767.98px) {
+    .uk-site-body {
+        font-size: 15px;
+    }
+
+    .uk-site-body nav.navbar {
+        padding: 6px 0;
+    }
+}

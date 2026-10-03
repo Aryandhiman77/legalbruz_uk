@@ -184,7 +184,7 @@
             $effectiveRank = max($effectiveRank, $statusRank[\App\Support\StuckTrademarkWorkflow::EXECUTION_ACTIVE] ?? $effectiveRank);
         }
 
-        $displayTimezone = 'Asia/Kolkata';
+        $displayTimezone = config('app.timezone', 'Europe/London');
         $statusLogsChronological = $case->statusLogs->sortBy('created_at')->values();
         $timelineLogForStep = function (array $step) use ($statusLogsChronological) {
             $eventTitles = $step['event_titles'] ?? [];

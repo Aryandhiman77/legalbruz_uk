@@ -43,7 +43,7 @@
     @endphp
 
     <section class="header">
-        <div class="kicker">Legal Bruz LLP · Trademark Registration Probability</div>
+        <div class="kicker">Legal Bruz Pvt. Ltd. · Trademark Registration Probability</div>
         <h1>{{ $analysis['keyword'] ?? $keyword }}</h1>
         <p class="muted">Generated on {{ $generatedAt }} from {{ count($records) }} trademark search {{ count($records) === 1 ? 'record' : 'records' }}.</p>
 

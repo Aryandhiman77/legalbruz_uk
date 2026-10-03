@@ -2,7 +2,7 @@
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
         <div>
             <h1 class="h3 mb-1" style="color:#1D3557;">{{ $title }}</h1>
-            <p class="text-muted mb-0">Published FAQs appear immediately on the public FAQ page.</p>
+            <p class="text-muted mb-0">Published FAQs appear immediately in the UK homepage accordion and on the public FAQ page.</p>
         </div>
         <a href="{{ route('admin.faqs.index') }}" class="btn btn-outline-secondary btn-sm">Back to FAQs</a>
     </div>
@@ -32,18 +32,9 @@
                         @error('answer') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
                     <div class="col-md-6">
-                        <label for="category" class="form-label fw-bold">Category</label>
-                        <input id="category" name="category" type="text"
-                            class="form-control @error('category') is-invalid @enderror"
-                            value="{{ old('category', $faq->category) }}" maxlength="100" list="faq-categories" required>
-                        <datalist id="faq-categories">
-                            <option value="General">
-                            <option value="Trademark Registration">
-                            <option value="Applications">
-                            <option value="Payments">
-                            <option value="Support">
-                        </datalist>
-                        @error('category') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        <label class="form-label fw-bold">Website section</label>
+                        <input name="category" type="hidden" value="UK Trade Marks">
+                        <div class="form-control bg-light">UK homepage · Trade mark FAQs</div>
                     </div>
                     <div class="col-md-3">
                         <label for="sort_order" class="form-label fw-bold">Display order</label>

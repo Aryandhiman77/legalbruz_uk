@@ -5,9 +5,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', config('app.name', 'Legal Bruz (LLP)') . ' - IPR Registration')</title>
-    <link rel="icon" type="image/png" href="{{ asset('logo4.png') }}">
-    <meta name="description" content="@yield('meta_description', 'Legal Bruz simplifies trademark registration, intellectual property protection, and legal support for businesses across India.')">
+    <title>@yield('title', config('app.name', 'Legal Bruz Pvt. Ltd.') . ' - IPR Registration')</title>
+    <link rel="icon" type="image/png" href="{{ asset('legal-bruz-pvt-ltd-logo.png') }}">
+    <meta name="description" content="@yield('meta_description', 'Legal Bruz provides clear UK trade mark application preparation, filing support and online tracking.')">
     <meta name="robots" content="@yield('meta_robots', request()->is('admin*', 'login', 'register', 'dashboard*', 'home') ? 'noindex, nofollow' : 'index, follow, max-image-preview:large')">
     <link rel="canonical" href="@yield('canonical_url', url()->current())">
     <meta property="og:type" content="@yield('og_type', 'website')">
@@ -15,18 +15,18 @@
     <meta property="og:title" content="@yield('og_title', 'Legal Bruz - Intellectual Property Services')">
     <meta property="og:description" content="@yield('og_description', 'Trademark and intellectual property services made clear and accessible.')">
     <meta property="og:url" content="@yield('canonical_url', url()->current())">
-    <meta property="og:image" content="@yield('og_image', asset('logo.png'))">
+    <meta property="og:image" content="@yield('og_image', asset('legal-bruz-pvt-ltd-logo.png'))">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="@yield('og_title', 'Legal Bruz - Intellectual Property Services')">
     <meta name="twitter:description" content="@yield('og_description', 'Trademark and intellectual property services made clear and accessible.')">
-    <meta name="twitter:image" content="@yield('og_image', asset('logo.png'))">
+    <meta name="twitter:image" content="@yield('og_image', asset('legal-bruz-pvt-ltd-logo.png'))">
     @yield('head')
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap"
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap"
         rel="stylesheet">
 
     <!-- Bootstrap -->
@@ -51,7 +51,7 @@
         }
 
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'DM Sans', sans-serif;
             background: var(--light-bg);
             color: var(--slate);
         }
@@ -62,7 +62,7 @@
         h4,
         h5,
         h6 {
-            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-family: 'Manrope', sans-serif;
             color: var(--navy);
             font-weight: 800;
         }
@@ -116,20 +116,29 @@
 
         /* Responsive Logo Styling */
         .navbar-logo {
-            height: 56px;
-            width: auto;
+            display: block;
+            width: 106px;
+            height: 79px;
+            max-width: 106px;
+            max-height: 79px;
             object-fit: contain;
         }
 
         @media (max-width: 768px) {
             .navbar-logo {
-                height: 48px;
+                width: 92px;
+                height: 68px;
+                max-width: 92px;
+                max-height: 68px;
             }
         }
 
         @media (max-width: 480px) {
             .navbar-logo {
-                height: 40px;
+                width: 84px;
+                height: 62px;
+                max-width: 84px;
+                max-height: 62px;
             }
         }
 
@@ -563,15 +572,17 @@
         }
     </style>
     <link rel="stylesheet" href="{{ asset('css/mobile-typography.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/uk-site-theme.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/site-footer.css') }}?v={{ filemtime(public_path('css/site-footer.css')) }}">
 </head>
 
-<body>
+<body class="uk-site-body">
     <div id="app">
         <!-- ============ NAVBAR ============ -->
         <nav class="navbar navbar-expand-lg">
             <div class="container">
                 <a class="navbar-brand d-flex align-items-center gap-2" href="{{ url('/') }}">
-                    <img src="{{ asset('logo.png') }}" alt="Legal Bruz (LLP) logo" class="navbar-logo">
+                    <img src="{{ asset('legal-bruz-pvt-ltd-logo.png') }}" alt="Legal Bruz Pvt. Ltd. logo" class="navbar-logo" width="106" height="79">
                 </a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                     <span class="navbar-toggler-icon"></span>
@@ -613,25 +624,7 @@
         </main>
 
         <!-- ============ FOOTER ============ -->
-        <footer>
-            <div class="container">
-                <p>&copy; {{ now()->year }} Legal Bruz (LLP). All rights reserved. |
-                    <a href="{{ route('blog.index') }}" style="color: var(--emerald); text-decoration: none;">Blog</a> |
-                    <a href="{{ route('careers.index') }}" style="color: var(--emerald); text-decoration: none;">Careers</a> |
-                    <a href="{{ route('faq') }}" style="color: var(--emerald); text-decoration: none;">FAQ</a> |
-                    <a href="{{ route('contact') }}" style="color: var(--emerald); text-decoration: none;">Contact</a> |
-                    <a href="{{ route('privacy') }}" style="color: var(--emerald); text-decoration: none;">Privacy Policy</a> |
-                    <a href="{{ route('refund') }}" style="color: var(--emerald); text-decoration: none;">Refund Policy</a> |
-                    <a href="{{ route('terms') }}" style="color: var(--emerald); text-decoration: none;">Terms</a>
-                    @foreach (config('social_links') as $social)
-                        | <a href="{{ $social['url'] }}" target="_blank" rel="noopener noreferrer"
-                            aria-label="Legal Bruz on {{ $social['label'] }}" style="color: var(--emerald); text-decoration: none;">
-                            <i class="bi {{ $social['icon'] }}" aria-hidden="true"></i> {{ $social['label'] }}
-                        </a>
-                    @endforeach
-                </p>
-            </div>
-        </footer>
+        @include('partials.site-footer')
     </div>
 
     <!-- Scripts -->

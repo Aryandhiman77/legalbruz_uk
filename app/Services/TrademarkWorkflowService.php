@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Mail\EventNotification;
+use App\Mail\AdminWorkflowNotification;
 use App\Models\Application;
 use App\Models\ApplicationStatusLog;
 use App\Models\ApplicationTask;
@@ -30,6 +31,27 @@ class TrademarkWorkflowService
                 'registry_status' => TrademarkWorkflow::REGISTRY_NOT_FILED,
             ])->save();
         }
+    }
+
+    public function notifyAdminsOfClientAction(Application $application, string $title, string $message): void
+    {
+        $applicationLabel = $application->application_number ?: ('Application #' . $application->id);
+        $client = $application->user;
+        $body = implode(PHP_EOL, array_filter([
+            $message,
+            '',
+            'Applicant: ' . ($client?->name ?: $application->applicant_name ?: 'Not available'),
+            'Applicant email: ' . ($client?->email ?: $application->email ?: 'Not available'),
+            'Application: ' . $applicationLabel,
+            'Brand: ' . ($application->brand_name ?: 'Not available'),
+            'Submitted at: ' . now()->timezone(config('app.timezone', 'Europe/London'))->format('d M Y, h:i A T'),
+        ]));
+
+        $this->notifyAdmins(
+            $title . ' - ' . $applicationLabel,
+            $body,
+            route('admin.view-application', $application->id)
+        );
     }
 
     public function markAdvancePaymentComplete(Application $application): void
@@ -108,8 +130,13 @@ class TrademarkWorkflowService
         }
 
         $this->ensureOnboardingPackage($application);
-        $this->transition($application, TrademarkWorkflow::ONBOARDING_PENDING, $note ?: 'Admin approved application and issued onboarding package.');
-        $this->notifyUser($application, 'onboarding_ready', 'Onboarding package ready', 'Please review the onboarding documents, electronically sign the Engagement Letter, and upload physically signed POA and Affidavit copies.');
+        $this->transition($application, TrademarkWorkflow::ONBOARDING_PENDING, $note ?: 'Admin approved the application and issued the Engagement Letter.');
+        $this->notifyUser(
+            $application,
+            'engagement_letter_ready',
+            'Engagement Letter ready to sign',
+            'Please review and electronically sign the Engagement Letter. POA and Affidavit are not required for this UK application.'
+        );
     }
 
     public function refreshOnboardingStatus(Application $application): void
@@ -123,24 +150,21 @@ class TrademarkWorkflowService
         }
 
         $this->completeTask($application, 'engagement_letter_signed');
-        $this->completeTask($application, 'poa_signed');
         $this->completeTask($application, 'signature_submitted');
 
         $this->saveApplicationFields($application, [
             'onboarding_completed_at' => now(),
         ]);
-        $this->transition($application, TrademarkWorkflow::ONBOARDING_COMPLETED, 'User completed onboarding package.');
-        $this->transition($application, TrademarkWorkflow::STRATEGY_IN_PROGRESS, 'Signed engagement letter, POA, and Affidavit verified. Strategy work started.');
-        $this->ensureTask($application, 'strategy_report', 'Prepare strategy report', 'admin', 'strategy');
-        $this->notifyUser($application, 'strategy_in_progress', 'Strategy work started', 'Your signed engagement letter, POA, and Affidavit have been verified. Our team is now preparing the trademark strategy and draft.');
+        $this->transition($application, TrademarkWorkflow::ONBOARDING_COMPLETED, 'The signed Engagement Letter was verified.');
+        $this->transition($application, TrademarkWorkflow::STRATEGY_IN_PROGRESS, 'Signed Engagement Letter verified. Search and specification work started.');
+        $this->ensureTask($application, 'strategy_report', 'Prepare search observations and final specification', 'admin', 'strategy');
+        $this->notifyUser($application, 'strategy_in_progress', 'Search and specification started', 'Your signed Engagement Letter has been verified. Our team is now preparing the UK search observations and application specification.');
     }
 
     private function onboardingPackageReadyForStrategy(Application $application): bool
     {
         foreach ([
             'engagement_letter (Signed)',
-            'poa (Signed)',
-            'affidavit (Signed)',
         ] as $documentType) {
             $document = $application->documents()
                 ->where('document_type', $documentType)
@@ -305,13 +329,9 @@ class TrademarkWorkflowService
     {
         $this->saveApplicationFields($application, [
             'final_payment_completed_at' => now(),
-            'application_number' => $application->application_number ?: 'TM-' . now()->format('Y') . '-' . $application->id,
-            'filed_at' => now(),
-            'registry_status' => TrademarkWorkflow::REGISTRY_FILED,
         ]);
-        $this->transition($application, TrademarkWorkflow::PAYMENT_COMPLETED, 'Final payment completed.');
-        $this->transition($application, TrademarkWorkflow::FILED, 'Final payment completed and application moved to filed stage.');
-        $this->notifyUser($application, 'application_filed', 'Trademark filed successfully', 'Your final payment has been received and your application is now in the filed stage.');
+        $this->transition($application, TrademarkWorkflow::PAYMENT_COMPLETED, 'Final payment completed. The application is ready for UKIPO filing.');
+        $this->notifyUser($application, 'ready_to_file', 'Application ready to file', 'Your final payment has been received. The approved application is ready for submission to the UKIPO.');
         $this->notifyAdmins(
             'Applicant completed final payment',
             'The applicant completed final payment for application #' . $application->id . ' (' . ($application->brand_name ?: 'Trademark') . ').'
@@ -345,7 +365,7 @@ class TrademarkWorkflowService
         $filingNote = trim((string) ($data['filing_note'] ?? ''));
         $updates = [
             'application_number' => $data['application_number'] ?? $application->application_number ?: 'TM-' . now()->format('Y') . '-' . $application->id,
-            'filed_at' => now(),
+            'filed_at' => $data['filing_date'] ?? now(),
             'filing_receipt_path' => $data['filing_receipt_path'] ?? $application->filing_receipt_path,
             'registry_status' => TrademarkWorkflow::REGISTRY_FILED,
         ];
@@ -359,19 +379,28 @@ class TrademarkWorkflowService
 
         $this->saveApplicationFields($application, $updates);
 
-        $this->transition($application, TrademarkWorkflow::FILED, $filingNote !== '' ? $filingNote : 'Trademark application filed.');
-        $this->transition($application, TrademarkWorkflow::POST_FILING, 'Post-filing care started.');
-        $this->saveApplicationFields($application, [
-            'post_filing_started_at' => now(),
-        ]);
+        if ($this->hasApplicationsColumn('workflow_meta')) {
+            $application->refresh();
+            $meta = $application->workflow_meta ?? [];
+            $meta['ukipo']['application_number'] = $updates['application_number'];
+            $meta['ukipo']['filing_date'] = $data['filing_date'] ?? now()->toDateString();
+            $meta['ukipo']['examination_deadline'] = $data['examination_deadline'] ?? null;
+            $meta['ukipo']['publication_date'] = $data['publication_date'] ?? null;
+            $meta['ukipo']['opposition_deadline'] = $data['opposition_deadline'] ?? null;
+            $meta['ukipo']['registration_number'] = $data['registration_number'] ?? null;
+            $meta['ukipo']['renewal_date'] = $data['renewal_date'] ?? null;
+            $application->forceFill(['workflow_meta' => $meta])->save();
+        }
 
-        $message = 'Your application has been filed. You can now track the application number and post-filing milestones from your dashboard.';
+        $this->transition($application, TrademarkWorkflow::FILED, $filingNote !== '' ? $filingNote : 'Trade mark application filed with the UKIPO.');
+
+        $message = 'Your application has been filed with the UKIPO. You can now track the application number and later milestones from your dashboard.';
 
         if ($filingNote !== '') {
             $message .= "\n\nAdmin note: " . $filingNote;
         }
 
-        $this->notifyUser($application, 'application_filed', 'Trademark filed successfully', $message);
+        $this->notifyUser($application, 'application_filed', 'Trade mark filed with UKIPO', $message);
     }
 
     public function completeFiledStage(Application $application, ?string $note = null, array $mailAttachments = []): void
@@ -393,9 +422,8 @@ class TrademarkWorkflowService
     public function ensureOnboardingPackage(Application $application): void
     {
         $this->ensureTask($application, 'engagement_letter_signed', 'Electronically sign engagement letter', 'user', 'onboarding');
-        $this->ensureTask($application, 'poa_signed', 'Upload physically signed power of attorney', 'user', 'onboarding');
-        $this->ensureTask($application, 'signature_submitted', 'Submit signed onboarding package', 'user', 'onboarding');
-        $this->ensureTask($application, 'strategy_report', 'Prepare strategy report', 'admin', 'strategy');
+        $this->ensureTask($application, 'signature_submitted', 'Submit the signed engagement letter', 'user', 'onboarding');
+        $this->ensureTask($application, 'strategy_report', 'Prepare search observations and final specification', 'admin', 'strategy');
     }
 
     public function ensureTask(Application $application, string $taskCode, string $title, string $assigneeType = 'user', ?string $group = null): ApplicationTask
@@ -582,13 +610,8 @@ class TrademarkWorkflowService
 
             if (config('queue.default') !== 'sync') {
                 Mail::to($application->user->email)->queue($notification);
-            } elseif (config('mail.default') !== 'smtp') {
-                Mail::to($application->user->email)->send($notification);
             } else {
-                Log::warning('Skipped synchronous workflow notification email to avoid request timeout.', [
-                    'application_id' => $application->id,
-                    'type' => $type,
-                ]);
+                Mail::to($application->user->email)->send($notification);
             }
         } catch (\Throwable $e) {
             Log::warning('Workflow notification email failed.', [
@@ -619,16 +642,17 @@ class TrademarkWorkflowService
             ->all();
     }
 
-    private function notifyAdmins(string $title, string $message): void
+    private function notifyAdmins(string $title, string $message, ?string $actionUrl = null): void
     {
         try {
-            Admin::query()->pluck('email')->filter()->each(function (string $email) use ($title, $message) {
-                Mail::raw($message, function ($mail) use ($email, $title) {
-                    $mail->to($email)->subject($title);
-                });
+            Admin::query()->pluck('email')->filter()->unique()->each(function (string $email) use ($title, $message, $actionUrl) {
+                Mail::to($email)->send(new AdminWorkflowNotification($title, $message, $actionUrl));
             });
         } catch (\Throwable $e) {
-            // Keep workflow transitions resilient even if admin mail delivery is unavailable.
+            Log::warning('Admin workflow notification email failed.', [
+                'title' => $title,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 
@@ -636,10 +660,12 @@ class TrademarkWorkflowService
     {
         return match ($type) {
             'engagement_letter' => 'This engagement letter confirms the scope of our trademark filing services for ' . ($application->brand_name ?: 'your mark') . '.',
-            'invoice' => 'Invoice for the onboarding package and the initial service engagement.',
-            'tm_intake_form' => 'This TM intake form captures the owner details, mark details, use claim, goods/services, and filing instructions required to proceed with onboarding.',
+            'invoice' => 'Invoice for the UK trade mark application service.',
+            'tm_intake_form' => 'This application summary records the applicant, mark, business activities and filing instructions.',
             'terms_of_business' => 'These terms govern the professional services, timelines, and responsibilities for your trademark matter.',
-            'poa' => 'Power of Attorney authorizing us to act for your trademark filing and prosecution matter.',
+            'application_summary' => 'Summary of the UK trade mark application prepared for client review.',
+            'final_specification' => 'The final classes and goods and services specification prepared for client approval.',
+            'filing_authority' => 'Authority for Legal Bruz Pvt. Ltd. to submit the client-approved application to the UKIPO.',
             default => 'Workflow document generated for this trademark application.',
         };
     }

@@ -14,6 +14,12 @@ class TrademarkScraperController extends Controller
             'limit' => 'nullable|integer|min:1|max:100',
         ]);
 
+        // The original scraper loads each result's detail page sequentially.
+        // Keep that behaviour intact while allowing the full request to finish.
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(180);
+        }
+
         $keyword = $request->keyword;
         $limit = $request->limit ?? 20;
 

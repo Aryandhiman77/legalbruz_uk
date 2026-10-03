@@ -4,7 +4,7 @@
     $canonical = $blog->canonical_url ?: route('blog.show', $blog);
     $socialImage = $blog->og_image_path
         ? route('storage.public.view', ['path' => $blog->og_image_path])
-        : ($blog->featured_image_path ? route('storage.public.view', ['path' => $blog->featured_image_path]) : asset('logo.png'));
+        : ($blog->featured_image_path ? route('storage.public.view', ['path' => $blog->featured_image_path]) : asset('legal-bruz-pvt-ltd-logo.png'));
 @endphp
 
 @section('title', $blog->meta_title . ' | Legal Bruz')
@@ -36,7 +36,7 @@
                 <h1>{{ $blog->title }}</h1>
                 <div class="blog-meta">
                     <span><i class="bi bi-person"></i>{{ $blog->author_name }}</span>
-                    <span><i class="bi bi-calendar3"></i>{{ $blog->published_at->timezone('Asia/Kolkata')->format('d M Y') }}</span>
+                    <span><i class="bi bi-calendar3"></i>{{ $blog->published_at->timezone(config('app.timezone', 'Europe/London'))->format('d M Y') }}</span>
                     <span><i class="bi bi-clock"></i>{{ $blog->reading_time }} min read</span>
                 </div>
             </div>

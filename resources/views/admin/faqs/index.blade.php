@@ -5,10 +5,10 @@
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
             <div>
                 <h1 class="h3 mb-1" style="color:#1D3557;">Frequently Asked Questions</h1>
-                <p class="text-muted mb-0">Create, order, publish, and update the FAQs shown on the website.</p>
+                <p class="text-muted mb-0">Create, order, publish, and update the accordion FAQs shown on the UK homepage.</p>
             </div>
             <div class="d-flex gap-2">
-                <a href="{{ route('faq') }}" target="_blank" class="btn btn-outline-secondary btn-sm">View Public Page</a>
+                <a href="{{ route('landing') }}#faqs" target="_blank" class="btn btn-outline-secondary btn-sm">View Homepage FAQs</a>
                 <a href="{{ route('admin.faqs.create') }}" class="btn btn-primary btn-sm" style="background:#2A9D8F;border:0;">
                     <i class="fas fa-plus"></i> Add FAQ
                 </a>

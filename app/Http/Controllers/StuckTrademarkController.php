@@ -1060,7 +1060,7 @@ class StuckTrademarkController extends Controller
         unset($updates['note']);
 
         if (filled($validated['next_follow_up_at'] ?? null)) {
-            $updates['next_follow_up_at'] = Carbon::parse($validated['next_follow_up_at'], 'Asia/Kolkata')->utc();
+            $updates['next_follow_up_at'] = Carbon::parse($validated['next_follow_up_at'], config('app.timezone', 'Europe/London'))->utc();
         }
 
         if ($validated['status'] === StuckTrademarkWorkflow::RESOLVED && !$case->resolved_at) {

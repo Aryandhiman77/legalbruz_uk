@@ -2,7 +2,7 @@
 
 @section('content')
     @php
-        $displayTimezone = 'Asia/Kolkata';
+        $displayTimezone = config('app.timezone', 'Europe/London');
         $latestDocumentsByType = $case->documents->sortByDesc('id')->unique('document_type')->values();
         $latestDocumentIdsByType = $latestDocumentsByType->pluck('id', 'document_type');
         $documentTypeLabels = [

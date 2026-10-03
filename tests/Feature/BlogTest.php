@@ -154,7 +154,7 @@ class BlogTest extends TestCase
     public function test_admin_can_open_blog_create_form(): void
     {
         $admin = $this->createAdmin();
-        Carbon::setTestNow(Carbon::create(2026, 7, 29, 13, 15, 0, 'Asia/Kolkata'));
+        Carbon::setTestNow(Carbon::create(2026, 7, 29, 13, 15, 0, 'Europe/London'));
 
         $this->actingAs($admin, 'admin')
             ->get(route('admin.blogs.create'))
@@ -165,7 +165,7 @@ class BlogTest extends TestCase
             ->assertSee('id="blogEditorForm"', false)
             ->assertSee('articleEditor.getData()', false)
             ->assertSee('value="2026-07-29T13:15"', false)
-            ->assertSee('data-default-current="true"', false);
+            ->assertSee('UK local time (GMT/BST)');
 
         Carbon::setTestNow();
     }

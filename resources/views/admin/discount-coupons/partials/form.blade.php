@@ -264,7 +264,7 @@
                                             <label class="coupon-label">Discount Type <span class="text-danger">*</span></label>
                                             <select name="discount_type" class="coupon-select" id="discountType" required>
                                                 <option value="percentage" @selected($discountType === 'percentage')>Percentage (%)</option>
-                                                <option value="flat" @selected($discountType === 'flat')>Flat Amount</option>
+                                                <option value="flat" @selected($discountType === 'flat')>Flat Amount (£)</option>
                                             </select>
                                         </div>
                                         <div class="col-md-6">
@@ -284,12 +284,9 @@
                                             <label class="coupon-label">Applies To <span class="text-danger">*</span></label>
                                             <select name="applies_to" class="coupon-select" id="appliesTo" required>
                                                 <option value="all_services" @selected($appliesTo === 'all_services')>All Services</option>
-                                                <option value="trademark_filing" @selected($appliesTo === 'trademark_filing')>Trademark Filing</option>
-                                                <option value="audit_package_purchase" @selected($appliesTo === 'audit_package_purchase')>Audit Package Purchase</option>
-                                                <option value="execution_package_purchase" @selected($appliesTo === 'execution_package_purchase')>Execution Package Purchase</option>
-                                                <option value="opposition_defence_package" @selected($appliesTo === 'opposition_defence_package')>Opposition Defence</option>
-                                                <option value="opposition_filing" @selected($appliesTo === 'opposition_filing')>Opposition Filing</option>
-                                                <option value="objection_reply" @selected($appliesTo === 'objection_reply')>Objection Reply</option>
+                                                <option value="trademark_filing" @selected($appliesTo === 'trademark_filing')>UK Trade Mark Filing</option>
+                                                <option value="uk_search" @selected($appliesTo === 'uk_search')>UK Trade Mark Search</option>
+                                                <option value="uk_examination_response" @selected($appliesTo === 'uk_examination_response')>UK Examination Response</option>
                                             </select>
                                             <div class="coupon-help">Select specific services or categories.</div>
                                         </div>
@@ -330,6 +327,7 @@
                                         <input type="datetime-local" name="ends_at" class="coupon-input"
                                             value="{{ $endsAt }}">
                                     </div>
+                                    <div class="coupon-help mb-3">Times use UK local time (GMT/BST).</div>
                                     <div>
                                         <label class="coupon-label">Applicable Users</label>
                                         <select name="applicable_users" class="coupon-select" id="applicableUsers">
@@ -474,7 +472,7 @@
         function updatePreview() {
             const code = couponCode.value.trim() || 'TM50';
             const value = discountValue.value || '20';
-            const label = discountType.value === 'flat' ? '₹' + value : value + '% OFF';
+            const label = discountType.value === 'flat' ? '£' + value : value + '% OFF';
 
             previewCode.textContent = code.toUpperCase();
             previewCode.classList.add('coupon-ticket-code');

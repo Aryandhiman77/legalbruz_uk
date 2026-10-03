@@ -27,12 +27,12 @@ class AdminNavigationTest extends TestCase
             ->assertSee('transform: translateX(-105%)', false)
             ->assertSee('body.admin-sidebar-open', false)
             ->assertSee('Trademarks')
-            ->assertSee('Opposition &amp; Objections', false)
+            ->assertDontSee('Opposition &amp; Objections', false)
+            ->assertDontSee('Recovery Cases')
             ->assertSee('Website')
             ->assertSee('Inbox')
             ->assertSee('Quick links')
             ->assertSee('All Applications')
-            ->assertSee('Oppose Cases')
             ->assertSee('Career Applications')
             ->assertSee('Registered Users')
             ->assertSee('View registered users')
@@ -91,10 +91,6 @@ class AdminNavigationTest extends TestCase
         $routes = [
             'admin.applications' => 'UNDER_REVIEW',
             'admin.all-applications' => 'UNDER_REVIEW',
-            'admin.stuck-trademark.index' => 'INTAKE_SUBMITTED',
-            'admin.trademark-opposition.index' => 'Application Received',
-            'admin.trademark-opposition.oppose.index' => 'Application Received',
-            'admin.examination-reply.index' => 'Application Received',
             'admin.blogs.index' => 'draft',
             'admin.career-jobs.index' => 'open',
             'admin.career-applications.index' => 'new',

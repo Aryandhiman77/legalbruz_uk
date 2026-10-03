@@ -19,8 +19,8 @@ class EmailOtpAuthenticationTest extends TestCase
             $this->get($url)
                 ->assertOk()
                 ->assertSee('<nav class="navbar', false)
-                ->assertSee('<footer>', false)
-                ->assertSee('logo4.png', false)
+                ->assertSee('<footer class="site-footer">', false)
+                ->assertSee('legal-bruz-pvt-ltd-logo.png', false)
                 ->assertSee('css/auth.css', false);
         }
     }

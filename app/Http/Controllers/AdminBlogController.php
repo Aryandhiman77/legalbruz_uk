@@ -49,7 +49,7 @@ class AdminBlogController extends Controller
                 'category' => 'Insights',
                 'author_name' => 'Legal Bruz Team',
                 'status' => 'draft',
-                'published_at' => now('Asia/Kolkata')->utc(),
+                'published_at' => now(config('app.timezone', 'Europe/London')),
             ]),
         ]);
     }
@@ -137,7 +137,7 @@ class AdminBlogController extends Controller
             $data['published_at'] = Carbon::createFromFormat(
                 'Y-m-d\TH:i',
                 $data['published_at'],
-                'Asia/Kolkata'
+                config('app.timezone', 'Europe/London')
             )->utc();
         }
         if (filled($data['schema_markup'] ?? null)) {

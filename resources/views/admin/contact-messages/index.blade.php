@@ -45,7 +45,7 @@
                                         <td><strong>{{ $message->name }}</strong><br><small class="text-muted">{{ $message->email }}</small></td>
                                         <td>{{ $message->business_name ?: 'Not provided' }}</td>
                                         <td>{{ $message->service_interested ?: $message->subject }}<br><small class="text-muted">{{ Str::limit($message->message, 70) }}</small></td>
-                                        <td><small>{{ $message->created_at->timezone('Asia/Kolkata')->format('d M Y, h:i A') }}</small></td>
+                                        <td><small>{{ $message->created_at->timezone(config('app.timezone', 'Europe/London'))->format('d M Y, h:i A T') }}</small></td>
                                         <td>
                                             <x-admin-status :status="$message->status" />
                                         </td>

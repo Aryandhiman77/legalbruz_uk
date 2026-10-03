@@ -71,7 +71,7 @@
         @endif
 
         <div class="meta">
-            Submitted by {{ $user->name }} on {{ $submittedAt->timezone('Asia/Kolkata')->format('d M Y h:i A') }}
+            Submitted by {{ $user->name }} on {{ $submittedAt->timezone(config('app.timezone', 'Europe/London'))->format('d M Y h:i A T') }}
         </div>
     </div>
 </body>

@@ -21,13 +21,13 @@ class AdminTrademarkPricingController extends Controller
     {
         $validated = $request->validate([
             'prices' => ['required', 'array'],
-            'prices.individual' => ['required', 'numeric', 'min:1', 'max:1000000'],
-            'prices.company' => ['required', 'numeric', 'min:1', 'max:1000000'],
+            'prices.uk_application' => ['required', 'numeric', 'min:1', 'max:1000000'],
         ]);
 
         TrademarkPricing::ensureDefaults();
 
-        foreach (TrademarkPricing::defaults() as $key => $default) {
+        foreach ([TrademarkPricing::APPLICATION] as $key) {
+            $default = TrademarkPricing::defaults()[$key];
             TrademarkPricing::query()->updateOrCreate(
                 ['key' => $key],
                 [
@@ -43,6 +43,6 @@ class AdminTrademarkPricingController extends Controller
 
         return redirect()
             ->route('admin.trademark-pricing.edit')
-            ->with('success', 'Trademark pricing updated across the application.');
+            ->with('success', 'UK trade mark pricing updated across the website.');
     }
 }

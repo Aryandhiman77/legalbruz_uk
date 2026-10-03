@@ -85,15 +85,14 @@
                                 <h6><i class="fas fa-info-circle"></i> Document Requirements</h6>
                                 <ul class="mb-0">
                                     @if ($application->entity_type === 'individual')
-                                        <li><strong>PAN Card:</strong> Scanned copy of original</li>
+                                        <li><strong>Identity document:</strong> Passport or driving licence</li>
                                         <li><strong>Address Proof:</strong> Utility bill, passport, or government ID</li>
                                         <li><strong>Affidavit:</strong> Auto-generated document - upload after generation</li>
                                         <li><strong>Power of Attorney:</strong> Auto-generated document - upload after generation</li>
                                     @else
-                                        <li><strong>Certificate of Incorporation:</strong> From ROC</li>
-                                        <li><strong>PAN Card:</strong> Company PAN</li>
-                                        <li><strong>GST Certificate:</strong> If registered</li>
-                                        <li><strong>Authorized Signatory ID:</strong> Government issued ID</li>
+                                        <li><strong>Certificate of Incorporation:</strong> Companies House document</li>
+                                        <li><strong>Registered Office Address:</strong> Recent supporting document</li>
+                                        <li><strong>Authorized Signatory ID:</strong> Passport or driving licence</li>
                                         <li><strong>Affidavit:</strong> Auto-generated document - upload after generation</li>
                                         <li><strong>Power of Attorney:</strong> Auto-generated document - upload after generation</li>
                                     @endif

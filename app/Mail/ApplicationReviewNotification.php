@@ -55,8 +55,6 @@ class ApplicationReviewNotification extends Mailable
 
         $documentTypes = [
             'engagement_letter',
-            'poa',
-            'affidavit',
             'other_document',
         ];
 

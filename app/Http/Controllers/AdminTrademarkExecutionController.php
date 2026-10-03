@@ -314,7 +314,7 @@ class AdminTrademarkExecutionController extends Controller
             'status' => $to,
             'current_stage' => $to === StuckTrademarkWorkflow::RESOLVED ? 'Resolved & Closed' : 'Monitoring & Updates',
             'next_follow_up_at' => filled($validated['next_follow_up_at'] ?? null)
-                ? Carbon::parse($validated['next_follow_up_at'], 'Asia/Kolkata')->utc()
+                ? Carbon::parse($validated['next_follow_up_at'], config('app.timezone', 'Europe/London'))->utc()
                 : $case->next_follow_up_at,
             'resolved_at' => $to === StuckTrademarkWorkflow::RESOLVED ? ($case->resolved_at ?: now()) : $case->resolved_at,
         ];

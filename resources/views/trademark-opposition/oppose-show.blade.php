@@ -3,8 +3,8 @@
 @section('content')
     @php
         $workflow = \App\Support\TrademarkOppositionWorkflow::class;
-        $displayTimezone = 'Asia/Kolkata';
-        $formatDateTime = fn ($timestamp, string $format = 'd M Y, h:i A') => $timestamp
+        $displayTimezone = config('app.timezone', 'Europe/London');
+        $formatDateTime = fn ($timestamp, string $format = 'd M Y, h:i A T') => $timestamp
             ? \Illuminate\Support\Carbon::parse($timestamp)->timezone($displayTimezone)->format($format)
             : null;
         $uploadedEvidence = $case->evidence->where('file_path', '!=', 'metadata')->where('uploaded_by', 'client')->sortByDesc('id')->unique('evidence_type')->reject(fn ($evidence) => $evidence->review_status === 'rejected')->pluck('evidence_type')->all();

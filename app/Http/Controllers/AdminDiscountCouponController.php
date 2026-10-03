@@ -16,7 +16,7 @@ class AdminDiscountCouponController extends Controller
         $coupons = DiscountCoupon::query()
             ->when($request->filled('status'), function ($query) use ($request) {
                 $status = (string) $request->string('status');
-                $now = now('Asia/Kolkata');
+                $now = now(config('app.timezone', 'Europe/London'));
 
                 match ($status) {
                     'active' => $query->where('is_active', true)
@@ -103,11 +103,8 @@ class AdminDiscountCouponController extends Controller
             'applies_to' => ['required', Rule::in([
                 'all_services',
                 'trademark_filing',
-                'audit_package_purchase',
-                'execution_package_purchase',
-                'opposition_defence_package',
-                'opposition_filing',
-                'objection_reply',
+                'uk_search',
+                'uk_examination_response',
             ])],
             'applicable_users' => ['required', Rule::in(['all_users', 'specific_users'])],
             'selected_user_ids' => ['nullable', 'array'],
