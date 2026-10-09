@@ -119,6 +119,48 @@ class UkHomepageTest extends TestCase
         $this->assertSame(425.0, TrademarkPricing::amountForApplicantType('company'));
     }
 
+    public function test_admin_can_add_remove_and_edit_homepage_pricing_card_key_points(): void
+    {
+        $admin = Admin::query()->create([
+            'name' => 'Homepage Pricing Admin',
+            'email' => 'homepage-pricing@example.test',
+            'password' => bcrypt('password'),
+        ]);
+
+        $this->actingAs($admin, 'admin')
+            ->get(route('admin.trademark-pricing.edit'))
+            ->assertOk()
+            ->assertSee('Homepage pricing card key points')
+            ->assertSee('+ Add key point')
+            ->assertSee('data-remove-feature', false);
+
+        $features = [
+            TrademarkPricing::OPPOSITION => ['Custom opposition point', 'Second opposition point'],
+            TrademarkPricing::APPLICATION => ['Custom filing point'],
+            TrademarkPricing::EXAMINATION_RESPONSE => ['Custom report point', 'Second report point', 'Third report point'],
+        ];
+
+        $this->put(route('admin.trademark-pricing.update'), [
+            'prices' => [
+                TrademarkPricing::SEARCH => 149,
+                TrademarkPricing::APPLICATION => 399,
+                TrademarkPricing::CONSULTATION => 25,
+            ],
+            'features' => $features,
+        ])->assertRedirect(route('admin.trademark-pricing.edit'));
+
+        auth('admin')->logout();
+        $response = $this->get(route('landing'))->assertOk();
+
+        foreach ($features as $cardFeatures) {
+            foreach ($cardFeatures as $feature) {
+                $response->assertSee($feature);
+            }
+        }
+
+        $response->assertDontSee('Flow A: defend your mark');
+    }
+
     public function test_first_visit_disclaimer_is_present_on_the_uk_homepage(): void
     {
         $this->get(route('landing'))

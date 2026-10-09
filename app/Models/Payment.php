@@ -13,6 +13,10 @@ class Payment extends Model
         'amount',
         'total_amount',
         'payment_type',
+        'discount_coupon_id',
+        'coupon_code',
+        'discount_amount',
+        'discounted_total_amount',
         'percentage',
         'transaction_id',
         'payment_method',
@@ -31,6 +35,8 @@ class Payment extends Model
         'rejected_at' => 'datetime',
         'amount' => 'decimal:2',
         'total_amount' => 'decimal:2',
+        'discount_amount' => 'decimal:2',
+        'discounted_total_amount' => 'decimal:2',
     ];
 
     public function application(): BelongsTo
@@ -45,6 +51,11 @@ class Payment extends Model
 
     public function invoiceDiscountAmount(): float
     {
+        if (array_key_exists('discount_amount', $this->attributes)
+            && $this->attributes['discount_amount'] !== null) {
+            return max(round((float) $this->attributes['discount_amount'], 2), 0);
+        }
+
         $baseAmount = $this->invoiceDiscountBaseAmount();
 
         if ($baseAmount <= 0) {
@@ -88,6 +99,18 @@ class Payment extends Model
         return rtrim(rtrim(number_format($percent, 2), '0'), '.') . '% OFF';
     }
 
+    public function invoiceCouponCode(): ?string
+    {
+        $code = trim((string) ($this->coupon_code ?? ''));
+
+        return $code !== '' ? $code : null;
+    }
+
+    public function invoicePaymentBaseAmount(): float
+    {
+        return round((float) $this->amount + $this->invoiceDiscountAmount(), 2);
+    }
+
     public function isAdvanceInvoice(): bool
     {
         $paymentType = strtolower((string) ($this->payment_type ?? ''));
@@ -117,14 +140,8 @@ class Payment extends Model
             return (float) $this->total_amount;
         }
 
-        if ($paymentType === 'final' && $this->application_id && (float) $this->total_amount > 0) {
-            $previousPaidAmount = static::query()
-                ->where('application_id', $this->application_id)
-                ->whereIn('status', ['completed', 'approved'])
-                ->where('id', '<', $this->id)
-                ->sum('amount');
-
-            return max((float) $this->total_amount - (float) $previousPaidAmount, 0);
+        if ($paymentType === 'final' && (float) $this->total_amount > 0) {
+            return round((float) $this->total_amount * 0.5, 2);
         }
 
         return (float) $this->amount;

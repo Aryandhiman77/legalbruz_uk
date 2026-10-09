@@ -127,23 +127,31 @@
                 @php
                     $invoiceDiscountAmount = $payment->invoiceDiscountAmount();
                     $invoiceDiscountLabel = $payment->invoiceDiscountLabel();
+                    $invoiceCouponCode = $payment->invoiceCouponCode();
+                    $invoicePaymentBaseAmount = $payment->invoicePaymentBaseAmount();
                     $isAdvanceInvoice = $payment->isAdvanceInvoice();
-                    $advanceBaseAmount = $payment->invoiceAdvanceBaseAmount();
                 @endphp
                 <table style="width: 100%;">
                     <tr>
                         <td>Total service amount</td>
                         <td class="text-right">GBP {{ number_format((float) $payment->total_amount, 2) }}</td>
                     </tr>
-                    @if ($isAdvanceInvoice)
+                    @if ($isAdvanceInvoice || $invoiceDiscountAmount > 0)
                         <tr>
-                            <td>50% advance payment</td>
-                            <td class="text-right">GBP {{ number_format($advanceBaseAmount, 2) }}</td>
+                            <td>{{ $isAdvanceInvoice ? '50% advance before discount' : 'Payment amount before discount' }}</td>
+                            <td class="text-right">GBP {{ number_format($invoicePaymentBaseAmount, 2) }}</td>
                         </tr>
                     @endif
                     @if ($invoiceDiscountAmount > 0)
                         <tr>
-                            <td>Coupon discount{{ $invoiceDiscountLabel ? ' (' . $invoiceDiscountLabel . ')' : '' }}</td>
+                            <td>
+                                Coupon discount
+                                @if ($invoiceCouponCode)
+                                    ({{ $invoiceCouponCode }})
+                                @elseif ($invoiceDiscountLabel)
+                                    ({{ $invoiceDiscountLabel }})
+                                @endif
+                            </td>
                             <td class="text-right">- GBP {{ number_format($invoiceDiscountAmount, 2) }}</td>
                         </tr>
                     @endif

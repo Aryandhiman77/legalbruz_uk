@@ -40,6 +40,12 @@
             'current' => $discountedApplicationPrice,
             'coupon' => $discountedApplicationPrice < $applicationPrice ? $applicationCoupon : null,
         ];
+        $oppositionFeatures = $plans[\App\Models\TrademarkPricing::OPPOSITION]['features']
+            ?? $defaults[\App\Models\TrademarkPricing::OPPOSITION]['features'];
+        $applicationFeatures = $plans[\App\Models\TrademarkPricing::APPLICATION]['features']
+            ?? $defaults[\App\Models\TrademarkPricing::APPLICATION]['features'];
+        $examinationFeatures = $plans[\App\Models\TrademarkPricing::EXAMINATION_RESPONSE]['features']
+            ?? $defaults[\App\Models\TrademarkPricing::EXAMINATION_RESPONSE]['features'];
         $couponBannerEndsAt = $applicationPriceDetails['coupon']?->ends_at
             ? $applicationPriceDetails['coupon']->ends_at
                 ->copy()
@@ -389,7 +395,7 @@
                         <h3>Defend or oppose a trade mark</h3>
                         <p class="coming-soon-copy">Choose the service that matches your opposition situation.</p>
                         <ul>
-                            @foreach (['Flow A: defend your mark', 'Flow B: oppose a conflicting mark', 'Evidence and document review', 'Online case tracking'] as $feature)
+                            @foreach ($oppositionFeatures as $feature)
                                 <li><span>✓</span>{{ $feature }}</li>
                             @endforeach
                         </ul>
@@ -411,7 +417,7 @@
                             @endif
                         </div>
                         <ul>
-                            @foreach (['Owner and mark review', 'Classes and specification', 'Client approval', 'UKIPO filing and tracking'] as $feature)
+                            @foreach ($applicationFeatures as $feature)
                                 <li><span>✓</span>{{ $feature }}</li>
                             @endforeach
                         </ul>
@@ -425,7 +431,7 @@
                         <h3>Respond to an examination report</h3>
                         <p class="coming-soon-copy">Review, draft approval and filing support for examination objections.</p>
                         <ul>
-                            @foreach (['Report and objection review', 'Reply strategy and drafting', 'Client draft approval', 'Registry filing and tracking'] as $feature)
+                            @foreach ($examinationFeatures as $feature)
                                 <li><span>✓</span>{{ $feature }}</li>
                             @endforeach
                         </ul>

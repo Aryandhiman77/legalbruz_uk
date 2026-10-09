@@ -16,6 +16,7 @@ class TrademarkPricing extends Model
     public const APPLICATION = 'uk_application';
     public const EXAMINATION_RESPONSE = 'uk_examination_response';
     public const CONSULTATION = 'consultation_call';
+    public const OPPOSITION = 'opposition_service';
 
     private const CACHE_KEY = 'trademark_pricing.active_plans';
 
@@ -23,12 +24,14 @@ class TrademarkPricing extends Model
         'key',
         'label',
         'amount',
+        'features',
         'is_active',
         'sort_order',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
+        'features' => 'array',
         'is_active' => 'boolean',
     ];
 
@@ -46,6 +49,7 @@ class TrademarkPricing extends Model
                 'key' => self::APPLICATION,
                 'label' => 'UK Trade Mark Application',
                 'amount' => 399.00,
+                'features' => ['Owner and mark review', 'Classes and specification', 'Client approval', 'UKIPO filing and tracking'],
                 'is_active' => true,
                 'sort_order' => 2,
             ],
@@ -53,6 +57,7 @@ class TrademarkPricing extends Model
                 'key' => self::EXAMINATION_RESPONSE,
                 'label' => 'Examination Response',
                 'amount' => 249.00,
+                'features' => ['Report and objection review', 'Reply strategy and drafting', 'Client draft approval', 'Registry filing and tracking'],
                 'is_active' => true,
                 'sort_order' => 3,
             ],
@@ -62,6 +67,14 @@ class TrademarkPricing extends Model
                 'amount' => 25.00,
                 'is_active' => true,
                 'sort_order' => 4,
+            ],
+            self::OPPOSITION => [
+                'key' => self::OPPOSITION,
+                'label' => 'Opposition Service',
+                'amount' => 0.00,
+                'features' => ['Flow A: defend your mark', 'Flow B: oppose a conflicting mark', 'Evidence and document review', 'Online case tracking'],
+                'is_active' => true,
+                'sort_order' => 10,
             ],
             self::INDIVIDUAL => [
                 'key' => self::INDIVIDUAL,
@@ -96,14 +109,20 @@ class TrademarkPricing extends Model
         }
 
         foreach (self::defaults() as $plan) {
+            $values = [
+                'label' => $plan['label'],
+                'amount' => $plan['amount'],
+                'is_active' => $plan['is_active'],
+                'sort_order' => $plan['sort_order'],
+            ];
+
+            if (Schema::hasColumn('trademark_pricings', 'features')) {
+                $values['features'] = $plan['features'] ?? null;
+            }
+
             self::query()->firstOrCreate(
                 ['key' => $plan['key']],
-                [
-                    'label' => $plan['label'],
-                    'amount' => $plan['amount'],
-                    'is_active' => $plan['is_active'],
-                    'sort_order' => $plan['sort_order'],
-                ],
+                $values,
             );
         }
 
@@ -127,6 +146,7 @@ class TrademarkPricing extends Model
                         'key' => $pricing->key,
                         'label' => $pricing->label,
                         'amount' => (float) $pricing->amount,
+                        'features' => $pricing->features ?: (self::defaults()[$pricing->key]['features'] ?? []),
                         'is_active' => (bool) $pricing->is_active,
                         'sort_order' => (int) $pricing->sort_order,
                     ])
@@ -160,7 +180,7 @@ class TrademarkPricing extends Model
         }
 
         return self::query()
-            ->whereIn('key', [self::SEARCH, self::APPLICATION, self::CONSULTATION])
+            ->whereIn('key', [self::SEARCH, self::APPLICATION, self::EXAMINATION_RESPONSE, self::CONSULTATION, self::OPPOSITION])
             ->orderBy('sort_order')
             ->get();
     }
@@ -196,6 +216,7 @@ class TrademarkPricing extends Model
                 $table->string('key')->unique();
                 $table->string('label');
                 $table->decimal('amount', 10, 2);
+                $table->json('features')->nullable();
                 $table->boolean('is_active')->default(true);
                 $table->unsignedSmallInteger('sort_order')->default(0);
                 $table->timestamps();

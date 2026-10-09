@@ -150,6 +150,46 @@ class PaymentSplitTest extends TestCase
         $this->assertSame(TrademarkWorkflow::UNDER_REVIEW, $application->fresh()->current_status);
     }
 
+    public function test_invoice_shows_the_saved_coupon_code_and_exact_discount_breakdown(): void
+    {
+        [$user, $application] = $this->application(TrademarkWorkflow::UNDER_REVIEW);
+        $payment = Payment::query()->create([
+            'application_id' => $application->id,
+            'user_id' => $user->id,
+            'amount' => 174.50,
+            'total_amount' => 399,
+            'payment_type' => 'advance',
+            'discount_coupon_id' => 123,
+            'coupon_code' => 'TM50',
+            'discount_amount' => 25,
+            'discounted_total_amount' => 349,
+            'percentage' => '50%',
+            'payment_method' => 'razorpay',
+            'status' => 'completed',
+            'reference_number' => 'order_discount_snapshot',
+            'transaction_id' => 'pay_discount_snapshot',
+            'paid_at' => now(),
+        ]);
+
+        $invoice = view('emails.attachments.invoice', [
+            'application' => $application,
+            'user' => $user,
+            'payment' => $payment,
+            'invoiceNumber' => 'INV-TEST-1',
+            'paymentLabel' => 'Advance Payment (50%)',
+            'issuedAt' => $payment->paid_at,
+            'firmName' => 'Legal Bruz Ltd.',
+            'firmEmail' => 'test@example.com',
+        ])->render();
+
+        $this->assertStringContainsString('50% advance before discount', $invoice);
+        $this->assertStringContainsString('GBP 199.50', $invoice);
+        $this->assertStringContainsString('Coupon discount', $invoice);
+        $this->assertStringContainsString('TM50', $invoice);
+        $this->assertStringContainsString('- GBP 25.00', $invoice);
+        $this->assertStringContainsString('GBP 174.50', $invoice);
+    }
+
     private function application(string $status): array
     {
         $user = User::factory()->create();

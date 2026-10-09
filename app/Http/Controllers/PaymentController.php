@@ -149,6 +149,11 @@ class PaymentController extends Controller
             'final' => max($discountedTotalAmount - $paidServiceAmount, 0),
             default => round($discountedTotalAmount * 0.5, 2),
         };
+        $paymentAmountBeforeDiscount = match ($validated['payment_type']) {
+            'final' => $serviceTotalAmount - round($serviceTotalAmount * 0.5, 2),
+            default => round($serviceTotalAmount * 0.5, 2),
+        };
+        $paymentDiscountAmount = round(max($paymentAmountBeforeDiscount - $verifiedAmount, 0), 2);
 
         if ($verifiedAmount <= 0) {
             throw ValidationException::withMessages([
@@ -206,6 +211,19 @@ class PaymentController extends Controller
 
             if ($this->hasPaymentsColumn('payment_type')) {
                 $paymentData['payment_type'] = $normalizedPaymentType;
+            }
+
+            if ($this->hasPaymentsColumn('discount_coupon_id')) {
+                $paymentData['discount_coupon_id'] = $coupon?->id;
+            }
+            if ($this->hasPaymentsColumn('coupon_code')) {
+                $paymentData['coupon_code'] = $coupon?->code;
+            }
+            if ($this->hasPaymentsColumn('discount_amount')) {
+                $paymentData['discount_amount'] = $paymentDiscountAmount;
+            }
+            if ($this->hasPaymentsColumn('discounted_total_amount')) {
+                $paymentData['discounted_total_amount'] = $discountedTotalAmount;
             }
 
             $payment = Payment::create($paymentData);

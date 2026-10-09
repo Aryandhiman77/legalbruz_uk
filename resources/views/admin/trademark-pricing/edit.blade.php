@@ -20,6 +20,11 @@
                 'featured' => false,
             ],
         ];
+        $homepageFeatureCards = [
+            'opposition_service' => 'Opposition Service',
+            'uk_application' => 'UK Trade Mark Application',
+            'uk_examination_response' => 'Examination Report',
+        ];
     @endphp
 
     <div class="admin-pricing-page">
@@ -39,7 +44,9 @@
 
             <div class="admin-pricing-grid">
                 @foreach ($priceFields as $key => $field)
-                    @php($amount = old("prices.{$key}", $planMap->get($key)->amount ?? $defaults[$key]['amount']))
+                    @php
+                        $amount = old("prices.{$key}", $planMap->get($key)->amount ?? $defaults[$key]['amount']);
+                    @endphp
                     <label class="admin-price-field {{ !empty($field['featured']) ? 'featured' : '' }}">
                         <span>{{ $field['title'] }}</span>
                         <small>{{ $field['description'] }}</small>
@@ -53,6 +60,41 @@
                     </label>
                 @endforeach
             </div>
+
+            <section class="admin-feature-section">
+                <div class="admin-feature-heading">
+                    <span>Homepage pricing card key points</span>
+                    <p>Edit, add or remove the tick points shown inside each public pricing card.</p>
+                </div>
+                <div class="admin-feature-grid">
+                    @foreach ($homepageFeatureCards as $key => $cardTitle)
+                        @php
+                            $storedFeatures = old("features.{$key}", $planMap->get($key)?->features ?? $defaults[$key]['features']);
+                        @endphp
+                        <div class="admin-feature-card">
+                            <strong>{{ $cardTitle }}</strong>
+                            <div data-feature-list="{{ $key }}">
+                                @foreach ($storedFeatures as $index => $feature)
+                                    <div class="admin-feature-row" data-feature-row>
+                                        <label>
+                                            <span data-feature-number>Key point {{ $index + 1 }}</span>
+                                            <input type="text" name="features[{{ $key }}][]" value="{{ $feature }}" maxlength="120" required>
+                                        </label>
+                                        <button type="button" class="admin-feature-remove" data-remove-feature>Remove</button>
+                                    </div>
+                                @endforeach
+                            </div>
+                            <button type="button" class="admin-feature-add" data-add-feature="{{ $key }}">+ Add key point</button>
+                            @error("features.{$key}")
+                                <em>{{ $message }}</em>
+                            @enderror
+                            @error("features.{$key}.*")
+                                <em>{{ $message }}</em>
+                            @enderror
+                        </div>
+                    @endforeach
+                </div>
+            </section>
 
             <div class="admin-pricing-note">
                 <i class="bi bi-info-circle"></i>
@@ -86,6 +128,73 @@
         .admin-pricing-note{display:flex;gap:10px;margin-top:18px;padding:14px;border-radius:12px;background:#fff8e6;color:#73510d}
         .admin-pricing-note p{margin:0;line-height:1.5}
         .admin-pricing-actions{display:flex;justify-content:flex-end;gap:12px;margin-top:22px}
+        .admin-feature-section{margin-top:24px;padding-top:24px;border-top:1px solid #e0e8f0}
+        .admin-feature-heading span{display:block;color:#102a4c;font-size:1.05rem;font-weight:950}
+        .admin-feature-heading p{margin:4px 0 16px;color:#66758b}
+        .admin-feature-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+        .admin-feature-card{padding:18px;border:1px solid #e0e8f0;border-radius:14px;background:#fbfdff}
+        .admin-feature-card>strong{display:block;margin-bottom:12px;color:#102a4c}
+        .admin-feature-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end;margin-top:10px}
+        .admin-feature-card label{display:block}
+        .admin-feature-card label span{display:block;margin-bottom:4px;color:#66758b;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+        .admin-feature-card input{width:100%;min-height:42px;padding:8px 10px;border:1px solid #cdd8e5;border-radius:9px;color:#102a4c}
+        .admin-feature-card em{display:block;margin-top:8px;color:#b42318;font-style:normal;font-weight:800}
+        .admin-feature-remove,.admin-feature-add{min-height:42px;border-radius:9px;font-size:.78rem;font-weight:850;cursor:pointer}
+        .admin-feature-remove{padding:0 10px;border:1px solid #efc2c2;background:#fff7f7;color:#a32323}
+        .admin-feature-remove:disabled,.admin-feature-add:disabled{cursor:not-allowed;opacity:.4}
+        .admin-feature-add{width:100%;margin-top:12px;border:1px dashed #73bdb3;background:#f1fbf8;color:#087565}
+        @media(max-width:1000px){.admin-feature-grid{grid-template-columns:1fr}}
         @media(max-width:760px){.admin-pricing-grid{grid-template-columns:1fr}.admin-price-field small{min-height:0}.admin-pricing-actions{display:grid}}
     </style>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const maximumFeatures = 8;
+
+            const refreshFeatureList = list => {
+                const rows = Array.from(list.querySelectorAll('[data-feature-row]'));
+                rows.forEach((row, index) => {
+                    const number = row.querySelector('[data-feature-number]');
+                    const remove = row.querySelector('[data-remove-feature]');
+                    if (number) number.textContent = `Key point ${index + 1}`;
+                    if (remove) remove.disabled = rows.length === 1;
+                });
+
+                const add = document.querySelector(`[data-add-feature="${list.dataset.featureList}"]`);
+                if (add) add.disabled = rows.length >= maximumFeatures;
+            };
+
+            document.querySelectorAll('[data-feature-list]').forEach(list => {
+                list.addEventListener('click', event => {
+                    const remove = event.target.closest('[data-remove-feature]');
+                    if (!remove || list.querySelectorAll('[data-feature-row]').length <= 1) return;
+                    remove.closest('[data-feature-row]')?.remove();
+                    refreshFeatureList(list);
+                });
+                refreshFeatureList(list);
+            });
+
+            document.querySelectorAll('[data-add-feature]').forEach(button => {
+                button.addEventListener('click', () => {
+                    const key = button.dataset.addFeature;
+                    const list = document.querySelector(`[data-feature-list="${key}"]`);
+                    if (!list || list.querySelectorAll('[data-feature-row]').length >= maximumFeatures) return;
+
+                    const row = document.createElement('div');
+                    row.className = 'admin-feature-row';
+                    row.dataset.featureRow = '';
+                    row.innerHTML = `
+                        <label>
+                            <span data-feature-number></span>
+                            <input type="text" name="features[${key}][]" maxlength="120" required>
+                        </label>
+                        <button type="button" class="admin-feature-remove" data-remove-feature>Remove</button>
+                    `;
+                    list.appendChild(row);
+                    refreshFeatureList(list);
+                    row.querySelector('input')?.focus();
+                });
+            });
+        });
+    </script>
 @endsection
