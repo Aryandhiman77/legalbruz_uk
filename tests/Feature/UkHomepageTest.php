@@ -214,10 +214,57 @@ class UkHomepageTest extends TestCase
 
         $this->get(route('landing'))
             ->assertOk()
+            ->assertSee('Active offer')
+            ->assertSee('Automatically applied at checkout')
+            ->assertSee('Claim offer')
             ->assertSee('£399')
             ->assertSee('£374')
             ->assertSee('UKSAVE25')
             ->assertSee('£25.00')
             ->assertDontSee('₹');
+    }
+
+    public function test_coupon_banner_shows_an_expiry_countdown_when_the_offer_has_an_end_date(): void
+    {
+        DiscountCoupon::create([
+            'code' => 'UKTIMED20',
+            'title' => 'Timed UK filing offer',
+            'discount_type' => 'percentage',
+            'discount_value' => 20,
+            'applies_to' => 'trademark_filing',
+            'applicable_users' => 'all_users',
+            'auto_apply' => true,
+            'show_on_website' => true,
+            'is_active' => true,
+            'ends_at' => now()->addDay(),
+        ]);
+
+        $this->get(route('landing'))
+            ->assertOk()
+            ->assertSee('UKTIMED20')
+            ->assertSee('data-coupon-banner', false)
+            ->assertSee('data-coupon-ends-at=', false)
+            ->assertSee('data-coupon-countdown', false)
+            ->assertSee('Ends in');
+    }
+
+    public function test_inactive_or_hidden_coupon_is_not_shown_or_applied_on_the_homepage(): void
+    {
+        DiscountCoupon::create([
+            'code' => 'HIDDEN50',
+            'title' => 'Hidden filing offer',
+            'discount_type' => 'percentage',
+            'discount_value' => 50,
+            'applies_to' => 'trademark_filing',
+            'applicable_users' => 'all_users',
+            'auto_apply' => true,
+            'show_on_website' => false,
+            'is_active' => true,
+        ]);
+
+        $this->get(route('landing'))
+            ->assertOk()
+            ->assertDontSee('HIDDEN50')
+            ->assertDontSee('£200');
     }
 }

@@ -29,7 +29,9 @@
         $defaults = \App\Models\TrademarkPricing::defaults();
         $applicationHref = auth()->check() ? route('trademark.type-selection') : route('register');
         $applicationPrice = (float) ($plans['uk_application']['amount'] ?? $defaults['uk_application']['amount']);
-        $applicationCoupon = \App\Models\DiscountCoupon::autoApplyForPublicService('trademark_filing');
+        $applicationCoupon = auth()->check()
+            ? \App\Models\DiscountCoupon::autoApplyForPayment('trademark_filing', auth()->id())
+            : \App\Models\DiscountCoupon::autoApplyForPublicService('trademark_filing');
         $discountedApplicationPrice = $applicationCoupon
             ? $applicationCoupon->discountedAmountFor($applicationPrice)
             : $applicationPrice;
@@ -38,10 +40,43 @@
             'current' => $discountedApplicationPrice,
             'coupon' => $discountedApplicationPrice < $applicationPrice ? $applicationCoupon : null,
         ];
+        $couponBannerEndsAt = $applicationPriceDetails['coupon']?->ends_at
+            ? $applicationPriceDetails['coupon']->ends_at
+                ->copy()
+                ->timezone(config('app.timezone', 'Europe/London'))
+                ->toIso8601String()
+            : null;
         $displayFaqs = $faqs ?? collect();
     @endphp
 
     <a class="skip-link" href="#main-content">Skip to main content</a>
+
+    @if ($applicationPriceDetails['coupon'])
+        <aside
+            class="coupon-banner"
+            aria-label="Active discount offer"
+            data-coupon-banner
+            @if ($couponBannerEndsAt) data-coupon-ends-at="{{ $couponBannerEndsAt }}" @endif
+        >
+            <div class="page-shell coupon-banner-inner">
+                <div class="coupon-banner-copy">
+                    <span class="coupon-banner-label">Active offer</span>
+                    <strong>{{ $applicationPriceDetails['coupon']->code }}</strong>
+                    <span>
+                        {{ $applicationPriceDetails['coupon']->discount_label }} on UK Trade Mark Application
+                    </span>
+                    @if ($couponBannerEndsAt)
+                        <span class="coupon-banner-countdown">
+                            Ends in <b data-coupon-countdown>Calculating…</b>
+                        </span>
+                    @else
+                        <span class="coupon-banner-countdown">Automatically applied at checkout</span>
+                    @endif
+                </div>
+                <a href="{{ $applicationHref }}" class="coupon-banner-action">Claim offer <span aria-hidden="true">→</span></a>
+            </div>
+        </aside>
+    @endif
 
     <header class="site-header" data-header>
         <div class="page-shell nav-shell">
@@ -463,6 +498,37 @@
                     });
                 });
             });
+
+            const couponBanner = document.querySelector('[data-coupon-banner]');
+            const couponCountdown = couponBanner?.querySelector('[data-coupon-countdown]');
+            const couponEndsAt = couponBanner?.dataset.couponEndsAt;
+
+            if (couponBanner && couponCountdown && couponEndsAt) {
+                const targetTime = new Date(couponEndsAt).getTime();
+
+                const updateCouponCountdown = () => {
+                    const remaining = targetTime - Date.now();
+
+                    if (!Number.isFinite(targetTime) || remaining <= 0) {
+                        couponBanner.remove();
+                        return false;
+                    }
+
+                    const totalSeconds = Math.floor(remaining / 1000);
+                    const days = Math.floor(totalSeconds / 86400);
+                    const hours = Math.floor((totalSeconds % 86400) / 3600);
+                    const minutes = Math.floor((totalSeconds % 3600) / 60);
+                    const seconds = totalSeconds % 60;
+
+                    couponCountdown.textContent = `${days}d ${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`;
+
+                    return true;
+                };
+
+                if (updateCouponCountdown()) {
+                    window.setInterval(updateCouponCountdown, 1000);
+                }
+            }
 
             document.querySelectorAll('[data-review-carousel]').forEach(carousel => {
                 const track = carousel.querySelector('[data-review-track]');
