@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\PaymentVerificationException;
 use App\Mail\EventNotification;
 use App\Models\Admin;
 use App\Models\Application;
@@ -17,6 +18,7 @@ use App\Models\OppositionEvidence;
 use App\Models\OppositionGround;
 use App\Models\OppositionRegistryUpdate;
 use App\Models\TrademarkOppositionCase;
+use App\Services\RazorpayPaymentVerifier;
 use App\Support\PostFilingJourney;
 use App\Support\TrademarkOppositionWorkflow;
 use App\Support\TrademarkWorkflow;
@@ -323,7 +325,7 @@ class TrademarkOppositionController extends Controller
         }
     }
 
-    public function verifyOpposePaymentSignature(Request $request, TrademarkOppositionCase $case): JsonResponse
+    public function verifyOpposePaymentSignature(Request $request, TrademarkOppositionCase $case, RazorpayPaymentVerifier $verifier): JsonResponse
     {
         $this->authorizeClient($case);
         abort_unless($case->flow_type === TrademarkOppositionWorkflow::FLOW_OPPOSE, 404);
@@ -349,14 +351,17 @@ class TrademarkOppositionController extends Controller
             return response()->json(['status' => 'error', 'message' => 'This Razorpay order does not belong to the current opposition case.'], 422);
         }
 
-        $expectedSignature = hash_hmac(
-            'sha256',
-            $validated['razorpay_order_id'] . '|' . $validated['razorpay_payment_id'],
-            (string) config('razorpay.key_secret')
-        );
-
-        if (!hash_equals($expectedSignature, $validated['razorpay_signature'])) {
-            return response()->json(['status' => 'error', 'message' => 'Payment verification failed. Razorpay signature is invalid.'], 422);
+        try {
+            $verifier->verifyCaptured(
+                $validated['razorpay_payment_id'],
+                $validated['razorpay_order_id'],
+                $validated['razorpay_signature'],
+                $validated['razorpay_order_id'],
+                (int) ($order['amount'] ?? 0),
+                (string) config('razorpay.currency', 'GBP'),
+            );
+        } catch (PaymentVerificationException $exception) {
+            return response()->json(['status' => 'error', 'message' => $exception->getMessage()], $exception->httpStatus());
         }
 
         $case->update([
@@ -885,7 +890,7 @@ class TrademarkOppositionController extends Controller
         }
     }
 
-    public function verifyPaymentSignature(Request $request, TrademarkOppositionCase $case): JsonResponse
+    public function verifyPaymentSignature(Request $request, TrademarkOppositionCase $case, RazorpayPaymentVerifier $verifier): JsonResponse
     {
         $this->authorizeClient($case);
 
@@ -913,17 +918,17 @@ class TrademarkOppositionController extends Controller
             ], 422);
         }
 
-        $expectedSignature = hash_hmac(
-            'sha256',
-            $validated['razorpay_order_id'] . '|' . $validated['razorpay_payment_id'],
-            (string) config('razorpay.key_secret')
-        );
-
-        if (!hash_equals($expectedSignature, $validated['razorpay_signature'])) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Payment verification failed. Razorpay signature is invalid.',
-            ], 422);
+        try {
+            $verifier->verifyCaptured(
+                $validated['razorpay_payment_id'],
+                $validated['razorpay_order_id'],
+                $validated['razorpay_signature'],
+                $validated['razorpay_order_id'],
+                (int) ($order['amount'] ?? 0),
+                (string) config('razorpay.currency', 'GBP'),
+            );
+        } catch (PaymentVerificationException $exception) {
+            return response()->json(['status' => 'error', 'message' => $exception->getMessage()], $exception->httpStatus());
         }
 
         $updates = ['payment_status' => 'paid'];
@@ -3257,6 +3262,22 @@ class TrademarkOppositionController extends Controller
     {
         $oldStatus = $case->current_admin_status;
         $clientStage = TrademarkOppositionWorkflow::clientStageForAdminStatus($status);
+        $paidServiceStages = [
+            TrademarkOppositionWorkflow::CLIENT_DRAFTING,
+            TrademarkOppositionWorkflow::CLIENT_DOCUMENT_FILED,
+            TrademarkOppositionWorkflow::CLIENT_AWAITING_OTHER_PARTY,
+            TrademarkOppositionWorkflow::CLIENT_AWAITING_EVIDENCE_STAGE,
+            TrademarkOppositionWorkflow::CLIENT_EVIDENCE_STAGE,
+            TrademarkOppositionWorkflow::CLIENT_HEARING_STAGE,
+            TrademarkOppositionWorkflow::CLIENT_DECISION_AWAITED,
+        ];
+
+        abort_unless(
+            ($status !== 'Payment Completed' && ! in_array($clientStage, $paidServiceStages, true))
+                || $case->payment_status === 'paid',
+            409,
+            'Verified payment is required before this opposition stage can begin.',
+        );
 
         $case->forceFill([
             'current_admin_status' => $status,

@@ -56,14 +56,15 @@
             </div>
             <div class="admin-service-grid">
                 @foreach ($serviceVisitorCounts as $service)
-                    <article class="admin-service-card">
+                    <a class="admin-service-card" href="{{ $service['admin_url'] }}" aria-label="Open {{ $service['label'] }} records">
                         <span class="admin-service-icon"><i class="bi {{ $service['icon'] }}"></i></span>
                         <div class="admin-service-copy">
                             <strong>{{ $service['label'] }}</strong>
                             <small>{{ $service['description'] }}</small>
                         </div>
                         <span class="admin-service-count">{{ number_format($service['visitors']) }}</span>
-                    </article>
+                        <i class="bi bi-arrow-up-right admin-service-arrow" aria-hidden="true"></i>
+                    </a>
                 @endforeach
             </div>
         </section>
@@ -78,12 +79,16 @@
             </div>
 
             @foreach (\App\Support\AdminNavigation::groups() as $group)
-                <div class="admin-quicklinks-group">
+                <div class="admin-quicklinks-group" id="{{ \Illuminate\Support\Str::slug($group['label']) }}">
                     <h3>{{ $group['label'] }}</h3>
                     <div class="admin-quicklinks-grid">
                         @foreach ($group['items'] as $item)
-                            <a href="{{ route($item['route']) }}"
-                                class="admin-quicklink {{ request()->routeIs(...$item['active']) ? 'active' : '' }}">
+                            @php
+                                $itemIsActive = request()->routeIs(...$item['active'])
+                                    && (! isset($item['parameters']['key']) || request()->route('key') === $item['parameters']['key']);
+                            @endphp
+                            <a href="{{ route($item['route'], $item['parameters'] ?? []) }}"
+                                class="admin-quicklink {{ $itemIsActive ? 'active' : '' }}">
                                 <span class="admin-quicklink-icon"><i class="bi {{ $item['icon'] }}"></i></span>
                                 <span class="admin-quicklink-copy">
                                     <strong>{{ $item['label'] }}</strong>
@@ -125,14 +130,16 @@
         .admin-service-heading span { color:#159485;font-size:.65rem;font-weight:900;letter-spacing:.11em;text-transform:uppercase }
         .admin-service-heading h2 { margin:3px 0 0;color:#102a4c;font-size:1rem }
         .admin-service-heading p { margin:0;color:#748196;font-size:.74rem }
-        .admin-service-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin-top:17px }
-        .admin-service-card { display:flex;align-items:center;gap:13px;min-height:82px;padding:15px;border:1px solid #e2e9f0;border-radius:12px;background:#fbfdff }
+        .admin-service-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;margin-top:17px }
+        .admin-service-card { position:relative;display:flex;align-items:center;gap:13px;min-height:82px;padding:15px 38px 15px 15px;border:1px solid #e2e9f0;border-radius:12px;color:inherit;text-decoration:none;background:#fbfdff;transition:border-color .18s ease,box-shadow .18s ease,transform .18s ease }
+        .admin-service-card:hover { color:inherit;border-color:#9fd7cf;box-shadow:0 10px 24px rgba(7,31,72,.08);transform:translateY(-2px) }
         .admin-service-icon { display:grid;place-items:center;flex:0 0 42px;height:42px;border-radius:11px;color:#159485;background:#e7f7f4;font-size:1rem }
         .admin-service-copy { min-width:0;flex:1 }
         .admin-service-copy strong,.admin-service-copy small { display:block }
         .admin-service-copy strong { color:#172b46;font-size:.84rem }
         .admin-service-copy small { margin-top:3px;color:#748196;font-size:.7rem;line-height:1.4 }
         .admin-service-count { color:#0c4464;font-size:1.4rem;font-weight:900;line-height:1 }
+        .admin-service-arrow { position:absolute;top:11px;right:13px;color:#9aabba;font-size:.7rem }
         .admin-quicklinks-panel { margin-top:22px;padding:25px;border:1px solid #dfe7ef;border-radius:15px;background:#fff;box-shadow:0 10px 28px rgba(7,31,72,.055) }
         .admin-quicklinks-heading { display:flex;align-items:flex-start;gap:13px;padding-bottom:20px;border-bottom:1px solid #edf1f5 }
         .admin-panel-icon { display:grid;place-items:center;flex:0 0 42px;height:42px;border-radius:10px;color:#158f82;background:#e9f7f4 }
@@ -149,7 +156,7 @@
         .admin-quicklink-copy strong { color:#172b46;font-size:.84rem }
         .admin-quicklink-copy small { margin-top:4px;color:#748196;font-size:.72rem;line-height:1.45 }
         .admin-quicklink-arrow { position:absolute;top:15px;right:15px;color:#9aabba;font-size:.72rem }
-        @media(max-width:1100px){.admin-quicklinks-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+        @media(max-width:1100px){.admin-quicklinks-grid,.admin-service-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
         @media(max-width:1100px){.admin-visitor-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
         @media(max-width:900px){.admin-welcome-mark{display:none}}
         @media(max-width:650px){.admin-quicklinks-grid,.admin-service-grid{grid-template-columns:1fr}.admin-service-heading{align-items:flex-start;flex-direction:column;gap:6px}}

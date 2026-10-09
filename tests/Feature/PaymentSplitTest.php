@@ -7,6 +7,8 @@ use App\Models\Payment;
 use App\Models\User;
 use App\Support\TrademarkWorkflow;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class PaymentSplitTest extends TestCase
@@ -76,6 +78,76 @@ class PaymentSplitTest extends TestCase
             ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('payment_type');
+    }
+
+    public function test_application_is_not_advanced_until_razorpay_confirms_exact_captured_payment(): void
+    {
+        Mail::fake();
+        config([
+            'razorpay.key_id' => 'rzp_test_key',
+            'razorpay.key_secret' => 'test_secret',
+            'razorpay.currency' => 'GBP',
+        ]);
+
+        [$user, $application] = $this->application(TrademarkWorkflow::DRAFT);
+        $payment = Payment::query()->create([
+            'application_id' => $application->id,
+            'user_id' => $user->id,
+            'amount' => 199.50,
+            'total_amount' => 399,
+            'payment_type' => 'advance',
+            'percentage' => '50%',
+            'payment_method' => 'razorpay',
+            'status' => 'pending',
+            'reference_number' => 'order_application_secure_1',
+        ]);
+        $signature = hash_hmac('sha256', 'order_application_secure_1|pay_application_secure_1', 'test_secret');
+
+        Http::fake([
+            'api.razorpay.com/v1/payments/pay_application_secure_1' => Http::sequence()
+                ->push([
+                    'id' => 'pay_application_secure_1',
+                    'order_id' => 'order_application_secure_1',
+                    'amount' => 1,
+                    'currency' => 'GBP',
+                    'status' => 'captured',
+                    'captured' => true,
+                    'amount_refunded' => 0,
+                ])
+                ->push([
+                    'id' => 'pay_application_secure_1',
+                    'order_id' => 'order_application_secure_1',
+                    'amount' => 19950,
+                    'currency' => 'GBP',
+                    'status' => 'captured',
+                    'captured' => true,
+                    'amount_refunded' => 0,
+                ]),
+        ]);
+
+        $this->actingAs($user)
+            ->postJson(route('payment.verify-signature', $application), [
+                'razorpay_payment_id' => 'pay_application_secure_1',
+                'razorpay_order_id' => 'order_application_secure_1',
+                'razorpay_signature' => $signature,
+            ])
+            ->assertUnprocessable();
+
+        $this->assertSame('pending', $payment->fresh()->status);
+        $this->assertSame(TrademarkWorkflow::DRAFT, $application->fresh()->current_status);
+
+        $this->actingAs($user)
+            ->postJson(route('payment.verify-signature', $application), [
+                'razorpay_payment_id' => 'pay_application_secure_1',
+                'razorpay_order_id' => 'order_application_secure_1',
+                'razorpay_signature' => $signature,
+            ])
+            ->assertOk()
+            ->assertJson(['status' => 'success']);
+
+        $this->assertSame('completed', $payment->fresh()->status);
+        $this->assertSame('pay_application_secure_1', $payment->fresh()->transaction_id);
+        $this->assertSame(TrademarkWorkflow::UNDER_REVIEW, $application->fresh()->current_status);
     }
 
     private function application(string $status): array

@@ -27,11 +27,22 @@ class AdminNavigationTest extends TestCase
             ->assertSee('transform: translateX(-105%)', false)
             ->assertSee('body.admin-sidebar-open', false)
             ->assertSee('Trademarks')
-            ->assertDontSee('Opposition &amp; Objections', false)
+            ->assertSee('Opposition &amp; Objections', false)
+            ->assertSee('Defence Cases')
+            ->assertSee('Oppose Cases')
+            ->assertSee('Objection Replies')
             ->assertDontSee('Recovery Cases')
             ->assertSee('Website')
             ->assertSee('Inbox')
             ->assertSee('Quick links')
+            ->assertSee('Website CMS')
+            ->assertSee('About CMS')
+            ->assertSee('Regulatory Information')
+            ->assertSee('Terms &amp; Conditions', false)
+            ->assertSee('Privacy Policy')
+            ->assertSee('Refund Policy')
+            ->assertSee('Website Disclaimer')
+            ->assertDontSee('Website Content')
             ->assertSee('All Applications')
             ->assertSee('Career Applications')
             ->assertSee('Registered Users')
@@ -44,7 +55,27 @@ class AdminNavigationTest extends TestCase
             ->assertSee(route('admin.contact-messages.index'), false)
             ->assertSee(route('admin.reviews.index'), false)
             ->assertSee(route('admin.users.index'), false)
-            ->assertSee(route('admin.discount-coupons.index'), false);
+            ->assertSee(route('admin.discount-coupons.index'), false)
+            ->assertSee(route('admin.cms-pages.edit', 'about'), false)
+            ->assertSee(route('admin.cms-pages.edit', 'regulatory'), false)
+            ->assertSee(route('admin.cms-pages.edit', 'terms'), false)
+            ->assertSee(route('admin.cms-pages.edit', 'privacy'), false)
+            ->assertSee(route('admin.cms-pages.edit', 'refund'), false)
+            ->assertSee(route('admin.cms-pages.edit', 'disclaimer'), false);
+
+        $this->actingAs($admin, 'admin')
+            ->get('/admin/cms-pages')
+            ->assertNotFound();
+
+        $this->actingAs($admin, 'admin')
+            ->get(route('admin.trademark-opposition.index'))
+            ->assertOk();
+        $this->actingAs($admin, 'admin')
+            ->get(route('admin.trademark-opposition.oppose.index'))
+            ->assertOk();
+        $this->actingAs($admin, 'admin')
+            ->get(route('admin.examination-reply.index'))
+            ->assertOk();
     }
 
     public function test_trademark_application_listing_contains_status_summaries(): void

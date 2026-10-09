@@ -69,10 +69,11 @@
                         </div>
                         <div class="col-12">
                             <label for="service_interested">Service Interested In</label>
+                            @php($currentService = old('service_interested', $selectedContactService ?? null))
                             <select id="service_interested" name="service_interested" class="form-select @error('service_interested') is-invalid @enderror" required>
-                                <option value="" disabled @selected(! old('service_interested'))>Select a service</option>
-                                @foreach (($contactServices ?? collect(config('visitor_services'))->pluck('label')->push('Copyright Registration')->push('Patent Registration')->push('Examination Response')->push('Other')->all()) as $service)
-                                    <option value="{{ $service }}" @selected(old('service_interested') === $service)>{{ $service }}</option>
+                                <option value="" disabled @selected(! $currentService)>Select a service</option>
+                                @foreach (($contactServices ?? collect(config('visitor_services'))->filter(fn ($service) => $service['contact_visible'] ?? true)->pluck('label')->push('Examination Report')->push('Opposition Service')->push('Other')->all()) as $service)
+                                    <option value="{{ $service }}" @selected($currentService === $service)>{{ $service }}</option>
                                 @endforeach
                                 
                             </select>
@@ -103,14 +104,6 @@
                 <div class="contact-detail">
                     <span><i class="bi bi-envelope"></i></span>
                     <div><strong>Email</strong><a href="mailto:info@legalbruz.com">info@legalbruz.com</a></div>
-                </div>
-                <div class="contact-detail">
-                    <span><i class="bi bi-geo-alt"></i></span>
-                    <div><strong>Ambala Office</strong><span>34 Krishna Nagar, Ambala Cantt, Haryana -133001</span></div>
-                </div>
-                <div class="contact-detail">
-                    <span><i class="bi bi-geo-alt"></i></span>
-                    <div><strong>Ambala District Court Office</strong><span>Top Floor Chamber no.98 Ambala District court, Haryana</span></div>
                 </div>
                 <div class="contact-detail">
                     <span><i class="bi bi-geo-alt"></i></span>

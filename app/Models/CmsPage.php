@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Cache;
@@ -15,6 +14,8 @@ class CmsPage extends Model
     public const PRIVACY = 'privacy';
     public const REFUND = 'refund';
     public const DISCLAIMER = 'disclaimer';
+    public const ABOUT = 'about';
+    public const REGULATORY = 'regulatory';
 
     private const CACHE_PREFIX = 'cms_page.';
 
@@ -34,9 +35,23 @@ class CmsPage extends Model
         return [self::TERMS, self::PRIVACY, self::REFUND, self::DISCLAIMER];
     }
 
+    public static function editableKeys(): array
+    {
+        return [self::ABOUT, self::REGULATORY, ...self::legalKeys()];
+    }
+
     public static function defaults(): array
     {
-        return config('cms_pages', []);
+        return array_merge([
+            self::ABOUT => [
+                'title' => 'About Us',
+                'content' => json_encode(config('about_page', []), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            ],
+            self::REGULATORY => [
+                'title' => 'Regulatory information',
+                'content' => '<p>Legal Bruz Ltd. provides permitted unreserved legal and intellectual property services. Legal Bruz Ltd. is not authorised or regulated by the Solicitors Regulation Authority or the Intellectual Property Regulation Board and is not an SRA-authorised law firm or an IPReg-regulated trade mark attorney firm.</p>',
+            ],
+        ], config('cms_pages', []));
     }
 
     public static function findByKey(string $key): array
@@ -72,18 +87,12 @@ class CmsPage extends Model
         }
     }
 
-    public static function legalPages(): Collection
+    public static function aboutContent(): array
     {
-        self::ensureDefaults();
+        $page = self::findByKey(self::ABOUT);
+        $stored = json_decode((string) ($page['content'] ?? ''), true);
 
-        if (! self::tableIsAvailable()) {
-            return new Collection(collect(self::legalKeys())->map(fn (string $key) => (object) self::findByKey($key))->all());
-        }
-
-        return self::query()
-            ->whereIn('key', self::legalKeys())
-            ->orderByRaw("FIELD(`key`, 'terms', 'privacy', 'refund', 'disclaimer')")
-            ->get();
+        return array_replace(config('about_page', []), is_array($stored) ? $stored : []);
     }
 
     public static function ensureDefaults(): void
@@ -112,8 +121,8 @@ class CmsPage extends Model
                 return;
             }
 
-            foreach (self::legalKeys() as $legalKey) {
-                Cache::forget(self::CACHE_PREFIX.$legalKey);
+            foreach (self::editableKeys() as $editableKey) {
+                Cache::forget(self::CACHE_PREFIX.$editableKey);
             }
         } catch (\Throwable) {
             //

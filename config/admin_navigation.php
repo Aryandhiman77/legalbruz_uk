@@ -13,7 +13,16 @@ return [
         'items' => [
             ['label' => 'All Applications', 'description' => 'View every trademark application', 'icon' => 'bi-journal-text', 'route' => 'admin.all-applications', 'active' => ['admin.all-applications', 'admin.view-application', 'admin.review-application']],
             ['label' => 'Pending Review', 'description' => 'Review new and pending submissions', 'icon' => 'bi-hourglass-split', 'route' => 'admin.applications', 'active' => ['admin.applications']],
-            ['label' => 'Pricing Settings', 'description' => 'Set UK trade mark prices', 'icon' => 'bi-currency-pound', 'route' => 'admin.trademark-pricing.edit', 'active' => ['admin.trademark-pricing.*']],
+            ['label' => 'Search Reports', 'description' => 'Manage paid search requests and upload PDF reports', 'icon' => 'bi-file-earmark-pdf', 'route' => 'admin.trademark-search-reports.index', 'active' => ['admin.trademark-search-reports.*']],
+            ['label' => 'Pricing Settings', 'description' => 'Set report, application and consultation fees', 'icon' => 'bi-currency-pound', 'route' => 'admin.trademark-pricing.edit', 'active' => ['admin.trademark-pricing.*']],
+        ],
+    ],
+    [
+        'label' => 'Opposition & Objections',
+        'items' => [
+            ['label' => 'Defence Cases', 'description' => 'Defend trademarks under opposition', 'icon' => 'bi-shield-check', 'route' => 'admin.trademark-opposition.index', 'active' => ['admin.trademark-opposition.index', 'admin.trademark-opposition.show']],
+            ['label' => 'Oppose Cases', 'description' => 'Manage trademark opposition filings', 'icon' => 'bi-bank', 'route' => 'admin.trademark-opposition.oppose.index', 'active' => ['admin.trademark-opposition.oppose.*']],
+            ['label' => 'Objection Replies', 'description' => 'Handle examination report replies', 'icon' => 'bi-file-earmark-check', 'route' => 'admin.examination-reply.index', 'active' => ['admin.examination-reply.*']],
         ],
     ],
     [
@@ -27,9 +36,14 @@ return [
         ],
     ],
     [
-        'label' => 'CMS',
+        'label' => 'Website CMS',
         'items' => [
-            ['label' => 'Legal Pages', 'description' => 'Edit policies and disclaimer popup', 'icon' => 'bi-file-earmark-richtext', 'route' => 'admin.cms-pages.index', 'active' => ['admin.cms-pages.*']],
+            ['label' => 'About CMS', 'description' => 'Edit every About page section and image', 'icon' => 'bi-person-badge', 'route' => 'admin.cms-pages.edit', 'parameters' => ['key' => 'about'], 'active' => ['admin.cms-pages.*']],
+            ['label' => 'Regulatory Information', 'description' => 'Edit footer regulatory content', 'icon' => 'bi-shield-check', 'route' => 'admin.cms-pages.edit', 'parameters' => ['key' => 'regulatory'], 'active' => ['admin.cms-pages.*']],
+            ['label' => 'Terms & Conditions', 'description' => 'Edit the public terms page', 'icon' => 'bi-file-earmark-text', 'route' => 'admin.cms-pages.edit', 'parameters' => ['key' => 'terms'], 'active' => ['admin.cms-pages.*']],
+            ['label' => 'Privacy Policy', 'description' => 'Edit privacy and cookies content', 'icon' => 'bi-lock', 'route' => 'admin.cms-pages.edit', 'parameters' => ['key' => 'privacy'], 'active' => ['admin.cms-pages.*']],
+            ['label' => 'Refund Policy', 'description' => 'Edit cancellation and refund terms', 'icon' => 'bi-arrow-counterclockwise', 'route' => 'admin.cms-pages.edit', 'parameters' => ['key' => 'refund'], 'active' => ['admin.cms-pages.*']],
+            ['label' => 'Website Disclaimer', 'description' => 'Edit the disclaimer popup content', 'icon' => 'bi-exclamation-circle', 'route' => 'admin.cms-pages.edit', 'parameters' => ['key' => 'disclaimer'], 'active' => ['admin.cms-pages.*']],
         ],
     ],
     [

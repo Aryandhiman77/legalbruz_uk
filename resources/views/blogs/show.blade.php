@@ -4,7 +4,7 @@
     $canonical = $blog->canonical_url ?: route('blog.show', $blog);
     $socialImage = $blog->og_image_path
         ? route('storage.public.view', ['path' => $blog->og_image_path])
-        : ($blog->featured_image_path ? route('storage.public.view', ['path' => $blog->featured_image_path]) : asset('legal-bruz-pvt-ltd-logo.png'));
+        : ($blog->featured_image_path ? route('storage.public.view', ['path' => $blog->featured_image_path]) : asset('legal-bruz-ltd-logo.png'));
 @endphp
 
 @section('title', $blog->meta_title . ' | Legal Bruz')

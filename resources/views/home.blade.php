@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Legal Bruz Pvt. Ltd. - IPR & Trademark Registration | India's Fastest Platform</title>
-    <link rel="icon" type="image/png" href="{{ asset('legal-bruz-pvt-ltd-logo.png') }}">
+    <title>Legal Bruz Ltd. - IPR & Trademark Registration | India's Fastest Platform</title>
+    <link rel="icon" type="image/png" href="{{ asset('legal-bruz-ltd-logo.png') }}">
     <meta name="description" content="Protect your brand with Legal Bruz. Search trademarks, file applications, respond to objections, and manage intellectual property matters online.">
     <meta name="robots" content="index, follow, max-image-preview:large">
     <link rel="canonical" href="{{ route('landing') }}">
@@ -15,18 +15,18 @@
     <meta property="og:title" content="Legal Bruz - Trademark & Intellectual Property Services">
     <meta property="og:description" content="Trademark registration and intellectual property support made clear, accessible, and easy to manage.">
     <meta property="og:url" content="{{ route('landing') }}">
-    <meta property="og:image" content="{{ asset('legal-bruz-pvt-ltd-logo.png') }}">
+    <meta property="og:image" content="{{ asset('legal-bruz-ltd-logo.png') }}">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Legal Bruz - Trademark & Intellectual Property Services">
     <meta name="twitter:description" content="Trademark registration and intellectual property support made clear and accessible.">
-    <meta name="twitter:image" content="{{ asset('legal-bruz-pvt-ltd-logo.png') }}">
+    <meta name="twitter:image" content="{{ asset('legal-bruz-ltd-logo.png') }}">
     <script type="application/ld+json">
         {!! json_encode([
             '@context' => 'https://schema.org',
             '@type' => 'Organization',
             'name' => 'Legal Bruz',
             'url' => route('landing'),
-            'logo' => asset('legal-bruz-pvt-ltd-logo.png'),
+            'logo' => asset('legal-bruz-ltd-logo.png'),
             'email' => 'info@legalbruz.com',
             'sameAs' => collect(config('social_links'))->pluck('url')->values()->all(),
             'address' => [
@@ -986,7 +986,7 @@
     <nav class="navbar navbar-expand-lg">
         <div class="container">
             <a class="navbar-brand" href="/">
-                <img src="{{ asset('legal-bruz-pvt-ltd-logo.png') }}" alt="Legal Bruz Pvt. Ltd. logo"
+                <img src="{{ asset('legal-bruz-ltd-logo.png') }}" alt="Legal Bruz Ltd. logo"
                     class="navbar-logo" width="106" height="79">
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
@@ -1653,7 +1653,7 @@
     <section class="benefits-section" id="why-us">
         <div class="container">
             <div class="section-header">
-                <h2>Why Choose Legal Bruz Pvt. Ltd.?</h2>
+                <h2>Why Choose Legal Bruz Ltd.?</h2>
                 <p>We make trademark registration simple and affordable.</p>
             </div>
 
@@ -2851,7 +2851,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px;bord
 <body>
 <main class="page">
 <section class="hero">
-<div class="kicker">Legal Bruz Pvt. Ltd. · Trademark Registration Probability</div>
+<div class="kicker">Legal Bruz Ltd. · Trademark Registration Probability</div>
 <h1>${escapeHtml(analysis.keyword)}</h1>
 <p class="muted">Generated on ${escapeHtml(generatedAt)} from ${tmSearchState.results.length} searched trademark record${tmSearchState.results.length === 1 ? '' : 's'}.</p>
 <div class="grid">

@@ -5,18 +5,18 @@ return [
         'title' => 'Terms & Conditions',
         'content' => <<<'CMS_TERMS'
 Last updated: [●]
-These Terms and Conditions (“Terms”) govern your access to and use of the website of Legal Bruz Pvt. Ltd. and any request, booking, communication, or service initiated through the website.
+These Terms and Conditions (“Terms”) govern your access to and use of the website of Legal Bruz Ltd. and any request, booking, communication, or service initiated through the website.
 By accessing or using this website, you agree to be bound by these Terms. If you do not agree, please do not use the website.
 1. Definitions
-“Website” means [www.Legalbruz.com] and related pages, forms, landing pages, and digital properties operated by Legal Bruz Pvt. Ltd.
+“Website” means [www.Legalbruz.com] and related pages, forms, landing pages, and digital properties operated by Legal Bruz Ltd.
 “User” means any person visiting, browsing, or using the website.
-“Services” means consultations, advisory support, trademark-related assistance, startup-related documentation support, filings, strategy sessions, or any other lawful services offered by Legal Bruz Pvt. Ltd.
+“Services” means consultations, advisory support, trademark-related assistance, startup-related documentation support, filings, strategy sessions, or any other lawful services offered by Legal Bruz Ltd.
 2. Nature of Website
-This website is an informational and service-enablement platform. It allows users to learn about Legal Bruz, submit inquiries, request consultations, and engage services subject to acceptance by Legal Bruz Pvt. Ltd.
+This website is an informational and service-enablement platform. It allows users to learn about Legal Bruz, submit inquiries, request consultations, and engage services subject to acceptance by Legal Bruz Ltd.
 3. No Automatic Engagement
-Submission of forms, sending messages, making preliminary payments, or booking consultations does not automatically oblige Legal Bruz Pvt. Ltd. to accept a matter. We reserve the right to decline any request, inquiry, or proposed engagement at our discretion and in accordance with law and professional ethics.
+Submission of forms, sending messages, making preliminary payments, or booking consultations does not automatically oblige Legal Bruz Ltd. to accept a matter. We reserve the right to decline any request, inquiry, or proposed engagement at our discretion and in accordance with law and professional ethics.
 4. Scope of Services
-The precise scope of any service shall be limited to what is expressly confirmed in writing by Legal Bruz Pvt. Ltd. Any work outside the agreed scope may require a revised timeline, additional documentation, and additional fees.
+The precise scope of any service shall be limited to what is expressly confirmed in writing by Legal Bruz Ltd. Any work outside the agreed scope may require a revised timeline, additional documentation, and additional fees.
 5. User Obligations
 You agree:
 to provide true, accurate, current, and complete information;
@@ -38,9 +38,9 @@ government / registry delays;
 portal downtime;
 objections, oppositions, hearings, third-party challenges;
 force majeure events.
-Legal Bruz Pvt. Ltd. shall not be liable for delay attributable to the above factors.
+Legal Bruz Ltd. shall not be liable for delay attributable to the above factors.
 8. Consultations
-Consultation bookings are limited to the slot duration and subject matter booked. Legal Bruz Pvt. Ltd. may reschedule consultations due to professional commitments, emergencies, or technical issues, in which even reasonable efforts will be made to provide an alternate slot.
+Consultation bookings are limited to the slot duration and subject matter booked. Legal Bruz Ltd. may reschedule consultations due to professional commitments, emergencies, or technical issues, in which even reasonable efforts will be made to provide an alternate slot.
 9. Intellectual Property Search / Trademark Search
 Any free brand check, availability check, preliminary search, or risk assessment provided through the website is preliminary in nature and should not be construed as a final legal opinion, clearance opinion, or guarantee of registrability, availability, or non-infringement.
 A detailed legal opinion, if requested, will depend on the scope of search, documents reviewed, classes, goods/services, and factual matrix.
@@ -51,7 +51,7 @@ We take reasonable care in handling information shared with us. However, users s
 12. Website Availability
 We do not guarantee uninterrupted, timely, secure, or error-free operation of the website. Access may be suspended, restricted, or terminated temporarily for maintenance, technical reasons, security reasons, or other operational requirements.
 13. Third-Party Services
-The website may rely on third-party tools such as hosting providers, forms, analytics, scheduling software, payment gateways, communication platforms, and government portals. Legal Bruz Pvt. Ltd. is not responsible for the independent acts, omissions, downtime, or policies of such third parties.
+The website may rely on third-party tools such as hosting providers, forms, analytics, scheduling software, payment gateways, communication platforms, and government portals. Legal Bruz Ltd. is not responsible for the independent acts, omissions, downtime, or policies of such third parties.
 14. Prohibited Use
 You shall not:
 use the website for unlawful purposes;
@@ -62,7 +62,7 @@ use the website in a way that violates intellectual property, privacy, or other 
 15. Disclaimer of Advice and Warranties
 Use of this website is subject to the Disclaimer and Privacy Policy, which form part of these Terms. The website content is informational and is provided without warranties to the fullest extent permitted by law.
 16. Limitation of Liability
-To the fullest extent permitted by law, Legal Bruz Pvt. Ltd. shall not be liable for any indirect, consequential, incidental, special, or punitive damages arising out of or relating to:
+To the fullest extent permitted by law, Legal Bruz Ltd. shall not be liable for any indirect, consequential, incidental, special, or punitive damages arising out of or relating to:
 use or inability to use the website;
 reliance on any website content;
 delay, error, or technical failure;
@@ -77,7 +77,7 @@ fees remain unpaid;
 user conduct is abusive, unlawful, or unethical;
 continued engagement would create a conflict, legal risk, or professional impropriety.
 19. Indemnity
-You agree to indemnify and hold harmless Legal Bruz Pvt. Ltd., its partners, associates, consultants, staff, and representatives from claims, losses, costs, liabilities, or expenses arising out of:
+You agree to indemnify and hold harmless Legal Bruz Ltd., its partners, associates, consultants, staff, and representatives from claims, losses, costs, liabilities, or expenses arising out of:
 your misuse of the website;
 your breach of these Terms;
 false, incomplete, or misleading information provided by you;
@@ -85,7 +85,7 @@ violation of third-party rights or applicable law.
 20. Governing Law and Jurisdiction
 These Terms shall be governed by the laws of England and Wales. Subject to applicable law, the courts of England and Wales shall have jurisdiction.
 21. Entire Understanding
-These Terms, together with the Disclaimer, Privacy Policy, Refund Policy, and any engagement-specific communication, constitute the entire understanding between the user and Legal Bruz Pvt. Ltd. with respect to website usage and related service initiation.
+These Terms, together with the Disclaimer, Privacy Policy, Refund Policy, and any engagement-specific communication, constitute the entire understanding between the user and Legal Bruz Ltd. with respect to website usage and related service initiation.
 
 
 CMS_TERMS,
@@ -94,9 +94,9 @@ CMS_TERMS,
         'title' => 'Privacy Policy',
         'content' => <<<'CMS_PRIVACY'
 Last updated: [●]
-This Privacy Policy explains how Legal Bruz Pvt. Ltd. collects, uses, stores, shares, and protects personal data when you visit our website, fill out our forms, contact us, book a consultation, engage our services, or otherwise interact with us.
+This Privacy Policy explains how Legal Bruz Ltd. collects, uses, stores, shares, and protects personal data when you visit our website, fill out our forms, contact us, book a consultation, engage our services, or otherwise interact with us.
 1. Who We Are
-Legal Bruz Pvt. Ltd. provides UK trade mark filing support. For the purpose of this Privacy Policy, “Legal Bruz Pvt. Ltd.”, “we”, “us”, and “our” refer to Legal Bruz Pvt. Ltd.
+Legal Bruz Ltd. provides UK trade mark filing support. For the purpose of this Privacy Policy, “Legal Bruz Ltd.”, “we”, “us”, and “our” refer to Legal Bruz Ltd.
 Contact email: [UK email address — verify before publication]
 Registered office: [UK registered address — verify before publication]
 
@@ -196,7 +196,7 @@ CMS_PRIVACY,
         'title' => 'Refund Policy',
         'content' => <<<'CMS_REFUND'
 Last updated: [●]
-This Refund Policy applies to payments made to Legal Bruz Pvt. Ltd. through its website, payment links, card payment, bank transfer, or other approved payment channels for consultations, fixed-fee packages, filing assistance, advisory support, and related services.
+This Refund Policy applies to payments made to Legal Bruz Ltd. through its website, payment links, card payment, bank transfer, or other approved payment channels for consultations, fixed-fee packages, filing assistance, advisory support, and related services.
 1. General Principle
 Because legal, advisory, drafting, strategy, and filing-related services involve allocation of professional time, review effort, analysis, coordination, and case handling from the time work is accepted, refunds are limited and are subject to this Policy, package-specific terms, and applicable law.
 2. Non-Refundable Components
@@ -211,9 +211,9 @@ A refund may be considered in the following situations:
 A. Duplicate payment
 If you accidentally make the same payment more than once for the same service, the excess amount may be refunded after verification.
 B. Non-commencement of work
-If payment is received but Legal Bruz Pvt. Ltd. has not commenced work and no substantial time or resources have been allocated, a partial or full refund may be considered after deduction of processing charges, if any.
-C. Service declined by Legal Bruz Pvt. Ltd.
-If, after payment, Legal Bruz Pvt. Ltd. declines the matter due to conflict, legal impropriety, lack of jurisdiction, or inability to accept the engagement, the refundable amount, if any, will be determined after deducting consultation, review, and processing charges already incurred.
+If payment is received but Legal Bruz Ltd. has not commenced work and no substantial time or resources have been allocated, a partial or full refund may be considered after deduction of processing charges, if any.
+C. Service declined by Legal Bruz Ltd.
+If, after payment, Legal Bruz Ltd. declines the matter due to conflict, legal impropriety, lack of jurisdiction, or inability to accept the engagement, the refundable amount, if any, will be determined after deducting consultation, review, and processing charges already incurred.
 D. Proven billing error
 If an overcharge or billing error is established, the excess amount may be refunded or adjusted.
 4. No Refund Situations
@@ -246,7 +246,7 @@ date of payment;
 service purchased; and
 clear reason for the refund request.
 10. Review and Decision
-Each refund request will be reviewed on a case-by-case basis. Legal Bruz Pvt. Ltd. reserves the right to ask for supporting details and to determine refund eligibility based on work status, costs already incurred, and applicable law.
+Each refund request will be reviewed on a case-by-case basis. Legal Bruz Ltd. reserves the right to ask for supporting details and to determine refund eligibility based on work status, costs already incurred, and applicable law.
 11. Refund Timeline
 If a refund is approved, it will ordinarily be processed to the original payment source or by bank transfer within 15 business days, subject to banking and payment gateway timelines.
 12. Chargebacks
@@ -261,38 +261,38 @@ CMS_REFUND,
         'title' => 'Website Disclaimer',
         'content' => <<<'CMS_DISCLAIMER'
 Last updated: [●]
-Welcome to the website of Legal Bruz Pvt. Ltd. (“Legal Bruz”, “we”, “us”, or “our”).
+Welcome to the website of Legal Bruz Ltd. (“Legal Bruz”, “we”, “us”, or “our”).
 1. Regulatory Status
-Legal Bruz Pvt. Ltd. provides permitted unreserved legal and intellectual property services. Legal Bruz Pvt. Ltd. is not authorised or regulated by the Solicitors Regulation Authority or the Intellectual Property Regulation Board and is not an SRA-authorised law firm or an IPReg-regulated trade mark attorney firm. Website access does not by itself create a lawyer-client, fiduciary, or professional relationship.
+Legal Bruz Ltd. provides permitted unreserved legal and intellectual property services. Legal Bruz Ltd. is not authorised or regulated by the Solicitors Regulation Authority or the Intellectual Property Regulation Board and is not an SRA-authorised law firm or an IPReg-regulated trade mark attorney firm. Website access does not by itself create a lawyer-client, fiduciary, or professional relationship.
 2. Informational Purpose Only
 The content available on this website, including articles, guides, FAQs, case summaries, blogs, downloadable materials, and service descriptions, is provided for general informational purposes only. It is not legal advice, legal opinion, business advice, tax advice, investment advice, or professional recommendation.
 No content on this website should be relied upon as a substitute for specific legal advice based on your facts, documents, jurisdiction, and applicable law.
 3. No Advocate-Client Relationship
 Your use of this website, submission of any contact form, booking request, payment of any consultation fee, sending of an email, WhatsApp message, Instagram message, or other communication to us does not, by itself, create an advocate-client relationship.
 An advocate-client or professional engagement relationship shall arise only when:
-Legal Bruz Pvt. Ltd. has expressly agreed in writing to undertake the matter;
+Legal Bruz Ltd. has expressly agreed in writing to undertake the matter;
 the scope of work, fees, and engagement terms have been communicated and accepted; and
 any required conflict checks, KYC, and onboarding formalities have been completed.
 4. No Guarantee of Outcome
-Legal processes, trademark examination, registry practice, oppositions, hearings, government approvals, and adjudicatory outcomes depend on multiple external factors, including facts, documents, legal interpretation, actions of government authorities, and third-party objections. Accordingly, Legal Bruz Pvt. Ltd. does not guarantee:
+Legal processes, trademark examination, registry practice, oppositions, hearings, government approvals, and adjudicatory outcomes depend on multiple external factors, including facts, documents, legal interpretation, actions of government authorities, and third-party objections. Accordingly, Legal Bruz Ltd. does not guarantee:
 registration, approval, grant, or acceptance of any application;
 success in any legal proceeding or administrative process;
 any specific timeline for completion;
 non-objection, non-opposition, or non-infringement status of any mark, name, or business activity.
 Any timelines displayed on the website are estimates only and may change due to government, registry, technical, or third-party delays.
 5. Third-Party Platforms and External Links
-This website may contain links to third-party websites, portals, payment gateways, government platforms, social media pages, or external resources. Such links are provided only for convenience. Legal Bruz Pvt. Ltd. does not control and is not responsible for the availability, accuracy, legality, privacy practices, or content of such third-party sites.
+This website may contain links to third-party websites, portals, payment gateways, government platforms, social media pages, or external resources. Such links are provided only for convenience. Legal Bruz Ltd. does not control and is not responsible for the availability, accuracy, legality, privacy practices, or content of such third-party sites.
 6. No Warranty
-While we make reasonable efforts to keep the information on this website accurate and updated, the website and its contents are provided on an “as is” and “as available” basis. To the fullest extent permitted by law, Legal Bruz Pvt. Ltd. disclaims all warranties, express or implied, including warranties of accuracy, completeness, merchantability, fitness for a particular purpose, availability, and non-infringement.
+While we make reasonable efforts to keep the information on this website accurate and updated, the website and its contents are provided on an “as is” and “as available” basis. To the fullest extent permitted by law, Legal Bruz Ltd. disclaims all warranties, express or implied, including warranties of accuracy, completeness, merchantability, fitness for a particular purpose, availability, and non-infringement.
 7. Limitation of Liability
-To the fullest extent permitted under applicable law, Legal Bruz Pvt. Ltd. shall not be liable for any direct, indirect, incidental, consequential, special, exemplary, or punitive loss or damage arising out of or in connection with:
+To the fullest extent permitted under applicable law, Legal Bruz Ltd. shall not be liable for any direct, indirect, incidental, consequential, special, exemplary, or punitive loss or damage arising out of or in connection with:
 access to or use of this website;
 reliance placed on any content on this website;
 interruption, delay, error, malware, or technical malfunction;
 unauthorized access to data transmitted through the website; or
 acts, omissions, delays, or decisions of third parties, statutory bodies, or government authorities.
 8. Intellectual Property
-Unless otherwise stated, all text, graphics, logos, designs, branding elements, page layouts, downloadable content, and other materials on this website are the property of Legal Bruz Pvt. Ltd. or are used with permission. Unauthorized copying, reproduction, modification, republication, or commercial use is prohibited.
+Unless otherwise stated, all text, graphics, logos, designs, branding elements, page layouts, downloadable content, and other materials on this website are the property of Legal Bruz Ltd. or are used with permission. Unauthorized copying, reproduction, modification, republication, or commercial use is prohibited.
 9. Jurisdiction
 This website is intended for users seeking UK trade mark services. This Disclaimer shall be governed by the laws of England and Wales. Subject to applicable law, the courts of England and Wales shall have jurisdiction in relation to disputes arising from this website and this Disclaimer.
 CMS_DISCLAIMER,

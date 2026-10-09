@@ -10,7 +10,13 @@ class EnsureLegacyServicesEnabled
 {
     public function handle(Request $request, Closure $next): Response
     {
-        abort_unless(config('uk_site.legacy_services_enabled'), 404);
+        $activeService = $request->routeIs('trademark.opposition-management')
+            || $request->routeIs('trademark-opposition.*')
+            || $request->routeIs('examination-reply.*')
+            || $request->routeIs('admin.trademark-opposition.*')
+            || $request->routeIs('admin.examination-reply.*');
+
+        abort_unless($activeService || config('uk_site.legacy_services_enabled'), 404);
 
         return $next($request);
     }

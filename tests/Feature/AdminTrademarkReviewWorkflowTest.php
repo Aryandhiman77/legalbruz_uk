@@ -373,6 +373,19 @@ class AdminTrademarkReviewWorkflowTest extends TestCase
             'status' => TrademarkWorkflow::APPROVED_BY_CLIENT,
             'service_status' => TrademarkWorkflow::APPROVED_BY_CLIENT,
         ]);
+        Payment::create([
+            'application_id' => $application->id,
+            'user_id' => $client->id,
+            'amount' => 199.50,
+            'total_amount' => 399,
+            'payment_type' => 'final',
+            'percentage' => '50%',
+            'payment_method' => 'razorpay',
+            'status' => 'completed',
+            'reference_number' => 'order_verified_final_test',
+            'transaction_id' => 'pay_verified_final_test',
+            'paid_at' => now(),
+        ]);
 
         app(TrademarkWorkflowService::class)->markFinalPaymentComplete($application);
 
@@ -387,6 +400,100 @@ class AdminTrademarkReviewWorkflowTest extends TestCase
         $this->assertCount(16, TrademarkWorkflow::statusOptions());
         $this->assertSame('Filed with UKIPO', TrademarkWorkflow::statusOptions()[TrademarkWorkflow::FILED_WITH_UKIPO]);
         $this->assertSame('Withdrawn or Closed', TrademarkWorkflow::statusOptions()[TrademarkWorkflow::WITHDRAWN_OR_CLOSED]);
+    }
+
+    public function test_admin_can_edit_matter_overview_with_the_same_applicant_type_dropdown_as_the_client(): void
+    {
+        $admin = Admin::create([
+            'name' => 'Matter Admin',
+            'email' => 'matter-admin@example.com',
+            'password' => bcrypt('password'),
+        ]);
+        $client = User::factory()->create();
+        $application = Application::create([
+            'user_id' => $client->id,
+            'type' => 'trademark',
+            'entity_type' => 'individual',
+            'applicant_name' => 'Original Applicant',
+            'phone' => '+447123456789',
+            'email' => 'original@example.test',
+            'brand_name' => 'Original Mark',
+            'description' => 'Original activities',
+            'goods_services' => 'Original activities',
+            'status' => TrademarkWorkflow::UNDER_REVIEW,
+            'service_status' => TrademarkWorkflow::UNDER_REVIEW,
+            'members_details' => [
+                'applicant_details' => [
+                    'applicant_type' => 'individual',
+                    'legal_name' => 'Original Applicant',
+                    'email' => 'original@example.test',
+                    'phone' => '+447123456789',
+                    'postcode' => 'SW1A 1AA',
+                ],
+                'trademark_details' => [
+                    'trade_mark_wording' => 'Original Mark',
+                    'business_activities' => 'Original activities',
+                    'mark_type' => 'word',
+                ],
+            ],
+        ]);
+
+        $this->actingAs($admin, 'admin')
+            ->get(route('admin.view-application', $application))
+            ->assertOk()
+            ->assertSee('name="applicant_type"', false)
+            ->assertSee('<option value="limited_company"', false)
+            ->assertSee('<option value="charity"', false)
+            ->assertSee('name="business_activities"', false)
+            ->assertSee('data-matter-overview-fields disabled', false)
+            ->assertSee('data-matter-overview-toggle', false)
+            ->assertSee('data-matter-overview-cancel', false)
+            ->assertSee('data-matter-overview-label>Edit</span>', false)
+            ->assertSee("window.confirm('Save these changes to the Matter Overview?')", false)
+            ->assertDontSee('Save Matter Overview')
+            ->assertSee(route('admin.application.matter-overview.update', $application), false);
+
+        $this->actingAs($admin, 'admin')
+            ->put(route('admin.application.matter-overview.update', $application), [
+                'brand_name' => 'Updated Mark',
+                'applicant_name' => 'Updated Charity',
+                'applicant_type' => 'charity',
+                'email' => 'updated@example.test',
+                'phone' => '07123 456789',
+                'business_activities' => 'Updated education and community services.',
+            ])
+            ->assertRedirect(route('admin.view-application', $application))
+            ->assertSessionHas('success');
+
+        $application->refresh();
+
+        $this->assertSame('Updated Mark', $application->brand_name);
+        $this->assertSame('Updated Charity', $application->applicant_name);
+        $this->assertSame('company', $application->entity_type);
+        $this->assertSame('updated@example.test', $application->email);
+        $this->assertSame('+447123456789', $application->phone);
+        $this->assertSame('Updated education and community services.', $application->description);
+        $this->assertSame('Updated education and community services.', $application->goods_services);
+        $this->assertSame('charity', data_get($application->members_details, 'applicant_details.applicant_type'));
+        $this->assertSame('Updated Charity', data_get($application->members_details, 'applicant_details.legal_name'));
+        $this->assertSame('SW1A 1AA', data_get($application->members_details, 'applicant_details.postcode'));
+        $this->assertSame('Updated Mark', data_get($application->members_details, 'trademark_details.trade_mark_wording'));
+        $this->assertSame('word', data_get($application->members_details, 'trademark_details.mark_type'));
+
+        $this->actingAs($admin, 'admin')
+            ->from(route('admin.view-application', $application))
+            ->put(route('admin.application.matter-overview.update', $application), [
+                'brand_name' => 'Invalid Mark',
+                'applicant_name' => 'Invalid Applicant',
+                'applicant_type' => 'unsupported_type',
+                'email' => 'invalid@example.test',
+                'phone' => '+447123456789',
+                'business_activities' => 'Invalid update should not be persisted.',
+            ])
+            ->assertRedirect(route('admin.view-application', $application))
+            ->assertSessionHasErrors('applicant_type');
+
+        $this->assertSame('Updated Mark', $application->fresh()->brand_name);
     }
 
     public function test_admin_review_shows_complete_submission_and_application_payment_proof_with_invoice(): void

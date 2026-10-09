@@ -8,8 +8,12 @@
             <div class="admin-nav-group">
                 <p class="admin-nav-label">{{ $group['label'] }}</p>
                 @foreach ($group['items'] as $item)
-                    <a href="{{ route($item['route']) }}"
-                        class="admin-nav-link {{ request()->routeIs(...$item['active']) ? 'active' : '' }}">
+                    @php
+                        $itemIsActive = request()->routeIs(...$item['active'])
+                            && (! isset($item['parameters']['key']) || request()->route('key') === $item['parameters']['key']);
+                    @endphp
+                    <a href="{{ route($item['route'], $item['parameters'] ?? []) }}"
+                        class="admin-nav-link {{ $itemIsActive ? 'active' : '' }}">
                         <i class="bi {{ $item['icon'] }}"></i>
                         <span>{{ $item['label'] }}</span>
                     </a>

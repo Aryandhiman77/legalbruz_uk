@@ -56,6 +56,10 @@ class TrademarkWorkflowService
 
     public function markAdvancePaymentComplete(Application $application): void
     {
+        if (! $this->hasCompletedPaymentKind($application, ['advance', 'full'])) {
+            throw new \LogicException('A verified completed advance payment is required before the application can enter review.');
+        }
+
         $this->transition($application, TrademarkWorkflow::APPLICATION_SUBMITTED, 'Advance payment completed.');
         $this->transition($application, TrademarkWorkflow::UNDER_REVIEW, 'Advance payment completed and application submitted for admin review.');
         $this->notifyUser($application, 'under_review', 'Application under review', 'Your application and advance payment have been received. Our team is reviewing your application details.');
@@ -327,6 +331,10 @@ class TrademarkWorkflowService
 
     public function markFinalPaymentComplete(Application $application): void
     {
+        if (! $this->hasCompletedPaymentKind($application, ['final', 'full'])) {
+            throw new \LogicException('A verified completed final payment is required before the application can be marked ready to file.');
+        }
+
         $this->saveApplicationFields($application, [
             'final_payment_completed_at' => now(),
         ]);
@@ -357,6 +365,26 @@ class TrademarkWorkflowService
 
                 return (float) $payment->total_amount > 0
                     && (float) $payment->amount >= (float) $payment->total_amount;
+            });
+    }
+
+    private function hasCompletedPaymentKind(Application $application, array $allowedKinds): bool
+    {
+        if (! Schema::hasTable('payments')) {
+            return false;
+        }
+
+        return $application->payments()
+            ->whereIn('status', ['completed', 'approved'])
+            ->get()
+            ->contains(function ($payment) use ($allowedKinds): bool {
+                $type = strtolower((string) ($payment->payment_type ?? ''));
+
+                if ($type === '') {
+                    $type = (string) $payment->percentage === '100%' ? 'full' : 'advance';
+                }
+
+                return in_array($type, $allowedKinds, true);
             });
     }
 
@@ -665,7 +693,7 @@ class TrademarkWorkflowService
             'terms_of_business' => 'These terms govern the professional services, timelines, and responsibilities for your trademark matter.',
             'application_summary' => 'Summary of the UK trade mark application prepared for client review.',
             'final_specification' => 'The final classes and goods and services specification prepared for client approval.',
-            'filing_authority' => 'Authority for Legal Bruz Pvt. Ltd. to submit the client-approved application to the UKIPO.',
+            'filing_authority' => 'Authority for Legal Bruz Ltd. to submit the client-approved application to the UKIPO.',
             default => 'Workflow document generated for this trademark application.',
         };
     }

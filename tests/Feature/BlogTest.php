@@ -148,7 +148,12 @@ class BlogTest extends TestCase
             ->assertOk()
             ->assertSee('<meta name="description"', false)
             ->assertSee('<link rel="canonical" href="'.route('landing').'">', false)
+            ->assertSee('href="'.route('blog.index').'">Blogs</a>', false)
             ->assertSee('"@type":"Organization"', false);
+
+        $this->get(route('blog.index'))
+            ->assertOk()
+            ->assertSee('<h1>Blogs</h1>', false);
     }
 
     public function test_admin_can_open_blog_create_form(): void

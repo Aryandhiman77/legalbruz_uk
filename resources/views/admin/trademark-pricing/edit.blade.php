@@ -4,10 +4,20 @@
     @php
         $planMap = $plans->keyBy('key');
         $priceFields = [
+            'uk_search' => [
+                'title' => 'Trademark Search Report',
+                'description' => 'Fee charged when a visitor requests a search report and proceeds to secure payment.',
+                'featured' => false,
+            ],
             'uk_application' => [
                 'title' => 'UK Trade Mark Application',
                 'description' => 'Professional fee used on the homepage and in the active UK filing journey.',
                 'featured' => true,
+            ],
+            'consultation_call' => [
+                'title' => 'Consultation Call',
+                'description' => 'Fee charged when a visitor submits the Book a Call form and proceeds to payment.',
+                'featured' => false,
             ],
         ];
     @endphp
@@ -15,8 +25,8 @@
     <div class="admin-pricing-page">
         <header class="admin-pricing-hero">
             <span>UK website settings</span>
-            <h1>UK Trade Mark Pricing</h1>
-            <p>Set the professional fees shown on the UK website. Every amount is displayed in pounds sterling and UKIPO official fees remain separate.</p>
+            <h1>Website Service Pricing</h1>
+            <p>Set the professional fees shown on the UK website, including search reports, trade mark applications and paid consultation calls. Every amount is displayed in pounds sterling.</p>
         </header>
 
         @if (session('success'))
@@ -51,7 +61,7 @@
 
             <div class="admin-pricing-actions">
                 <a href="{{ route('admin.dashboard') }}" class="btn btn-outline-secondary">Back to Dashboard</a>
-                <button type="submit" class="btn btn-primary">Save Trademark Pricing</button>
+                <button type="submit" class="btn btn-primary">Save Pricing</button>
             </div>
         </form>
     </div>
@@ -63,7 +73,8 @@
         .admin-pricing-hero h1{margin:8px 0;color:#fff;font-size:clamp(1.6rem,3vw,2.35rem);font-weight:950}
         .admin-pricing-hero p{max-width:760px;margin:0;color:rgba(255,255,255,.78);line-height:1.65}
         .admin-pricing-card{margin-top:18px;padding:24px;border:1px solid #dfe8f4;border-radius:16px;background:#fff;box-shadow:0 14px 32px rgba(8,36,90,.07)}
-        .admin-pricing-grid{display:grid;grid-template-columns:minmax(0,560px);gap:18px}
+        .admin-pricing-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+        @media(max-width:1000px){.admin-pricing-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
         .admin-price-field{display:block;padding:20px;border:1px solid #e0e8f0;border-radius:14px;background:#fbfdff}
         .admin-price-field.featured{border-color:#a9d8d1;background:#f3fbf9}
         .admin-price-field span{display:block;color:#102a4c;font-size:1rem;font-weight:950}

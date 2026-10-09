@@ -5,8 +5,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', config('app.name', 'Legal Bruz Pvt. Ltd.') . ' - IPR Registration')</title>
-    <link rel="icon" type="image/png" href="{{ asset('legal-bruz-pvt-ltd-logo.png') }}">
+    <title>@yield('title', config('app.name', 'Legal Bruz Ltd.') . ' - IPR Registration')</title>
+    <link rel="icon" type="image/png" href="{{ asset('legal-bruz-ltd-logo.png') }}">
     <meta name="description" content="@yield('meta_description', 'Legal Bruz provides clear UK trade mark application preparation, filing support and online tracking.')">
     <meta name="robots" content="@yield('meta_robots', request()->is('admin*', 'login', 'register', 'dashboard*', 'home') ? 'noindex, nofollow' : 'index, follow, max-image-preview:large')">
     <link rel="canonical" href="@yield('canonical_url', url()->current())">
@@ -15,11 +15,11 @@
     <meta property="og:title" content="@yield('og_title', 'Legal Bruz - Intellectual Property Services')">
     <meta property="og:description" content="@yield('og_description', 'Trademark and intellectual property services made clear and accessible.')">
     <meta property="og:url" content="@yield('canonical_url', url()->current())">
-    <meta property="og:image" content="@yield('og_image', asset('legal-bruz-pvt-ltd-logo.png'))">
+    <meta property="og:image" content="@yield('og_image', asset('legal-bruz-ltd-logo.png'))">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="@yield('og_title', 'Legal Bruz - Intellectual Property Services')">
     <meta name="twitter:description" content="@yield('og_description', 'Trademark and intellectual property services made clear and accessible.')">
-    <meta name="twitter:image" content="@yield('og_image', asset('legal-bruz-pvt-ltd-logo.png'))">
+    <meta name="twitter:image" content="@yield('og_image', asset('legal-bruz-ltd-logo.png'))">
     @yield('head')
 
     <!-- Fonts -->
@@ -582,7 +582,7 @@
         <nav class="navbar navbar-expand-lg">
             <div class="container">
                 <a class="navbar-brand d-flex align-items-center gap-2" href="{{ url('/') }}">
-                    <img src="{{ asset('legal-bruz-pvt-ltd-logo.png') }}" alt="Legal Bruz Pvt. Ltd. logo" class="navbar-logo" width="106" height="79">
+                    <img src="{{ asset('legal-bruz-ltd-logo.png') }}" alt="Legal Bruz Ltd. logo" class="navbar-logo" width="106" height="79">
                 </a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                     <span class="navbar-toggler-icon"></span>

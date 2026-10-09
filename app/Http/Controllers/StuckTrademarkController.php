@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\PaymentVerificationException;
 use App\Mail\EventNotification;
 use App\Models\DiscountCoupon;
 use App\Models\Notification;
 use App\Models\StuckTrademarkCase;
 use App\Models\StuckTrademarkDocument;
 use App\Models\StuckTrademarkStatusLog;
+use App\Services\RazorpayPaymentVerifier;
 use App\Support\StuckTrademarkWorkflow;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -500,7 +502,7 @@ class StuckTrademarkController extends Controller
         }
     }
 
-    public function verifyAuditPaymentSignature(Request $request, StuckTrademarkCase $case)
+    public function verifyAuditPaymentSignature(Request $request, StuckTrademarkCase $case, RazorpayPaymentVerifier $verifier)
     {
         $this->authorizeApplicant($case);
 
@@ -528,17 +530,17 @@ class StuckTrademarkController extends Controller
             ], 422);
         }
 
-        $expectedSignature = hash_hmac(
-            'sha256',
-            $validated['razorpay_order_id'] . '|' . $validated['razorpay_payment_id'],
-            (string) config('razorpay.key_secret')
-        );
-
-        if (!hash_equals($expectedSignature, $validated['razorpay_signature'])) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Payment verification failed. Razorpay signature is invalid.',
-            ], 422);
+        try {
+            $verifier->verifyCaptured(
+                $validated['razorpay_payment_id'],
+                $validated['razorpay_order_id'],
+                $validated['razorpay_signature'],
+                $validated['razorpay_order_id'],
+                (int) ($order['amount'] ?? 0),
+                (string) config('razorpay.currency', 'GBP'),
+            );
+        } catch (PaymentVerificationException $exception) {
+            return response()->json(['status' => 'error', 'message' => $exception->getMessage()], $exception->httpStatus());
         }
 
         $this->activateAuditPackage(
@@ -803,7 +805,7 @@ class StuckTrademarkController extends Controller
         }
     }
 
-    public function verifyExecutionPaymentSignature(Request $request, StuckTrademarkCase $case)
+    public function verifyExecutionPaymentSignature(Request $request, StuckTrademarkCase $case, RazorpayPaymentVerifier $verifier)
     {
         $this->authorizeApplicant($case);
 
@@ -831,17 +833,17 @@ class StuckTrademarkController extends Controller
             ], 422);
         }
 
-        $expectedSignature = hash_hmac(
-            'sha256',
-            $validated['razorpay_order_id'] . '|' . $validated['razorpay_payment_id'],
-            (string) config('razorpay.key_secret')
-        );
-
-        if (!hash_equals($expectedSignature, $validated['razorpay_signature'])) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Payment verification failed. Razorpay signature is invalid.',
-            ], 422);
+        try {
+            $verifier->verifyCaptured(
+                $validated['razorpay_payment_id'],
+                $validated['razorpay_order_id'],
+                $validated['razorpay_signature'],
+                $validated['razorpay_order_id'],
+                (int) ($order['amount'] ?? 0),
+                (string) config('razorpay.currency', 'GBP'),
+            );
+        } catch (PaymentVerificationException $exception) {
+            return response()->json(['status' => 'error', 'message' => $exception->getMessage()], $exception->httpStatus());
         }
 
         $from = $case->status;
@@ -1071,9 +1073,38 @@ class StuckTrademarkController extends Controller
             $updates['closed_at'] = now();
         }
 
-        if ($validated['status'] === StuckTrademarkWorkflow::EXECUTION_ACTIVE) {
-            $updates['execution_payment_status'] = 'paid';
-            $updates['execution_paid_at'] = $case->execution_paid_at ?: now();
+        $auditProtectedStatuses = [
+            StuckTrademarkWorkflow::AUDIT_IN_PROGRESS,
+            StuckTrademarkWorkflow::AUDIT_COMPLETED,
+            StuckTrademarkWorkflow::AUDIT_REPORT_REVIEW,
+            StuckTrademarkWorkflow::AUDIT_REPORT_REUPLOAD_REQUESTED,
+            StuckTrademarkWorkflow::AWAITING_APPROVAL,
+            StuckTrademarkWorkflow::EXECUTION_PAYMENT_PENDING,
+            StuckTrademarkWorkflow::EXECUTION_ACTIVE,
+            StuckTrademarkWorkflow::REGISTRY_FOLLOW_UP,
+            StuckTrademarkWorkflow::MONITORING,
+            StuckTrademarkWorkflow::ADDITIONAL_ACTION_REQUIRED,
+            StuckTrademarkWorkflow::RESOLVED,
+        ];
+        if (in_array($validated['status'], $auditProtectedStatuses, true)
+            && $case->audit_payment_status !== 'paid') {
+            return redirect()
+                ->route('admin.stuck-trademark.show', $case)
+                ->with('error', 'This workflow stage cannot be activated until Razorpay confirms the audit payment as captured.');
+        }
+
+        $executionProtectedStatuses = [
+            StuckTrademarkWorkflow::EXECUTION_ACTIVE,
+            StuckTrademarkWorkflow::REGISTRY_FOLLOW_UP,
+            StuckTrademarkWorkflow::MONITORING,
+            StuckTrademarkWorkflow::ADDITIONAL_ACTION_REQUIRED,
+            StuckTrademarkWorkflow::RESOLVED,
+        ];
+        if (in_array($validated['status'], $executionProtectedStatuses, true)
+            && $case->execution_payment_status !== 'paid') {
+            return redirect()
+                ->route('admin.stuck-trademark.show', $case)
+                ->with('error', 'Execution cannot be activated until Razorpay confirms the payment as captured.');
         }
 
         $case->update($updates);

@@ -127,6 +127,18 @@ class TrackWebsiteVisitor
 
     private function serviceKey(Request $request, string $routeName): ?string
     {
+        if ($routeName === 'contact' && $request->query('service') === 'classification_specification') {
+            return 'classification_specification';
+        }
+
+        if (str_starts_with($routeName, 'trademark-search-report.')) {
+            return 'trademark_search_report';
+        }
+
+        if (str_starts_with($routeName, 'book-call.')) {
+            return 'consultation_call';
+        }
+
         if (in_array($routeName, [
             'trademark.search-page',
             'trademark.type-selection',

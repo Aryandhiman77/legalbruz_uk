@@ -11,11 +11,13 @@ use App\Http\Controllers\AdminFaqController;
 use App\Http\Controllers\AdminReviewController;
 use App\Http\Controllers\AdminTrademarkExecutionController;
 use App\Http\Controllers\AdminTrademarkPricingController;
+use App\Http\Controllers\AdminTrademarkSearchReportController;
 use App\Http\Controllers\AdminUserController;
 use App\Http\Controllers\Auth\AdminAuthController;
 use App\Http\Controllers\Auth\EmailOtpController;
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\CareerController;
+use App\Http\Controllers\ConsultationBookingController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\ExaminationReportReplyController;
@@ -29,6 +31,7 @@ use App\Http\Controllers\TrademarkController;
 use App\Http\Controllers\TrademarkOppositionController;
 use App\Http\Controllers\TrademarkProbabilityController;
 use App\Http\Controllers\TrademarkScraperController;
+use App\Http\Controllers\TrademarkSearchReportController;
 use App\Http\Controllers\UkPostcodeLookupController;
 use App\Http\Controllers\UserDocumentController;
 use App\Http\Controllers\WorkflowController;
@@ -97,6 +100,33 @@ Route::get('/contact', [PublicPageController::class, 'contact'])->name('contact'
 Route::post('/contact', [PublicPageController::class, 'submitContact'])
     ->middleware('throttle:5,1')
     ->name('contact.submit');
+Route::get('/book-a-call', [ConsultationBookingController::class, 'create'])->name('book-call.create');
+Route::post('/book-a-call', [ConsultationBookingController::class, 'store'])
+    ->middleware('throttle:5,1')
+    ->name('book-call.store');
+Route::get('/book-a-call/{booking}/payment', [ConsultationBookingController::class, 'payment'])->name('book-call.payment');
+Route::post('/book-a-call/{booking}/payment/order', [ConsultationBookingController::class, 'createOrder'])
+    ->middleware('throttle:10,1')
+    ->name('book-call.payment.order');
+Route::post('/book-a-call/{booking}/payment/verify', [ConsultationBookingController::class, 'verify'])
+    ->middleware('throttle:10,1')
+    ->name('book-call.payment.verify');
+Route::get('/book-a-call/{booking}/success', [ConsultationBookingController::class, 'success'])->name('book-call.success');
+Route::get('/trademark-search-report', [TrademarkSearchReportController::class, 'create'])->name('trademark-search-report.create');
+Route::post('/trademark-search-report', [TrademarkSearchReportController::class, 'store'])
+    ->middleware('throttle:5,1')
+    ->name('trademark-search-report.store');
+Route::get('/trademark-search-report/{reportRequest}/payment', [TrademarkSearchReportController::class, 'payment'])->name('trademark-search-report.payment');
+Route::post('/trademark-search-report/{reportRequest}/payment/order', [TrademarkSearchReportController::class, 'createOrder'])
+    ->middleware('throttle:10,1')
+    ->name('trademark-search-report.payment.order');
+Route::post('/trademark-search-report/{reportRequest}/payment/verify', [TrademarkSearchReportController::class, 'verify'])
+    ->middleware('throttle:10,1')
+    ->name('trademark-search-report.payment.verify');
+Route::get('/trademark-search-report/{reportRequest}/success', [TrademarkSearchReportController::class, 'success'])->name('trademark-search-report.success');
+Route::get('/trademark-search-report/{reportRequest}/documents/{document}/download', [TrademarkSearchReportController::class, 'download'])
+    ->middleware('auth')
+    ->name('trademark-search-report.download');
 Route::get('/careers', [CareerController::class, 'index'])->name('careers.index');
 Route::get('/careers/{careerJob:slug}', [CareerController::class, 'show'])->name('careers.show');
 Route::get('/careers/{careerJob:slug}/apply', [CareerController::class, 'apply'])->name('careers.apply');
@@ -180,8 +210,8 @@ Route::middleware(['auth'])->group(function () {
 
     // Payment Flow (Razorpay Integration)
     Route::get('/payment/{id}', [PaymentController::class, 'showPayment'])->name('payment.show');
-    Route::post('/payment/{id}/create-order', [PaymentController::class, 'createOrder'])->name('payment.create-order');
-    Route::post('/payment/{id}/verify-signature', [PaymentController::class, 'verifySignature'])->name('payment.verify-signature');
+    Route::post('/payment/{id}/create-order', [PaymentController::class, 'createOrder'])->middleware('throttle:10,1')->name('payment.create-order');
+    Route::post('/payment/{id}/verify-signature', [PaymentController::class, 'verifySignature'])->middleware('throttle:10,1')->name('payment.verify-signature');
     Route::get('/payment/{id}/check-status', [PaymentController::class, 'checkPaymentStatus'])->name('payment.check-status');
     Route::get('/payments/history', [PaymentController::class, 'paymentHistory'])->name('payment.history');
     Route::get('/payments/{payment}/invoice', [PaymentController::class, 'viewInvoice'])->name('payment.invoice');
@@ -238,8 +268,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/trademark-opposition/defend/{case}/evidence', [TrademarkOppositionController::class, 'uploadEvidence'])->name('trademark-opposition.evidence');
     Route::post('/trademark-opposition/defend/{case}/stage-documents', [TrademarkOppositionController::class, 'uploadOpposeThirdPartyEvidence'])->name('trademark-opposition.stage-documents');
     Route::post('/trademark-opposition/defend/{case}/payment', [TrademarkOppositionController::class, 'completePayment'])->name('trademark-opposition.payment');
-    Route::post('/trademark-opposition/defend/{case}/payment/create-order', [TrademarkOppositionController::class, 'createPaymentOrder'])->name('trademark-opposition.payment.create-order');
-    Route::post('/trademark-opposition/defend/{case}/payment/verify-signature', [TrademarkOppositionController::class, 'verifyPaymentSignature'])->name('trademark-opposition.payment.verify-signature');
+    Route::post('/trademark-opposition/defend/{case}/payment/create-order', [TrademarkOppositionController::class, 'createPaymentOrder'])->middleware('throttle:10,1')->name('trademark-opposition.payment.create-order');
+    Route::post('/trademark-opposition/defend/{case}/payment/verify-signature', [TrademarkOppositionController::class, 'verifyPaymentSignature'])->middleware('throttle:10,1')->name('trademark-opposition.payment.verify-signature');
     Route::get('/trademark-opposition/defend/{case}/payment/invoice', [TrademarkOppositionController::class, 'viewPaymentInvoice'])->name('trademark-opposition.payment.invoice');
     Route::post('/trademark-opposition/defend/{case}/draft/approve', [TrademarkOppositionController::class, 'approveDraft'])->name('trademark-opposition.draft.approve');
     Route::post('/trademark-opposition/defend/{case}/draft/request-changes', [TrademarkOppositionController::class, 'requestDraftChanges'])->name('trademark-opposition.draft.request-changes');
@@ -250,8 +280,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/trademark-opposition/oppose/{case}', [TrademarkOppositionController::class, 'showOppose'])->name('trademark-opposition.oppose.show');
     Route::post('/trademark-opposition/oppose/{case}/evidence', [TrademarkOppositionController::class, 'uploadOpposeEvidence'])->name('trademark-opposition.oppose.evidence');
     Route::post('/trademark-opposition/oppose/{case}/payment', [TrademarkOppositionController::class, 'completeOpposePayment'])->name('trademark-opposition.oppose.payment');
-    Route::post('/trademark-opposition/oppose/{case}/payment/create-order', [TrademarkOppositionController::class, 'createOpposePaymentOrder'])->name('trademark-opposition.oppose.payment.create-order');
-    Route::post('/trademark-opposition/oppose/{case}/payment/verify-signature', [TrademarkOppositionController::class, 'verifyOpposePaymentSignature'])->name('trademark-opposition.oppose.payment.verify-signature');
+    Route::post('/trademark-opposition/oppose/{case}/payment/create-order', [TrademarkOppositionController::class, 'createOpposePaymentOrder'])->middleware('throttle:10,1')->name('trademark-opposition.oppose.payment.create-order');
+    Route::post('/trademark-opposition/oppose/{case}/payment/verify-signature', [TrademarkOppositionController::class, 'verifyOpposePaymentSignature'])->middleware('throttle:10,1')->name('trademark-opposition.oppose.payment.verify-signature');
     Route::get('/trademark-opposition/oppose/{case}/payment/invoice', [TrademarkOppositionController::class, 'viewOpposePaymentInvoice'])->name('trademark-opposition.oppose.payment.invoice');
     Route::post('/trademark-opposition/oppose/{case}/draft/approve', [TrademarkOppositionController::class, 'approveOpposeDraft'])->name('trademark-opposition.oppose.draft.approve');
     Route::post('/trademark-opposition/oppose/{case}/draft/request-changes', [TrademarkOppositionController::class, 'requestOpposeDraftChanges'])->name('trademark-opposition.oppose.draft.request-changes');
@@ -267,15 +297,15 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/stuck-trademark/{case}', [StuckTrademarkController::class, 'show'])->name('stuck-trademark.show');
     Route::post('/stuck-trademark/{case}/documents', [StuckTrademarkController::class, 'uploadDocuments'])->name('stuck-trademark.documents.store');
     Route::get('/stuck-trademark/{case}/audit-package', [StuckTrademarkController::class, 'showAuditPackage'])->name('stuck-trademark.audit-package');
-    Route::post('/stuck-trademark/{case}/audit-payment/create-order', [StuckTrademarkController::class, 'createAuditOrder'])->name('stuck-trademark.audit-payment.create-order');
-    Route::post('/stuck-trademark/{case}/audit-payment/verify-signature', [StuckTrademarkController::class, 'verifyAuditPaymentSignature'])->name('stuck-trademark.audit-payment.verify-signature');
+    Route::post('/stuck-trademark/{case}/audit-payment/create-order', [StuckTrademarkController::class, 'createAuditOrder'])->middleware('throttle:10,1')->name('stuck-trademark.audit-payment.create-order');
+    Route::post('/stuck-trademark/{case}/audit-payment/verify-signature', [StuckTrademarkController::class, 'verifyAuditPaymentSignature'])->middleware('throttle:10,1')->name('stuck-trademark.audit-payment.verify-signature');
     Route::post('/stuck-trademark/{case}/audit-payment', [StuckTrademarkController::class, 'markAuditPaid'])->name('stuck-trademark.audit-payment');
     Route::get('/stuck-trademark/{case}/audit-payment/invoice', [StuckTrademarkController::class, 'viewAuditInvoice'])->name('stuck-trademark.audit-payment.invoice');
     Route::post('/stuck-trademark/{case}/audit-report/approve', [StuckTrademarkController::class, 'approveAuditReport'])->name('stuck-trademark.audit-report.approve');
     Route::post('/stuck-trademark/{case}/audit-report/request-reupload', [StuckTrademarkController::class, 'requestAuditReportReupload'])->name('stuck-trademark.audit-report.request-reupload');
     Route::post('/stuck-trademark/{case}/approve-execution', [StuckTrademarkController::class, 'approveExecution'])->name('stuck-trademark.approve-execution');
-    Route::post('/stuck-trademark/{case}/execution-payment/create-order', [StuckTrademarkController::class, 'createExecutionOrder'])->name('stuck-trademark.execution-payment.create-order');
-    Route::post('/stuck-trademark/{case}/execution-payment/verify-signature', [StuckTrademarkController::class, 'verifyExecutionPaymentSignature'])->name('stuck-trademark.execution-payment.verify-signature');
+    Route::post('/stuck-trademark/{case}/execution-payment/create-order', [StuckTrademarkController::class, 'createExecutionOrder'])->middleware('throttle:10,1')->name('stuck-trademark.execution-payment.create-order');
+    Route::post('/stuck-trademark/{case}/execution-payment/verify-signature', [StuckTrademarkController::class, 'verifyExecutionPaymentSignature'])->middleware('throttle:10,1')->name('stuck-trademark.execution-payment.verify-signature');
     Route::post('/stuck-trademark/{case}/skip-execution', [StuckTrademarkController::class, 'skipExecution'])->name('stuck-trademark.skip-execution');
     Route::get('/stuck-trademark/documents/{document}/view', [StuckTrademarkController::class, 'viewDocument'])->name('stuck-trademark.document.view');
     Route::get('/stuck-trademark/{case}/audit-report', [StuckTrademarkController::class, 'viewAuditReport'])->name('stuck-trademark.audit-report');
@@ -288,8 +318,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/trademark-objection-reply/{case}/evidence', [ExaminationReportReplyController::class, 'submitEvidence'])->name('examination-reply.evidence');
     Route::post('/trademark-objection-reply/{case}/draft/approve', [ExaminationReportReplyController::class, 'approveDraft'])->name('examination-reply.draft.approve');
     Route::post('/trademark-objection-reply/{case}/draft/request-changes', [ExaminationReportReplyController::class, 'requestDraftChanges'])->name('examination-reply.draft.request-changes');
-    Route::post('/trademark-objection-reply/{case}/payment/create-order', [ExaminationReportReplyController::class, 'createPaymentOrder'])->name('examination-reply.payment.create-order');
-    Route::post('/trademark-objection-reply/{case}/payment/verify-signature', [ExaminationReportReplyController::class, 'verifyPaymentSignature'])->name('examination-reply.payment.verify-signature');
+    Route::post('/trademark-objection-reply/{case}/payment/create-order', [ExaminationReportReplyController::class, 'createPaymentOrder'])->middleware('throttle:10,1')->name('examination-reply.payment.create-order');
+    Route::post('/trademark-objection-reply/{case}/payment/verify-signature', [ExaminationReportReplyController::class, 'verifyPaymentSignature'])->middleware('throttle:10,1')->name('examination-reply.payment.verify-signature');
     Route::get('/trademark-objection-reply/{case}/payment/invoice', [ExaminationReportReplyController::class, 'viewPaymentInvoice'])->name('examination-reply.payment.invoice');
     Route::get('/trademark-objection-reply/documents/{document}/view', [ExaminationReportReplyController::class, 'viewDocument'])->name('examination-reply.document.view');
     Route::get('/trademark-objection-reply/documents/{document}/download', [ExaminationReportReplyController::class, 'downloadDocument'])->name('examination-reply.document.download');
@@ -311,7 +341,7 @@ Route::middleware(['admin'])->prefix('admin')->group(function () {
             'update' => 'admin.blogs.update',
             'destroy' => 'admin.blogs.destroy',
         ]);
-    Route::get('/cms-pages', [AdminCmsPageController::class, 'index'])->name('admin.cms-pages.index');
+    Route::match(['post', 'put'], '/cms-pages/about/preview', [AdminCmsPageController::class, 'previewAbout'])->name('admin.cms-pages.about.preview');
     Route::get('/cms-pages/{key}/edit', [AdminCmsPageController::class, 'edit'])->name('admin.cms-pages.edit');
     Route::put('/cms-pages/{key}', [AdminCmsPageController::class, 'update'])->name('admin.cms-pages.update');
     Route::resource('/career-jobs', AdminCareerJobController::class)
@@ -352,6 +382,12 @@ Route::middleware(['admin'])->prefix('admin')->group(function () {
     Route::get('/contact-messages', [AdminContactMessageController::class, 'index'])->name('admin.contact-messages.index');
     Route::get('/contact-messages/{contactMessage}', [AdminContactMessageController::class, 'show'])->name('admin.contact-messages.show');
     Route::patch('/contact-messages/{contactMessage}', [AdminContactMessageController::class, 'update'])->name('admin.contact-messages.update');
+    Route::get('/trademark-search-reports', [AdminTrademarkSearchReportController::class, 'index'])->name('admin.trademark-search-reports.index');
+    Route::get('/trademark-search-reports/{reportRequest}', [AdminTrademarkSearchReportController::class, 'show'])->name('admin.trademark-search-reports.show');
+    Route::patch('/trademark-search-reports/{reportRequest}', [AdminTrademarkSearchReportController::class, 'update'])->name('admin.trademark-search-reports.update');
+    Route::post('/trademark-search-reports/{reportRequest}/documents', [AdminTrademarkSearchReportController::class, 'storeDocument'])->name('admin.trademark-search-reports.document.store');
+    Route::get('/trademark-search-reports/{reportRequest}/documents/{document}/download', [AdminTrademarkSearchReportController::class, 'download'])->name('admin.trademark-search-reports.document.download');
+    Route::delete('/trademark-search-reports/{reportRequest}/documents/{document}', [AdminTrademarkSearchReportController::class, 'destroyDocument'])->name('admin.trademark-search-reports.document.destroy');
     Route::get('/discount-coupons', [AdminDiscountCouponController::class, 'index'])->name('admin.discount-coupons.index');
     Route::get('/discount-coupons/create', [AdminDiscountCouponController::class, 'create'])->name('admin.discount-coupons.create');
     Route::post('/discount-coupons', [AdminDiscountCouponController::class, 'store'])->name('admin.discount-coupons.store');
@@ -363,6 +399,7 @@ Route::middleware(['admin'])->prefix('admin')->group(function () {
     Route::get('/applications/all', [AdminController::class, 'listAllApplications'])->name('admin.all-applications');
     Route::get('/application/{id}', [AdminController::class, 'viewApplication'])->name('admin.view-application');
     Route::get('/application/{id}/review', [AdminController::class, 'viewApplication'])->name('admin.review-application');
+    Route::put('/application/{id}/matter-overview', [AdminController::class, 'updateMatterOverview'])->name('admin.application.matter-overview.update');
     Route::get('/application/{id}/client-dashboard', [AdminController::class, 'viewClientDashboard'])->name('admin.application.client-dashboard');
     Route::get('/application/{id}/client-action-center', [AdminController::class, 'viewClientActionCenter'])->name('admin.application.client-action-center');
 

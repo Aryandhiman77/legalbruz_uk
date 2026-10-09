@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Coming Soon - Legal Bruz Pvt. Ltd.</title>
-    <link rel="icon" type="image/png" href="{{ asset('legal-bruz-pvt-ltd-logo.png') }}">
+    <title>Coming Soon - Legal Bruz Ltd.</title>
+    <link rel="icon" type="image/png" href="{{ asset('legal-bruz-ltd-logo.png') }}">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -344,7 +344,7 @@
                 </div>
 
                 <p class="footer-text">
-                    &copy; 2026 Legal Bruz Pvt. Ltd. Revolutionizing IPR & Trademark Registration in India.
+                    &copy; 2026 Legal Bruz Ltd. Revolutionizing IPR & Trademark Registration in India.
                 </p>
             </div>
         </div>

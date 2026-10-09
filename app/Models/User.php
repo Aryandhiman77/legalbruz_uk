@@ -64,6 +64,16 @@ class User extends Authenticatable
         return $this->hasMany(Payment::class);
     }
 
+    public function consultationBookings(): HasMany
+    {
+        return $this->hasMany(ConsultationBooking::class);
+    }
+
+    public function trademarkSearchReportRequests(): HasMany
+    {
+        return $this->hasMany(TrademarkSearchReportRequest::class);
+    }
+
     public function stuckTrademarkCases(): HasMany
     {
         return $this->hasMany(StuckTrademarkCase::class);

@@ -8,7 +8,7 @@
     <meta name="description" content="UK trade mark searches, application preparation and filing support for businesses, founders and brand owners.">
     <meta name="robots" content="index, follow, max-image-preview:large">
     <link rel="canonical" href="{{ route('landing') }}">
-    <link rel="icon" type="image/png" href="{{ asset('legal-bruz-pvt-ltd-logo.png') }}">
+    <link rel="icon" type="image/png" href="{{ asset('legal-bruz-ltd-logo.png') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
@@ -17,9 +17,9 @@
     <script type="application/ld+json">{!! json_encode([
         '@context' => 'https://schema.org',
         '@type' => 'Organization',
-        'name' => 'Legal Bruz Pvt. Ltd.',
+        'name' => 'Legal Bruz Ltd.',
         'url' => route('landing'),
-        'logo' => asset('legal-bruz-pvt-ltd-logo.png'),
+        'logo' => asset('legal-bruz-ltd-logo.png'),
         'sameAs' => collect(config('social_links'))->pluck('url')->values()->all(),
     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
 </head>
@@ -46,7 +46,7 @@
     <header class="site-header" data-header>
         <div class="page-shell nav-shell">
             <a class="brand" href="{{ route('landing') }}" aria-label="Legal Bruz home">
-                <img src="{{ asset('legal-bruz-pvt-ltd-logo.png') }}" alt="Legal Bruz Pvt. Ltd." width="106" height="79">
+                <img src="{{ asset('legal-bruz-ltd-logo.png') }}" alt="Legal Bruz Ltd." width="106" height="79">
             </a>
             <button class="nav-toggle" type="button" aria-label="Open navigation" aria-expanded="false" data-nav-toggle>
                 <span></span><span></span><span></span>
@@ -82,7 +82,7 @@
                     <p class="hero-lead">UK trade mark searches, application preparation and filing support for businesses, founders and brand owners.</p>
                     <div class="hero-actions">
                         <a class="button" href="{{ $applicationHref }}">Start your application <span aria-hidden="true">→</span></a>
-                        <a class="button button-secondary" href="{{ route('contact') }}">Book a consultation</a>
+                        <a class="button button-secondary" href="https://legalbruz.com" target="_blank" rel="noopener noreferrer">Visit Legalbruz India</a>
                     </div>
                     <p class="assurance"><span>Clear pricing</span><i></i><span>Human review</span><i></i><span>Client approval before filing</span></p>
                     <p class="hero-disclaimer">UKIPO official fees are charged separately unless expressly included. Filing does not guarantee registration.</p>
@@ -137,11 +137,11 @@
                 </div>
                 <div class="services-grid">
                     @foreach ([
-                        ['search', 'Trade Mark Search', 'UK register search, class review and written risk observations.', 'Search UK trade marks', '#trademark-search', 'Available now'],
+                        ['search', 'Trademark Search Report', 'UK register search, class review and written risk observations.', 'Request a search report', route('trademark-search-report.create'), 'Available now'],
                         ['application', 'UK Trade Mark Application', 'Owner review, specification preparation, filing and tracking.', 'Start an application', $applicationHref, 'Open for filing'],
-                        ['classes', 'Classification & Specification', 'Class recommendations and carefully drafted goods and services.', 'Get support', route('contact'), 'Included with filing'],
-                        ['response', 'Examination Response', 'Support with straightforward UKIPO examination issues.', 'Ask about responses', route('contact'), 'By assessment'],
-                        ['monitor', 'Trade Mark Monitoring', 'Status, publication, deadline and renewal reminders.', 'Coming soon', null, 'Planned service'],
+                        ['classes', 'Classification & Specification', 'Class recommendations and carefully drafted goods and services.', 'Get support', route('contact', ['service' => 'classification_specification']), 'Included with filing'],
+                        ['response', 'Examination Report', 'Support with examination reports, objections and reply filing.', 'Start with examination report', route('examination-reply.landing'), 'Available now'],
+                        ['monitor', 'Opposition Service', 'Choose Flow A to defend your mark or Flow B to oppose a conflicting mark.', 'Choose an opposition flow', route('trademark.opposition-management'), 'Available now'],
                         ['renewal', 'Trade Mark Renewal', 'Renewal review, submission and confirmation.', 'Coming soon', null, 'Planned service'],
                     ] as $index => [$icon, $title, $text, $action, $href, $tag])
                         <article class="service-card {{ $index === 1 ? 'service-card-featured' : '' }} reveal">
@@ -159,6 +159,7 @@
             </div>
         </section>
 
+        @if (config('uk_site.trademark_search_widget_enabled'))
         <section class="search-section" id="trademark-search">
             <div class="page-shell search-panel reveal">
                 <div class="search-decoration" aria-hidden="true"></div>
@@ -179,6 +180,7 @@
                 </form>
             </div>
         </section>
+        @endif
 
         <section class="process-section" id="process">
             <div class="process-corner process-corner-top" aria-hidden="true"></div>
@@ -345,18 +347,18 @@
                     <p>Professional fees and UKIPO official fees shown separately.</p>
                 </div>
                 <div class="pricing-grid">
-                    <article class="price-card price-card-coming-soon reveal">
-                        <span class="coming-soon-pill">Coming soon</span>
-                        <p class="price-kicker">Copyright registration</p>
-                        <div class="coming-soon-service-icon" aria-hidden="true">©</div>
-                        <h3>Protect your creative work</h3>
-                        <p class="coming-soon-copy">Safeguard music, art, literature, software and original designs.</p>
+                    <article class="price-card price-card-service reveal">
+                        <span class="popular-pill">Available now</span>
+                        <p class="price-kicker">Opposition service</p>
+                        <div class="coming-soon-service-icon" aria-hidden="true">⚖</div>
+                        <h3>Defend or oppose a trade mark</h3>
+                        <p class="coming-soon-copy">Choose the service that matches your opposition situation.</p>
                         <ul>
-                            @foreach (['Original work review', 'Application preparation', 'Ownership record support', 'Digital document archive'] as $feature)
+                            @foreach (['Flow A: defend your mark', 'Flow B: oppose a conflicting mark', 'Evidence and document review', 'Online case tracking'] as $feature)
                                 <li><span>✓</span>{{ $feature }}</li>
                             @endforeach
                         </ul>
-                        <span class="button button-dark button-disabled" aria-disabled="true">Coming soon</span>
+                        <a class="button button-dark" href="{{ route('trademark.opposition-management') }}">Start with opposition service <span>→</span></a>
                     </article>
 
                     <article class="price-card price-card-featured reveal">
@@ -381,18 +383,18 @@
                         <a class="button" href="{{ $applicationHref }}">Start your application <span>→</span></a>
                     </article>
 
-                    <article class="price-card price-card-coming-soon reveal">
-                        <span class="coming-soon-pill">Coming soon</span>
-                        <p class="price-kicker">Patent registration</p>
+                    <article class="price-card price-card-service reveal">
+                        <span class="popular-pill">Available now</span>
+                        <p class="price-kicker">Examination Report</p>
                         <div class="coming-soon-service-icon" aria-hidden="true">⌁</div>
-                        <h3>Protect your innovation</h3>
-                        <p class="coming-soon-copy">Support for inventions, technical developments and patent filing preparation.</p>
+                        <h3>Respond to an examination report</h3>
+                        <p class="coming-soon-copy">Review, draft approval and filing support for examination objections.</p>
                         <ul>
-                            @foreach (['Prior art search', 'Provisional filing', 'Complete application', 'Expert review'] as $feature)
+                            @foreach (['Report and objection review', 'Reply strategy and drafting', 'Client draft approval', 'Registry filing and tracking'] as $feature)
                                 <li><span>✓</span>{{ $feature }}</li>
                             @endforeach
                         </ul>
-                        <span class="button button-dark button-disabled" aria-disabled="true">Coming soon</span>
+                        <a class="button button-dark" href="{{ route('examination-reply.landing') }}">Start with examination report <span>→</span></a>
                     </article>
                 </div>
                 <div class="official-fee-note reveal">
@@ -430,7 +432,7 @@
         <section class="final-cta">
             <div class="page-shell final-cta-inner reveal">
                 <div><p class="eyebrow eyebrow-light"><span></span> Begin with clarity</p><h2>Ready to protect your brand in the UK?</h2><p>Start online or book a call to discuss the right next step.</p></div>
-                <div><a class="button button-white" href="{{ $applicationHref }}">Start your application <span>→</span></a><a class="button button-ghost" href="{{ route('contact') }}">Book a call</a></div>
+                <div><a class="button button-white" href="{{ $applicationHref }}">Start your application <span>→</span></a><a class="button button-ghost" href="{{ route('book-call.create') }}">Book a call</a></div>
             </div>
         </section>
     </main>

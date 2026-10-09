@@ -16,7 +16,9 @@ class PublicPageController extends Controller
 {
     public function about(): View
     {
-        return view('pages.about');
+        return view('pages.about', [
+            'aboutContent' => CmsPage::aboutContent(),
+        ]);
     }
 
     public function terms(): View
@@ -84,10 +86,16 @@ class PublicPageController extends Controller
         return view('pages.faq', compact('faqs', 'categories'));
     }
 
-    public function contact(): View
+    public function contact(Request $request): View
     {
+        $contactServices = $this->contactServiceOptions();
+        $requestedService = config('visitor_services.'.$request->query('service').'.label');
+
         return view('pages.contact', [
-            'contactServices' => $this->contactServiceOptions(),
+            'contactServices' => $contactServices,
+            'selectedContactService' => in_array($requestedService, $contactServices, true)
+                ? $requestedService
+                : null,
         ]);
     }
 
@@ -122,10 +130,10 @@ class PublicPageController extends Controller
     private function contactServiceOptions(): array
     {
         return collect(config('visitor_services'))
+            ->filter(fn (array $service) => $service['contact_visible'] ?? true)
             ->pluck('label')
-            ->push('Copyright Registration')
-            ->push('Patent Registration')
-            ->push('Examination Response')
+            ->push('Examination Report')
+            ->push('Opposition Service')
             ->push('Other')
             ->unique()
             ->values()

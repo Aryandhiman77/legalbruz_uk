@@ -1545,7 +1545,7 @@
                                                             <label class="form-check"><input class="form-check-input" type="checkbox" name="approve_mark" value="1" required><span class="form-check-label ms-2">I approve the trade mark wording and/or logo.</span></label>
                                                             <label class="form-check"><input class="form-check-input" type="checkbox" name="approve_classes_specification" value="1" required><span class="form-check-label ms-2">I approve the final classes and goods and services specification.</span></label>
                                                             <label class="form-check"><input class="form-check-input" type="checkbox" name="confirm_genuine_use" value="1" required><span class="form-check-label ms-2">I confirm genuine current use or a genuine intention to use the mark.</span></label>
-                                                            <label class="form-check"><input class="form-check-input" type="checkbox" name="authorise_filing" value="1" required><span class="form-check-label ms-2">I authorise Legal Bruz Pvt. Ltd. to submit the approved application.</span></label>
+                                                            <label class="form-check"><input class="form-check-input" type="checkbox" name="authorise_filing" value="1" required><span class="form-check-label ms-2">I authorise Legal Bruz Ltd. to submit the approved application.</span></label>
                                                         </div>
                                                         <div class="row g-3 mb-4">
                                                             <div class="col-12">

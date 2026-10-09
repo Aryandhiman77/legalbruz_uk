@@ -5,8 +5,11 @@ namespace Tests\Feature;
 use App\Models\Admin;
 use App\Models\CmsPage;
 use App\Models\ContactMessage;
+use App\Models\TrademarkSearchReportRequest;
 use App\Models\Faq;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class PublicInformationPagesTest extends TestCase
@@ -28,11 +31,12 @@ class PublicInformationPagesTest extends TestCase
             ->assertSee("Let's Protect Your Brand", false)
             ->assertSee('Business Name')
             ->assertSee('Service Interested In')
-            ->assertSee('<option value="Examination Response"', false)
+            ->assertSee('<option value="Examination Report"', false)
+            ->assertSee('<option value="Opposition Service"', false)
             ->assertSee('info@legalbruz.com')
             ->assertDontSee('support@legalbruz.com')
-            ->assertSee('34 Krishna Nagar, Ambala Cantt, Haryana -133001')
-            ->assertSee('Top Floor Chamber no.98 Ambala District court, Haryana')
+            ->assertDontSee('Ambala Office')
+            ->assertDontSee('Ambala District Court Office')
             ->assertSee('506-508 woodfield court, Honeypot lane, stanmore- HA7 1JR')
             ->assertSee('Mon to Friday - 10AM to 5PM');
         $this->get(route('faq'))
@@ -177,14 +181,18 @@ class PublicInformationPagesTest extends TestCase
         ]);
     }
 
-    public function test_contact_form_accepts_examination_response_as_a_service(): void
+    public function test_contact_form_accepts_examination_report_as_a_service(): void
     {
+        $this->get(route('contact'))
+            ->assertOk()
+            ->assertDontSee('<option value="Trademark Search Report"', false);
+
         $this->post(route('contact.submit'), [
             'name' => 'Jamie Carter',
             'email' => 'jamie@example.co.uk',
             'phone' => '+44 7123 456789',
             'business_name' => 'Carter Brands Ltd',
-            'service_interested' => 'Examination Response',
+            'service_interested' => 'Examination Report',
             'message' => 'I need help responding to a UKIPO examination report.',
         ])
             ->assertRedirect(route('contact'))
@@ -192,9 +200,105 @@ class PublicInformationPagesTest extends TestCase
 
         $this->assertDatabaseHas(ContactMessage::class, [
             'email' => 'jamie@example.co.uk',
-            'service_interested' => 'Examination Response',
-            'subject' => 'Examination Response',
+            'service_interested' => 'Examination Report',
+            'subject' => 'Examination Report',
         ]);
+    }
+
+    public function test_trademark_search_report_form_stores_a_report_request(): void
+    {
+        $this->get(route('trademark-search-report.create'))
+            ->assertOk()
+            ->assertSee('Trademark Search Report')
+            ->assertSee('Goods, Services or Business Activity');
+
+        $response = $this->post(route('trademark-search-report.store'), [
+            'name' => 'Alex Morgan',
+            'email' => 'alex@example.co.uk',
+            'phone' => '+44 7700 900123',
+            'brand_name' => 'North Pine',
+            'business_activity' => 'Online retail services for sustainable home and lifestyle products.',
+        ]);
+
+        $reportRequest = TrademarkSearchReportRequest::query()->firstOrFail();
+        $response->assertRedirect(route('trademark-search-report.payment', $reportRequest));
+
+        $this->assertDatabaseHas(TrademarkSearchReportRequest::class, [
+            'email' => 'alex@example.co.uk',
+            'brand_name' => 'North Pine',
+            'amount' => 149.00,
+            'payment_status' => 'pending',
+            'report_status' => 'awaiting_payment',
+        ]);
+        $this->assertDatabaseMissing(ContactMessage::class, [
+            'email' => 'alex@example.co.uk',
+            'service_interested' => 'Trademark Search Report',
+        ]);
+    }
+
+    public function test_admin_can_edit_about_sections_images_and_footer_regulatory_content(): void
+    {
+        Storage::fake('public');
+        $admin = Admin::create([
+            'name' => 'Content Admin',
+            'email' => 'content-admin@example.com',
+            'password' => bcrypt('password'),
+        ]);
+        $payload = collect(config('about_page'))
+            ->except(['hero_image', 'founder_image'])
+            ->all();
+
+        $this->actingAs($admin, 'admin')
+            ->get(route('admin.cms-pages.edit', CmsPage::ABOUT))
+            ->assertOk()
+            ->assertSee('Edit About Us')
+            ->assertSee('Founder photograph')
+            ->assertSee('Preview Page')
+            ->assertSee('data-about-preview', false)
+            ->assertSee('data-about-preview-modal', false)
+            ->assertDontSee('formtarget="_blank"', false);
+
+        $originalContent = CmsPage::query()->where('key', CmsPage::ABOUT)->firstOrFail()->content;
+        $previewPayload = $payload;
+        $previewPayload['hero_title'] = 'Unsaved preview heading.';
+        $previewPayload['founder_image_upload'] = UploadedFile::fake()->image('preview-founder.png', 800, 1000);
+
+        $this->actingAs($admin, 'admin')
+            ->put(route('admin.cms-pages.about.preview'), $previewPayload)
+            ->assertOk()
+            ->assertSee('Preview mode')
+            ->assertSee('These changes have not been saved.')
+            ->assertSee('Unsaved preview heading.')
+            ->assertSee('data:image/png;base64,', false);
+
+        $this->assertSame($originalContent, CmsPage::query()->where('key', CmsPage::ABOUT)->firstOrFail()->content);
+
+        $payload['hero_title'] = 'A clearer About heading.';
+        $payload['founder_image_upload'] = UploadedFile::fake()->image('founder.png', 800, 1000);
+
+        $this->actingAs($admin, 'admin')
+            ->put(route('admin.cms-pages.update', CmsPage::ABOUT), $payload)
+            ->assertRedirect(route('admin.cms-pages.edit', CmsPage::ABOUT));
+
+        $aboutPage = CmsPage::query()->where('key', CmsPage::ABOUT)->firstOrFail();
+        $storedAbout = json_decode($aboutPage->content, true);
+        Storage::disk('public')->assertExists($storedAbout['founder_image']);
+
+        $this->get(route('about'))
+            ->assertOk()
+            ->assertSee('A clearer About heading.');
+
+        $this->actingAs($admin, 'admin')
+            ->put(route('admin.cms-pages.update', CmsPage::REGULATORY), [
+                'title' => 'Updated regulatory heading',
+                'content' => '<p>Updated regulatory footer copy.</p>',
+            ])
+            ->assertRedirect(route('admin.cms-pages.edit', CmsPage::REGULATORY));
+
+        $this->get(route('landing'))
+            ->assertOk()
+            ->assertSee('Updated regulatory heading')
+            ->assertSee('Updated regulatory footer copy.');
     }
 
     public function test_contact_form_rejects_invalid_submissions(): void
@@ -283,12 +387,16 @@ class PublicInformationPagesTest extends TestCase
         $this->assertNotNull($message->fresh()->read_at);
 
         $this->actingAs($admin, 'admin')
-            ->patch(route('admin.contact-messages.update', $message), ['status' => 'resolved'])
+            ->patch(route('admin.contact-messages.update', $message), [
+                'status' => 'resolved',
+                'internal_notes' => 'Called the client and requested the opposition notice.',
+            ])
             ->assertRedirect(route('admin.contact-messages.show', $message));
 
         $this->assertDatabaseHas('contact_messages', [
             'id' => $message->id,
             'status' => 'resolved',
+            'internal_notes' => 'Called the client and requested the opposition notice.',
         ]);
     }
 }

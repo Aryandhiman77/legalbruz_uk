@@ -13,6 +13,8 @@ class AdminContactMessageController extends Controller
     public function index(Request $request): View
     {
         $messages = ContactMessage::query()
+            ->with('consultationBooking')
+            ->whereNull('archived_at')
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
             ->when($request->filled('search'), function ($query) use ($request) {
                 $search = (string) $request->string('search');
@@ -33,6 +35,8 @@ class AdminContactMessageController extends Controller
 
     public function show(ContactMessage $contactMessage): View
     {
+        $contactMessage->load('consultationBooking');
+
         if (! $contactMessage->read_at) {
             $contactMessage->update([
                 'read_at' => now(),
@@ -47,12 +51,13 @@ class AdminContactMessageController extends Controller
     {
         $validated = $request->validate([
             'status' => ['required', Rule::in(['new', 'in_progress', 'resolved'])],
+            'internal_notes' => ['nullable', 'string', 'max:10000'],
         ]);
 
         $contactMessage->update($validated);
 
         return redirect()
             ->route('admin.contact-messages.show', $contactMessage)
-            ->with('success', 'Message status updated.');
+            ->with('success', 'Message status and internal notes updated.');
     }
 }

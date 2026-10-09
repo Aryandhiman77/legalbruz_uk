@@ -13,6 +13,8 @@ use App\Models\StuckTrademarkCase;
 use App\Models\WebsiteVisitor;
 use App\Models\WebsiteServiceVisit;
 use App\Models\CustomerReview;
+use App\Models\ConsultationBooking;
+use App\Models\TrademarkSearchReportRequest;
 use App\Services\DocumentGenerator;
 use App\Services\NotificationService;
 use App\Services\TrademarkWorkflowService;
@@ -30,6 +32,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use App\Support\TrademarkWorkflow;
 use Throwable;
 
@@ -58,8 +61,17 @@ class AdminController extends Controller
         $publishedReviewsCount = Schema::hasTable('customer_reviews') ? CustomerReview::published()->count() : 0;
         $serviceVisitorCounts = collect(config('visitor_services', []))
             ->map(function (array $service, string $key) {
+                $adminUrl = isset($service['admin_route'])
+                    ? route($service['admin_route'], $service['admin_parameters'] ?? [])
+                    : null;
+
+                if ($adminUrl && isset($service['admin_fragment'])) {
+                    $adminUrl .= '#'.$service['admin_fragment'];
+                }
+
                 return array_merge($service, [
                     'key' => $key,
+                    'admin_url' => $adminUrl,
                     'visitors' => Schema::hasTable('website_service_visits')
                         ? WebsiteServiceVisit::where('service_key', $key)->count()
                         : 0,
@@ -132,6 +144,62 @@ class AdminController extends Controller
     }
 
     /**
+     * Update the client-supplied fields shown in the Matter Overview card.
+     */
+    public function updateMatterOverview(Request $request, $applicationId)
+    {
+        $application = Application::findOrFail($applicationId);
+        $phone = preg_replace('/[\s()-]+/', '', (string) $request->input('phone'));
+
+        if (str_starts_with($phone, '07')) {
+            $phone = '+44'.substr($phone, 1);
+        }
+
+        $request->merge(['phone' => $phone]);
+
+        $validated = $request->validate([
+            'brand_name' => ['required', 'string', 'max:255'],
+            'applicant_name' => ['required', 'string', 'max:255'],
+            'applicant_type' => ['required', Rule::in(array_keys(config('uk_site.applicant_types', [])))],
+            'email' => ['required', 'email', 'max:255'],
+            'phone' => ['required', 'string', 'max:30', 'regex:/^(?:\+44|0)7[0-9]{9}$/'],
+            'business_activities' => ['required', 'string', 'max:3000'],
+        ], [
+            'phone.regex' => 'Enter a valid UK mobile number beginning with 07 or +44 7.',
+        ]);
+
+        $details = $application->members_details ?? [];
+        $applicantDetails = $details['applicant_details'] ?? [];
+        $tradeMarkDetails = $details['trademark_details'] ?? [];
+
+        $details['applicant_details'] = array_merge($applicantDetails, [
+            'applicant_type' => $validated['applicant_type'],
+            'legal_name' => $validated['applicant_name'],
+            'email' => $validated['email'],
+            'phone' => $validated['phone'],
+        ]);
+        $details['trademark_details'] = array_merge($tradeMarkDetails, [
+            'trade_mark_wording' => $validated['brand_name'],
+            'business_activities' => $validated['business_activities'],
+        ]);
+
+        $application->update([
+            'brand_name' => $validated['brand_name'],
+            'applicant_name' => $validated['applicant_name'],
+            'entity_type' => $validated['applicant_type'] === 'individual' ? 'individual' : 'company',
+            'email' => $validated['email'],
+            'phone' => $validated['phone'],
+            'description' => $validated['business_activities'],
+            'goods_services' => $validated['business_activities'],
+            'members_details' => $details,
+        ]);
+
+        return redirect()
+            ->route('admin.view-application', $application)
+            ->with('success', 'Matter overview updated successfully.');
+    }
+
+    /**
      * Show the selected application's owner dashboard without impersonating the client.
      */
     public function viewClientDashboard($applicationId)
@@ -151,10 +219,18 @@ class AdminController extends Controller
             ->latest()
             ->get();
         $examinationReplyCases = $client->examinationReportReplyCases()->latest()->get();
+        $consultationBookings = Schema::hasTable('consultation_bookings')
+            ? ConsultationBooking::query()->visibleTo($client)->latest()->get()
+            : collect();
+        $trademarkSearchReportRequests = Schema::hasTable('trademark_search_report_requests')
+            ? TrademarkSearchReportRequest::query()->visibleTo($client)->with('documents')->latest()->get()
+            : collect();
         $pendingPayments = $applications->filter(fn ($clientApplication) => in_array($clientApplication->current_status, [
             TrademarkWorkflow::DRAFT,
             TrademarkWorkflow::PAYMENT_PENDING_FINAL,
-        ], true))->count();
+        ], true))->count()
+            + $consultationBookings->where('payment_status', 'pending')->count()
+            + $trademarkSearchReportRequests->where('payment_status', 'pending')->count();
         $underReview = $applications->where('current_status', TrademarkWorkflow::UNDER_REVIEW)->count();
         $registered = $applications->filter(function ($clientApplication) {
             if (Schema::hasColumn('applications', 'registry_status')) {
@@ -173,6 +249,8 @@ class AdminController extends Controller
             'trademarkOppositionCases' => $trademarkOppositionCases,
             'trademarkOpposeCases' => $trademarkOpposeCases,
             'examinationReplyCases' => $examinationReplyCases,
+            'consultationBookings' => $consultationBookings,
+            'trademarkSearchReportRequests' => $trademarkSearchReportRequests,
             'adminPreview' => true,
             'client' => $client,
             'previewApplication' => $application,
@@ -661,7 +739,8 @@ class AdminController extends Controller
     {
         $application = Application::findOrFail($applicationId);
 
-        if ($application->current_status !== TrademarkWorkflow::PAYMENT_COMPLETED) {
+        if ($application->current_status !== TrademarkWorkflow::PAYMENT_COMPLETED
+            || ! $this->hasVerifiedFinalPayment($application)) {
             return redirect()->back()->with('error', 'Full payment must be completed before filing.');
         }
 
@@ -2091,6 +2170,28 @@ class AdminController extends Controller
             'pending_admin',
             'approved',
         ];
+    }
+
+    private function hasVerifiedFinalPayment(Application $application): bool
+    {
+        if (! Schema::hasTable('payments')) {
+            return false;
+        }
+
+        $payments = $application->payments()
+            ->whereIn('status', ['completed', 'approved'])
+            ->get();
+
+        if ($payments->contains(fn (Payment $payment) => in_array(
+            strtolower((string) ($payment->payment_type ?? '')),
+            ['final', 'full'],
+            true,
+        ))) {
+            return true;
+        }
+
+        return $payments->where('percentage', '50%')->count() >= 2
+            || $payments->contains(fn (Payment $payment) => (string) $payment->percentage === '100%');
     }
 
     private function applicationRelations(): array

@@ -1,15 +1,10 @@
 <?php
 
 return [
-    'youtube' => [
-        'label' => 'YouTube',
-        'url' => 'https://www.youtube.com/@legalbruz',
-        'icon' => 'bi-youtube',
-    ],
-    'facebook' => [
-        'label' => 'Facebook',
-        'url' => 'https://www.facebook.com/legalbruz',
-        'icon' => 'bi-facebook',
+    'tiktok' => [
+        'label' => 'TikTok',
+        'url' => 'https://www.tiktok.com/@legalbruz',
+        'icon' => 'bi-tiktok',
     ],
     'instagram' => [
         'label' => 'Instagram',

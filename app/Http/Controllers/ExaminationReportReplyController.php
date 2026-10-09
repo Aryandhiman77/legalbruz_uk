@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\PaymentVerificationException;
 use App\Mail\EventNotification;
 use App\Models\Admin;
 use App\Models\DiscountCoupon;
@@ -14,6 +15,7 @@ use App\Models\ExaminationReplyStageDraft;
 use App\Models\ExaminationReplyStatusHistory;
 use App\Models\ExaminationReportReplyCase;
 use App\Models\Notification;
+use App\Services\RazorpayPaymentVerifier;
 use App\Support\ExaminationReportReplyWorkflow as Workflow;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -377,7 +379,7 @@ class ExaminationReportReplyController extends Controller
         }
     }
 
-    public function verifyPaymentSignature(Request $request, ExaminationReportReplyCase $case): JsonResponse
+    public function verifyPaymentSignature(Request $request, ExaminationReportReplyCase $case, RazorpayPaymentVerifier $verifier): JsonResponse
     {
         $this->authorizeClient($case);
         $data = $request->validate([
@@ -392,14 +394,17 @@ class ExaminationReportReplyController extends Controller
             return response()->json(['status' => 'error', 'message' => 'This Razorpay order does not belong to the current objection reply case.'], 422);
         }
 
-        $expectedSignature = hash_hmac(
-            'sha256',
-            $data['razorpay_order_id'] . '|' . $data['razorpay_payment_id'],
-            (string) config('razorpay.key_secret')
-        );
-
-        if (!hash_equals($expectedSignature, $data['razorpay_signature'])) {
-            return response()->json(['status' => 'error', 'message' => 'Invalid payment signature.'], 422);
+        try {
+            $verifier->verifyCaptured(
+                $data['razorpay_payment_id'],
+                $data['razorpay_order_id'],
+                $data['razorpay_signature'],
+                $data['razorpay_order_id'],
+                (int) ($order['amount'] ?? 0),
+                (string) config('razorpay.currency', 'GBP'),
+            );
+        } catch (PaymentVerificationException $exception) {
+            return response()->json(['status' => 'error', 'message' => $exception->getMessage()], $exception->httpStatus());
         }
 
         $case->update([
@@ -1565,6 +1570,28 @@ class ExaminationReportReplyController extends Controller
 
     private function transition(ExaminationReportReplyCase $case, string $adminStatus, ?string $note = null, string $changedBy = 'system'): void
     {
+        $paidServiceStatuses = [
+            Workflow::ADMIN_PAYMENT_COMPLETED,
+            Workflow::ADMIN_REPLY_DRAFTING,
+            Workflow::ADMIN_DRAFT_UNDER_REVIEW,
+            Workflow::ADMIN_CLIENT_APPROVAL_PENDING,
+            Workflow::ADMIN_CHANGES_REQUESTED,
+            Workflow::ADMIN_READY_FOR_FILING,
+            Workflow::ADMIN_FILED_WITH_REGISTRY,
+            Workflow::ADMIN_ACKNOWLEDGMENT_UPLOADED,
+            Workflow::ADMIN_AWAITING_REGISTRY_REVIEW,
+            Workflow::ADMIN_ACCEPTED,
+            Workflow::ADMIN_ACCEPTED_ADVERTISED,
+            Workflow::ADMIN_HEARING_ISSUED,
+            Workflow::ADMIN_FURTHER_ACTION_REQUIRED,
+        ];
+
+        abort_unless(
+            ! in_array($adminStatus, $paidServiceStatuses, true) || $case->payment_status === 'paid',
+            409,
+            'Verified payment is required before this objection-reply stage can begin.',
+        );
+
         $oldAdmin = $case->current_admin_status;
         $oldClient = $case->current_client_stage;
         $clientStage = Workflow::clientStageForAdminStatus($adminStatus);

@@ -295,21 +295,82 @@
 
         <div class="row g-4">
             <div class="col-lg-8">
-                <div class="card shadow-sm border-0 mb-4" id="submitted-data">
-                    <div class="card-header admin-card-header">
-                        <h5 class="mb-0">Matter Overview</h5>
+                @php
+                    $matterOverviewHasErrors = $errors->hasAny([
+                        'brand_name', 'applicant_name', 'applicant_type', 'email', 'phone', 'business_activities',
+                    ]);
+                @endphp
+                <form method="POST" action="{{ route('admin.application.matter-overview.update', $application) }}" class="card shadow-sm border-0 mb-4" id="submitted-data" data-matter-overview-form data-start-editing="{{ $matterOverviewHasErrors ? 'true' : 'false' }}">
+                    @csrf
+                    @method('PUT')
+                    <div class="card-header admin-card-header d-flex justify-content-between align-items-center gap-3">
+                        <div>
+                            <h5 class="mb-1">Matter Overview</h5>
+                            <small>Edit the client-submitted matter details below.</small>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-light btn-sm matter-overview-save" data-matter-overview-toggle>
+                                <i class="bi {{ $matterOverviewHasErrors ? 'bi-check2-circle' : 'bi-pencil-square' }} me-1" data-matter-overview-icon></i>
+                                <span data-matter-overview-label>{{ $matterOverviewHasErrors ? 'Save Changes' : 'Edit' }}</span>
+                            </button>
+                            <button type="button" class="btn btn-outline-light btn-sm matter-overview-cancel" data-matter-overview-cancel @if (! $matterOverviewHasErrors) hidden @endif>
+                                <i class="bi bi-x-lg me-1"></i> Cancel
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body">
+                        <fieldset class="matter-overview-fields" data-matter-overview-fields @disabled(! $matterOverviewHasErrors)>
                         <div class="row g-3">
-                            <div class="col-md-6"><div class="data-block"><span class="data-label">Trademark</span><div class="data-value">{{ $application->brand_name ?? 'N/A' }}</div></div></div>
-                            <div class="col-md-6"><div class="data-block"><span class="data-label">Applicant</span><div class="data-value">{{ $application->applicant_name ?? 'N/A' }}</div></div></div>
-                            <div class="col-md-6"><div class="data-block"><span class="data-label">Applicant Type</span><div class="data-value">{{ ucwords(str_replace('_', ' ', data_get($applicant, 'applicant_type', $application->entity_type ?? 'N/A'))) }}</div></div></div>
-                            <div class="col-md-6"><div class="data-block"><span class="data-label">Email</span><div class="data-value">{{ $application->email ?? $application->user->email }}</div></div></div>
-                            <div class="col-md-6"><div class="data-block"><span class="data-label">Phone</span><div class="data-value">{{ $application->phone ?? 'N/A' }}</div></div></div>
+                            <div class="col-md-6">
+                                <div class="data-block matter-overview-field">
+                                    <label class="data-label" for="matter_brand_name">Trademark</label>
+                                    <input id="matter_brand_name" name="brand_name" class="form-control @error('brand_name') is-invalid @enderror" value="{{ old('brand_name', $application->brand_name) }}" maxlength="255" required>
+                                    @error('brand_name')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="data-block matter-overview-field">
+                                    <label class="data-label" for="matter_applicant_name">Applicant</label>
+                                    <input id="matter_applicant_name" name="applicant_name" class="form-control @error('applicant_name') is-invalid @enderror" value="{{ old('applicant_name', $application->applicant_name) }}" maxlength="255" required>
+                                    @error('applicant_name')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="data-block matter-overview-field">
+                                    <label class="data-label" for="matter_applicant_type">Applicant Type</label>
+                                    <select id="matter_applicant_type" name="applicant_type" class="form-select @error('applicant_type') is-invalid @enderror" required>
+                                        <option value="">Select applicant type</option>
+                                        @foreach (config('uk_site.applicant_types', []) as $value => $label)
+                                            <option value="{{ $value }}" @selected(old('applicant_type', data_get($applicant, 'applicant_type', $application->entity_type)) === $value)>{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                    @error('applicant_type')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="data-block matter-overview-field">
+                                    <label class="data-label" for="matter_email">Email</label>
+                                    <input type="email" id="matter_email" name="email" class="form-control @error('email') is-invalid @enderror" value="{{ old('email', $application->email ?? $application->user->email) }}" maxlength="255" required>
+                                    @error('email')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="data-block matter-overview-field">
+                                    <label class="data-label" for="matter_phone">Phone</label>
+                                    <input type="tel" id="matter_phone" name="phone" class="form-control @error('phone') is-invalid @enderror" value="{{ old('phone', $application->phone) }}" maxlength="16" placeholder="07123 456789" required>
+                                    @error('phone')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                            </div>
                             <div class="col-md-6"><div class="data-block"><span class="data-label">Application Status</span><div class="data-value">{{ $adminStatusLabel }}</div></div></div>
                             <div class="col-md-6"><div class="data-block"><span class="data-label">Submitted Date</span><div class="data-value">{{ $formatDateTime($application->created_at, 'd M Y, h:i A') }}</div></div></div>
                             <div class="col-md-6"><div class="data-block"><span class="data-label">Requested Service</span><div class="data-value">UK Trade Mark Application</div></div></div>
-                            <div class="col-12"><div class="data-block"><span class="data-label">Business Activities</span><div class="data-value">{{ data_get($tradeMark, 'business_activities', $application->goods_services ?? 'N/A') }}</div></div></div>
+                            <div class="col-12">
+                                <div class="data-block matter-overview-field">
+                                    <label class="data-label" for="matter_business_activities">Business Activities</label>
+                                    <textarea id="matter_business_activities" name="business_activities" class="form-control @error('business_activities') is-invalid @enderror" rows="4" maxlength="3000" required>{{ old('business_activities', data_get($tradeMark, 'business_activities', $application->goods_services)) }}</textarea>
+                                    @error('business_activities')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                            </div>
                             @php
                                 $classValues = data_get($tradeMark, 'final_approved_classes', $application->classes) ?: data_get($tradeMark, 'proposed_classes');
                                 $classList = is_array($classValues) ? array_filter($classValues) : array_filter(preg_split('/\s*,\s*/', (string) $classValues));
@@ -317,8 +378,9 @@
                             <div class="col-md-6"><div class="data-block"><span class="data-label">Number of Classes</span><div class="data-value">{{ count($classList) ?: 'Not finalised' }}</div></div></div>
                             <div class="col-md-6"><div class="data-block"><span class="data-label">Estimated Official Fee</span><div class="data-value">{{ filled(data_get($billing, 'ukipo_official_fee')) ? '£'.number_format((float) data_get($billing, 'ukipo_official_fee'), 2) : 'To be confirmed' }}</div></div></div>
                         </div>
+                        </fieldset>
                     </div>
-                </div>
+                </form>
 
                 @if (false && ($oppositionApplication || $oppositionDefenceCase))
                     <div class="card shadow-sm border-0 mb-4">
@@ -1072,6 +1134,57 @@
             word-break: break-word;
         }
 
+        .matter-overview-save {
+            flex: 0 0 auto;
+            border-color: #159b8d !important;
+            background: #159b8d !important;
+            color: #ffffff !important;
+            font-weight: 800;
+            box-shadow: 0 6px 16px rgba(21, 155, 141, 0.24);
+        }
+
+        .matter-overview-save:hover,
+        .matter-overview-save:focus {
+            border-color: #0d7f74 !important;
+            background: #0d7f74 !important;
+            color: #ffffff !important;
+        }
+
+        .matter-overview-field .form-control,
+        .matter-overview-field .form-select {
+            border-color: #cfdae7;
+            color: #1d3557;
+            font-weight: 600;
+        }
+
+        .matter-overview-field textarea.form-control {
+            min-height: 112px;
+            resize: vertical;
+        }
+
+        .matter-overview-field .form-control:focus,
+        .matter-overview-field .form-select:focus {
+            border-color: #2a9d8f;
+            box-shadow: 0 0 0 0.2rem rgba(42, 157, 143, 0.14);
+        }
+
+        .matter-overview-fields {
+            min-width: 0;
+            margin: 0;
+            padding: 0;
+            border: 0;
+        }
+
+        .matter-overview-fields:disabled .form-control,
+        .matter-overview-fields:disabled .form-select {
+            border-color: transparent;
+            background-color: transparent;
+            box-shadow: none;
+            color: #1d3557;
+            cursor: default;
+            opacity: 1;
+        }
+
         .admin-card-header .payment-total-badge {
             display: inline-flex;
             align-items: center;
@@ -1351,6 +1464,58 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            const matterForm = document.querySelector('[data-matter-overview-form]');
+            const matterFields = matterForm?.querySelector('[data-matter-overview-fields]');
+            const matterToggle = matterForm?.querySelector('[data-matter-overview-toggle]');
+            const matterCancel = matterForm?.querySelector('[data-matter-overview-cancel]');
+            const matterLabel = matterForm?.querySelector('[data-matter-overview-label]');
+            const matterIcon = matterForm?.querySelector('[data-matter-overview-icon]');
+
+            if (matterForm && matterFields && matterToggle && matterCancel && matterLabel && matterIcon) {
+                const setMatterEditing = (editing, focusFirst = false) => {
+                    matterFields.disabled = !editing;
+                    matterForm.classList.toggle('is-editing', editing);
+                    matterCancel.hidden = !editing;
+                    matterLabel.textContent = editing ? 'Save Changes' : 'Edit';
+                    matterIcon.classList.toggle('bi-pencil-square', !editing);
+                    matterIcon.classList.toggle('bi-check2-circle', editing);
+
+                    if (editing && focusFirst) {
+                        matterFields.querySelector('input, select, textarea')?.focus();
+                    }
+                };
+
+                setMatterEditing(matterForm.dataset.startEditing === 'true');
+
+                matterToggle.addEventListener('click', () => {
+                    if (matterFields.disabled) {
+                        setMatterEditing(true, true);
+                        return;
+                    }
+
+                    matterForm.requestSubmit();
+                });
+
+                matterCancel.addEventListener('click', () => {
+                    window.location.reload();
+                });
+
+                matterForm.addEventListener('submit', (event) => {
+                    if (matterFields.disabled) {
+                        event.preventDefault();
+                        return;
+                    }
+
+                    if (!window.confirm('Save these changes to the Matter Overview?')) {
+                        event.preventDefault();
+                        return;
+                    }
+
+                    matterToggle.disabled = true;
+                    matterLabel.textContent = 'Saving…';
+                });
+            }
+
             const filingDocCard = document.querySelector('[data-filing-documents-card]');
             const filingDocForm = document.querySelector('[data-filing-doc-review-form]');
             const filingDocSelectToggle = document.querySelector('[data-filing-doc-select-toggle]');

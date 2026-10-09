@@ -48,7 +48,7 @@
                                 <label for="applicant_type">Applicant Type <b>*</b></label>
                                 <select id="applicant_type" name="applicant_type" required class="@error('applicant_type') is-invalid @enderror">
                                     <option value="">Select applicant type</option>
-                                    @foreach (['individual' => 'Individual', 'limited_company' => 'Limited company', 'llp' => 'Limited liability partnership', 'partnership' => 'Partnership', 'charity' => 'Charity', 'joint_applicants' => 'Joint applicants', 'other' => 'Other'] as $value => $label)
+                                    @foreach (config('uk_site.applicant_types', []) as $value => $label)
                                         <option value="{{ $value }}" @selected($oldApplicantType === $value)>{{ $label }}</option>
                                     @endforeach
                                 </select>

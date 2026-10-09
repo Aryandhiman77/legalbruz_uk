@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ConsultationBooking;
+use App\Models\TrademarkSearchReportRequest;
 use Illuminate\Http\Request;
 use App\Support\TrademarkOppositionWorkflow;
 use App\Support\TrademarkWorkflow;
@@ -31,10 +33,18 @@ class DashboardController extends Controller
         $examinationReplyCases = $user->examinationReportReplyCases()
             ->latest()
             ->get();
+        $consultationBookings = Schema::hasTable('consultation_bookings')
+            ? ConsultationBooking::query()->visibleTo($user)->latest()->get()
+            : collect();
+        $trademarkSearchReportRequests = Schema::hasTable('trademark_search_report_requests')
+            ? TrademarkSearchReportRequest::query()->visibleTo($user)->with('documents')->latest()->get()
+            : collect();
         $pendingPayments = $applications->filter(fn ($application) => in_array($application->current_status, [
             TrademarkWorkflow::DRAFT,
             TrademarkWorkflow::PAYMENT_PENDING_FINAL,
-        ]))->count();
+        ]))->count()
+            + $consultationBookings->where('payment_status', 'pending')->count()
+            + $trademarkSearchReportRequests->where('payment_status', 'pending')->count();
         $underReview = $applications->where('current_status', TrademarkWorkflow::UNDER_REVIEW)->count();
         $registered = $applications->filter(function ($application) {
             if (Schema::hasColumn('applications', 'registry_status')) {
@@ -53,6 +63,8 @@ class DashboardController extends Controller
             'trademarkOppositionCases' => $trademarkOppositionCases,
             'trademarkOpposeCases' => $trademarkOpposeCases,
             'examinationReplyCases' => $examinationReplyCases,
+            'consultationBookings' => $consultationBookings,
+            'trademarkSearchReportRequests' => $trademarkSearchReportRequests,
         ]);
     }
 

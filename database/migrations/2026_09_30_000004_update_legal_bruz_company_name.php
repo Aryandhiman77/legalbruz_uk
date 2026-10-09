@@ -49,7 +49,7 @@ return new class extends Migration
                                     'Legal Bruz (LLP)',
                                     'LegalBruz LLP',
                                 ],
-                                'Legal Bruz Pvt. Ltd.',
+                                'Legal Bruz Ltd.',
                                 $row->{$column},
                             );
 

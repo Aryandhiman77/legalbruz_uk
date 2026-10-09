@@ -7,6 +7,8 @@
         $workflow = \App\Support\TrademarkWorkflow::class;
         $isAdminPreview = !empty($adminPreview);
         $dashboardUser = $client ?? Auth::user();
+        $consultationBookings = $consultationBookings ?? collect();
+        $trademarkSearchReportRequests = $trademarkSearchReportRequests ?? collect();
         $trademarkStatusUrl = function ($clientApplication, bool $stageAction = false) use ($isAdminPreview) {
             if ($isAdminPreview) {
                 return route('admin.application.client-action-center', array_filter([
@@ -933,6 +935,9 @@
                     <a href="{{ route('trademark.type-selection') }}" class="dashboard-service-link">
                         <span class="dashboard-service-link-copy"><strong>File a Trademark</strong><small>Start a new application</small></span>
                     </a>
+                    <a href="{{ route('book-call.create') }}" class="dashboard-service-link">
+                        <span class="dashboard-service-link-copy"><strong>Book a Consultation</strong><small>Request a paid call with our team</small></span>
+                    </a>
                 </div>
             </div>
         </div>
@@ -1483,6 +1488,145 @@
                 </div>
             </div>
         @endif
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="dashboard-section-card">
+                    <div class="dashboard-section-head">
+                        <span class="dashboard-section-icon"><i class="fas fa-file-alt"></i></span>
+                        <h5 class="dashboard-section-title">My Trademark Search Reports</h5>
+                    </div>
+                    <div class="dashboard-table-wrap">
+                        @if ($trademarkSearchReportRequests->isNotEmpty())
+                            <div class="table-responsive dashboard-table-box">
+                                <table class="table table-hover mb-0 dashboard-table">
+                                    <thead><tr><th>Brand</th><th>Requested</th><th>Fee</th><th>Payment</th><th>Report Status</th><th>Action</th></tr></thead>
+                                    <tbody>
+                                        @foreach ($trademarkSearchReportRequests as $reportRequest)
+                                            <tr>
+                                                <td><span class="dashboard-primary-text">{{ $reportRequest->brand_name }}</span><span class="dashboard-subtext">Trademark Search Report</span></td>
+                                                <td><span class="dashboard-primary-text">{{ $reportRequest->created_at->timezone(config('app.timezone', 'Europe/London'))->format('d M Y') }}</span></td>
+                                                <td><span class="dashboard-primary-text">£{{ number_format((float) $reportRequest->amount, 2) }}</span></td>
+                                                <td><span class="dashboard-payment-text {{ $reportRequest->payment_status === 'paid' ? 'is-success' : 'is-warning' }}"><i class="fas {{ $reportRequest->payment_status === 'paid' ? 'fa-check-circle' : 'fa-clock' }}"></i> {{ $reportRequest->payment_status === 'paid' ? 'Paid' : 'Pending' }}</span></td>
+                                                <td><span class="dashboard-badge {{ in_array($reportRequest->report_status, ['report_ready', 'completed'], true) ? 'status-blue' : 'status-orange' }}">{{ $reportRequest->report_status_label }}</span></td>
+                                                <td>
+                                                    @if ($isAdminPreview)
+                                                        <span class="dashboard-subtext">Client action</span>
+                                                    @elseif ($reportRequest->payment_status !== 'paid')
+                                                        <a href="{{ route('trademark-search-report.payment', $reportRequest) }}" class="dashboard-action-btn btn-pay"><i class="fas fa-credit-card"></i> Pay Now</a>
+                                                    @elseif ($reportRequest->documents->isNotEmpty())
+                                                        <a href="{{ route('trademark-search-report.success', $reportRequest) }}" class="dashboard-action-btn btn-view"><i class="fas fa-file-download"></i> View Reports ({{ $reportRequest->documents->count() }})</a>
+                                                    @else
+                                                        <a href="{{ route('trademark-search-report.success', $reportRequest) }}" class="dashboard-action-btn btn-view"><i class="fas fa-eye"></i> View Status</a>
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="dashboard-mobile-cards">
+                                @foreach ($trademarkSearchReportRequests as $reportRequest)
+                                    <article class="dashboard-mobile-card dashboard-application-card">
+                                        <div class="dashboard-mobile-card-head">
+                                            <div class="dashboard-mobile-card-main"><span class="dashboard-primary-text">{{ $reportRequest->brand_name }}</span><span class="dashboard-subtext">Trademark Search Report</span></div>
+                                            <span class="dashboard-badge dashboard-application-status {{ in_array($reportRequest->report_status, ['report_ready', 'completed'], true) ? 'status-blue' : 'status-orange' }}">{{ $reportRequest->report_status_label }}</span>
+                                        </div>
+                                        <div class="dashboard-application-detail-list">
+                                            <div class="dashboard-application-detail"><div class="dashboard-application-copy"><span>Requested</span><strong>{{ $reportRequest->created_at->timezone(config('app.timezone', 'Europe/London'))->format('d M Y') }}</strong></div></div>
+                                            <div class="dashboard-application-detail"><div class="dashboard-application-copy"><span>Fee</span><strong>£{{ number_format((float) $reportRequest->amount, 2) }}</strong></div></div>
+                                            <div class="dashboard-application-detail"><div class="dashboard-application-copy"><span>Payment</span><strong class="dashboard-payment-text {{ $reportRequest->payment_status === 'paid' ? 'is-success' : 'is-warning' }}">{{ $reportRequest->payment_status === 'paid' ? 'Paid' : 'Pending' }}</strong></div></div>
+                                        </div>
+                                        @unless ($isAdminPreview)
+                                            <div class="dashboard-mobile-actions">
+                                                @if ($reportRequest->payment_status !== 'paid')
+                                                    <a href="{{ route('trademark-search-report.payment', $reportRequest) }}" class="dashboard-application-primary-action"><i class="fas fa-credit-card"></i> Pay Now <i class="fas fa-chevron-right"></i></a>
+                                                @else
+                                                    @if ($reportRequest->documents->isNotEmpty())
+                                                        <a href="{{ route('trademark-search-report.success', $reportRequest) }}" class="dashboard-application-primary-action"><i class="fas fa-file-download"></i> View Reports ({{ $reportRequest->documents->count() }}) <i class="fas fa-chevron-right"></i></a>
+                                                    @else
+                                                        <a href="{{ route('trademark-search-report.success', $reportRequest) }}" class="dashboard-application-primary-action"><i class="fas fa-eye"></i> View Status <i class="fas fa-chevron-right"></i></a>
+                                                    @endif
+                                                @endif
+                                            </div>
+                                        @endunless
+                                    </article>
+                                @endforeach
+                            </div>
+                        @else
+                            <div class="dashboard-empty-state"><i class="fas fa-search"></i><p>No trademark search reports requested yet.</p><a href="{{ route('trademark-search-report.create') }}" class="btn btn-primary">Request a Search Report</a></div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="dashboard-section-card">
+                    <div class="dashboard-section-head">
+                        <span class="dashboard-section-icon"><i class="fas fa-calendar-check"></i></span>
+                        <h5 class="dashboard-section-title">My Consultation Calls</h5>
+                    </div>
+                    <div class="dashboard-table-wrap">
+                        @if ($consultationBookings->isNotEmpty())
+                            <div class="table-responsive dashboard-table-box">
+                                <table class="table table-hover mb-0 dashboard-table">
+                                    <thead><tr><th>Consultation</th><th>Preferred Slot</th><th>Fee</th><th>Payment</th><th>Status</th><th>Action</th></tr></thead>
+                                    <tbody>
+                                        @foreach ($consultationBookings as $consultation)
+                                            <tr>
+                                                <td><span class="dashboard-primary-text">{{ $consultation->topic_label }}</span><span class="dashboard-subtext">Requested {{ $consultation->created_at->timezone(config('app.timezone', 'Europe/London'))->format('d M Y') }}</span></td>
+                                                <td><span class="dashboard-primary-text">{{ $consultation->preferred_date->format('d M Y') }}</span><span class="dashboard-subtext">{{ $consultation->time_slot_label }}</span></td>
+                                                <td><span class="dashboard-primary-text">£{{ number_format((float) $consultation->amount, 2) }}</span></td>
+                                                <td>
+                                                    <span class="dashboard-payment-text {{ $consultation->payment_status === 'paid' ? 'is-success' : 'is-warning' }}">
+                                                        <i class="fas {{ $consultation->payment_status === 'paid' ? 'fa-check-circle' : 'fa-clock' }}"></i>
+                                                        {{ $consultation->payment_status === 'paid' ? 'Paid' : 'Pending' }}
+                                                    </span>
+                                                </td>
+                                                <td><span class="dashboard-badge {{ $consultation->payment_status === 'paid' ? 'status-blue' : 'status-orange' }}">{{ $consultation->consultation_status_label }}</span></td>
+                                                <td>
+                                                    @if ($consultation->payment_status === 'paid')
+                                                        <a href="{{ route('book-call.success', $consultation) }}" class="dashboard-action-btn btn-view"><i class="fas fa-eye"></i> View Confirmation</a>
+                                                    @else
+                                                        <a href="{{ route('book-call.payment', $consultation) }}" class="dashboard-action-btn btn-pay"><i class="fas fa-credit-card"></i> Pay Now</a>
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="dashboard-mobile-cards">
+                                @foreach ($consultationBookings as $consultation)
+                                    <article class="dashboard-mobile-card dashboard-application-card">
+                                        <div class="dashboard-mobile-card-head">
+                                            <div class="dashboard-mobile-card-main"><span class="dashboard-primary-text">{{ $consultation->topic_label }}</span><span class="dashboard-subtext">Consultation call</span></div>
+                                            <span class="dashboard-badge dashboard-application-status {{ $consultation->payment_status === 'paid' ? 'status-blue' : 'status-orange' }}">{{ $consultation->consultation_status_label }}</span>
+                                        </div>
+                                        <div class="dashboard-application-detail-list">
+                                            <div class="dashboard-application-detail"><div class="dashboard-application-copy"><span>Preferred Date</span><strong>{{ $consultation->preferred_date->format('d M Y') }}</strong></div></div>
+                                            <div class="dashboard-application-detail"><div class="dashboard-application-copy"><span>Preferred Time</span><strong>{{ $consultation->time_slot_label }}</strong></div></div>
+                                            <div class="dashboard-application-detail"><div class="dashboard-application-copy"><span>Fee</span><strong>£{{ number_format((float) $consultation->amount, 2) }}</strong></div></div>
+                                            <div class="dashboard-application-detail"><div class="dashboard-application-copy"><span>Payment</span><strong class="dashboard-payment-text {{ $consultation->payment_status === 'paid' ? 'is-success' : 'is-warning' }}">{{ $consultation->payment_status === 'paid' ? 'Paid' : 'Pending' }}</strong></div></div>
+                                        </div>
+                                        <div class="dashboard-mobile-actions">
+                                            @if ($consultation->payment_status === 'paid')
+                                                <a href="{{ route('book-call.success', $consultation) }}" class="dashboard-application-primary-action"><i class="fas fa-eye"></i> View Confirmation <i class="fas fa-chevron-right"></i></a>
+                                            @else
+                                                <a href="{{ route('book-call.payment', $consultation) }}" class="dashboard-application-primary-action"><i class="fas fa-credit-card"></i> Pay Now <i class="fas fa-chevron-right"></i></a>
+                                            @endif
+                                        </div>
+                                    </article>
+                                @endforeach
+                            </div>
+                        @else
+                            <div class="dashboard-empty-state"><i class="fas fa-calendar-plus"></i><p>No consultation calls booked yet.</p><a href="{{ route('book-call.create') }}" class="btn btn-primary">Book a Consultation</a></div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="row">
             <div class="col-md-12">
                 <div class="dashboard-section-card">

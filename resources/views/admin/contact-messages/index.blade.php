@@ -38,13 +38,29 @@
                 @if ($messages->count())
                     <div class="table-responsive">
                         <table class="table table-hover align-middle admin-list-table">
-                            <thead><tr><th>From</th><th>Business</th><th>Service Interested In</th><th>Received</th><th>Status</th><th></th></tr></thead>
+                            <thead><tr><th>From</th><th>Business</th><th>Service Interested In</th><th>Payment</th><th>Received</th><th>Status</th><th></th></tr></thead>
                             <tbody>
                                 @foreach ($messages as $message)
+                                    @php
+                                        $consultation = $message->consultationBooking;
+                                        $paymentRecord = $consultation;
+                                        $isConsultation = $consultation || in_array($message->service_interested, ['Consultation Call', 'Book a Call'], true);
+                                        $isPaidService = $isConsultation;
+                                    @endphp
                                     <tr>
                                         <td><strong>{{ $message->name }}</strong><br><small class="text-muted">{{ $message->email }}</small></td>
                                         <td>{{ $message->business_name ?: 'Not provided' }}</td>
                                         <td>{{ $message->service_interested ?: $message->subject }}<br><small class="text-muted">{{ Str::limit($message->message, 70) }}</small></td>
+                                        <td>
+                                            @if ($paymentRecord)
+                                                <x-admin-status :status="$paymentRecord->payment_status" />
+                                                <small class="text-muted d-block mt-1">£{{ number_format((float) $paymentRecord->amount, 2) }}</small>
+                                            @elseif ($isPaidService)
+                                                <span class="badge text-bg-light">Not initiated</span>
+                                            @else
+                                                <span class="text-muted">—</span>
+                                            @endif
+                                        </td>
                                         <td><small>{{ $message->created_at->timezone(config('app.timezone', 'Europe/London'))->format('d M Y, h:i A T') }}</small></td>
                                         <td>
                                             <x-admin-status :status="$message->status" />

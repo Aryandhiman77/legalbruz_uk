@@ -15,6 +15,7 @@ class TrademarkPricing extends Model
     public const SEARCH = 'uk_search';
     public const APPLICATION = 'uk_application';
     public const EXAMINATION_RESPONSE = 'uk_examination_response';
+    public const CONSULTATION = 'consultation_call';
 
     private const CACHE_KEY = 'trademark_pricing.active_plans';
 
@@ -54,6 +55,13 @@ class TrademarkPricing extends Model
                 'amount' => 249.00,
                 'is_active' => true,
                 'sort_order' => 3,
+            ],
+            self::CONSULTATION => [
+                'key' => self::CONSULTATION,
+                'label' => 'Consultation Call',
+                'amount' => 25.00,
+                'is_active' => true,
+                'sort_order' => 4,
             ],
             self::INDIVIDUAL => [
                 'key' => self::INDIVIDUAL,
@@ -152,7 +160,7 @@ class TrademarkPricing extends Model
         }
 
         return self::query()
-            ->where('key', self::APPLICATION)
+            ->whereIn('key', [self::SEARCH, self::APPLICATION, self::CONSULTATION])
             ->orderBy('sort_order')
             ->get();
     }

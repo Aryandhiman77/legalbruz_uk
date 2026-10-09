@@ -633,3 +633,4 @@ body.about-body > #app > footer {
         min-height: 0;
     }
 }
+.about-preview-banner{position:sticky;top:0;z-index:1000;display:flex;align-items:center;justify-content:center;gap:10px;padding:10px 18px;background:#fff4cc;color:#6b4d00;border-bottom:1px solid #ead17a;font-size:.82rem}.about-preview-banner strong{font-weight:900}.about-preview-banner span{opacity:.82}

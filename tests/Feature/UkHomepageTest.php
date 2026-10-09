@@ -20,22 +20,30 @@ class UkHomepageTest extends TestCase
             ->assertSee('Protect Your Brand in')
             ->assertSee('UK TRADE MARK SERVICES', false)
             ->assertSee('Your UK filing journey')
-            ->assertSee('Search before committing to a UK application')
+            ->assertSee('Trademark Search Report')
+            ->assertDontSee('Search before committing to a UK application')
             ->assertSee('Your UK Trade Mark Journey')
             ->assertSee('Clear and itemised pricing')
             ->assertSee('UK trade mark FAQs')
-            ->assertSee('href="#trademark-search"', false)
-            ->assertSee('id="trademark-search"', false)
-            ->assertSee('Book a call')
-            ->assertSee('Legal Bruz Pvt. Ltd.')
-            ->assertSee('legal-bruz-pvt-ltd-logo.png', false)
+            ->assertDontSee('id="trademark-search"', false)
+            ->assertSee('Visit Legalbruz India')
+            ->assertSee('href="https://legalbruz.com" target="_blank"', false)
+            ->assertSee('Legal Bruz Ltd.')
+            ->assertDontSee('Legal Bruz Pvt. Ltd.')
+            ->assertSee('legal-bruz-ltd-logo.png', false)
             ->assertSee('£399')
             ->assertDontSee('£149')
             ->assertDontSee('₹')
             ->assertDontSee('Legal Bruz LLP')
             ->assertDontSee('Legal Bruz Private Ltd')
-            ->assertSee('Copyright registration')
-            ->assertSee('Patent registration')
+            ->assertSee('Opposition service')
+            ->assertSee('Examination Report')
+            ->assertSee('Start with opposition service')
+            ->assertSee('Start with examination report')
+            ->assertSee('Careers')
+            ->assertDontSee('Company number, registered address')
+            ->assertDontSee('Copyright registration')
+            ->assertDontSee('Patent registration')
             ->assertSee('Coming soon');
     }
 
@@ -50,7 +58,7 @@ class UkHomepageTest extends TestCase
         ])->get('/')
             ->assertOk()
             ->assertSee('href="https://legalbruz-test.ngrok-free.app/css/home-uk.css"', false)
-            ->assertSee('src="https://legalbruz-test.ngrok-free.app/legal-bruz-pvt-ltd-logo.png"', false)
+            ->assertSee('src="https://legalbruz-test.ngrok-free.app/legal-bruz-ltd-logo.png"', false)
             ->assertDontSee('http://localhost/css/', false);
     }
 
@@ -58,7 +66,7 @@ class UkHomepageTest extends TestCase
     {
         $this->get(route('trademark.search-page'))
             ->assertOk()
-            ->assertSee('legal-bruz-pvt-ltd-logo.png', false)
+            ->assertSee('legal-bruz-ltd-logo.png', false)
             ->assertSee('class="navbar-logo" width="106" height="79"', false)
             ->assertDontSee('sizes="(max-width: 768px) 100vw, 50px"', false);
     }

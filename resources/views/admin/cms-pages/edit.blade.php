@@ -13,7 +13,7 @@
                 <h1>{{ $title }}</h1>
                 <p>Changes are reflected immediately wherever this content is shown.</p>
             </div>
-            <a href="{{ route('admin.cms-pages.index') }}" class="btn btn-outline-light">Back to CMS</a>
+            <a href="{{ route('admin.dashboard') }}#website-cms" class="btn btn-outline-light">Back to Website CMS</a>
         </div>
 
         @if (session('success'))
@@ -37,7 +37,7 @@
             </div>
 
             <div class="cms-edit-actions">
-                <a href="{{ route('admin.cms-pages.index') }}" class="btn btn-outline-secondary">Cancel</a>
+                <a href="{{ route('admin.dashboard') }}#website-cms" class="btn btn-outline-secondary">Cancel</a>
                 <button type="submit" class="btn btn-primary">Save Content</button>
             </div>
         </form>

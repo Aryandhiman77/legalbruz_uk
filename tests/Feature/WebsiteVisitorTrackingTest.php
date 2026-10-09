@@ -49,6 +49,30 @@ class WebsiteVisitorTrackingTest extends TestCase
         $this->assertSame(2, WebsiteServiceVisit::firstOrFail()->page_views);
     }
 
+    public function test_each_active_public_service_is_tracked_separately(): void
+    {
+        $services = [
+            ['trademark.search-page', [], 'trademark_registration'],
+            ['contact', ['service' => 'classification_specification'], 'classification_specification'],
+            ['trademark-search-report.create', [], 'trademark_search_report'],
+            ['examination-reply.landing', [], 'examination_report_reply'],
+            ['trademark.opposition-management', [], 'opposition_management'],
+            ['book-call.create', [], 'consultation_call'],
+        ];
+
+        foreach ($services as [$routeName, $parameters, $serviceKey]) {
+            $this->get(route($routeName, $parameters))->assertOk();
+
+            $this->assertDatabaseHas('website_service_visits', [
+                'service_key' => $serviceKey,
+                'page_views' => 1,
+            ]);
+        }
+
+        $this->assertDatabaseCount('website_visitors', 1);
+        $this->assertDatabaseCount('website_service_visits', count($services));
+    }
+
     public function test_admin_pages_are_not_counted_and_dashboard_displays_visitor_totals(): void
     {
         $this->get(route('landing'))->assertOk();
@@ -67,17 +91,24 @@ class WebsiteVisitorTrackingTest extends TestCase
             ->assertSee('Service leads')
             ->assertSee('Visitors by service')
             ->assertSee('UK Trade Mark Filing')
-            ->assertDontSee('Examination Report Reply')
-            ->assertDontSee('Opposition Management')
+            ->assertSee('Classification &amp; Specification', false)
+            ->assertSee('Trademark Search Report')
+            ->assertSee('Examination Report')
+            ->assertSee('Opposition Service')
+            ->assertSee('Book a Call')
+            ->assertSee(route('admin.contact-messages.index', ['search' => 'Consultation Call']), false)
+            ->assertSee('Objection Replies')
+            ->assertSee('Defence Cases')
+            ->assertSee('Oppose Cases')
             ->assertDontSee('Filed &amp; Stuck Recovery', false);
 
         $this->assertDatabaseCount('website_visitors', 1);
     }
 
-    public function test_legacy_services_are_not_live_on_the_uk_site(): void
+    public function test_opposition_and_examination_are_live_while_stuck_recovery_stays_disabled(): void
     {
         $this->get(route('stuck-trademark.landing'))->assertNotFound();
-        $this->get(route('trademark.opposition-management'))->assertNotFound();
-        $this->get(route('examination-reply.landing'))->assertNotFound();
+        $this->get(route('trademark.opposition-management'))->assertOk()->assertSee('OPTION A')->assertSee('OPTION B');
+        $this->get(route('examination-reply.landing'))->assertOk()->assertSee('Trademark Objection Reply');
     }
 }

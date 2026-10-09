@@ -2,14 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\PaymentVerificationException;
 use App\Models\Application;
 use App\Models\DiscountCoupon;
 use App\Models\Payment;
 use App\Models\TrademarkPricing;
 use App\Services\TrademarkWorkflowService;
+use App\Services\RazorpayPaymentVerifier;
 use App\Support\TrademarkWorkflow;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
@@ -228,7 +231,12 @@ class PaymentController extends Controller
     /**
      * Verify Razorpay payment signature
      */
-    public function verifySignature(Request $request, $applicationId, TrademarkWorkflowService $workflow)
+    public function verifySignature(
+        Request $request,
+        $applicationId,
+        TrademarkWorkflowService $workflow,
+        RazorpayPaymentVerifier $verifier,
+    )
     {
         $application = Application::findOrFail($applicationId);
 
@@ -243,39 +251,55 @@ class PaymentController extends Controller
                 'razorpay_signature' => 'required|string',
             ]);
 
-            // Verify signature manually
             $orderId = $validated['razorpay_order_id'];
             $paymentId = $validated['razorpay_payment_id'];
-            $signature = $validated['razorpay_signature'];
 
-            $secret = config('razorpay.key_secret');
-
-            // Create the expected signature
-            $expectedSignature = hash_hmac('sha256', $orderId . '|' . $paymentId, $secret);
-
-            if ($expectedSignature !== $signature) {
-                throw new \Exception('Invalid payment signature');
-            }
-
-            // Update payment record
             $payment = Payment::where([
                 'application_id' => $applicationId,
-                'reference_number' => $orderId
+                'user_id' => Auth::id(),
+                'reference_number' => $orderId,
             ])->firstOrFail();
 
-            $payment->update([
-                'status' => 'completed',
-                'paid_at' => now(),
-                'transaction_id' => $paymentId,
-            ]);
+            if (in_array($payment->status, ['completed', 'approved'], true)) {
+                if (! hash_equals((string) $payment->transaction_id, $paymentId)) {
+                    throw new PaymentVerificationException('This order is already linked to a different payment.');
+                }
+            } else {
+                if ($payment->status !== 'pending') {
+                    throw new PaymentVerificationException('This payment order is no longer payable.');
+                }
+
+                $verifier->verifyCaptured(
+                    $paymentId,
+                    $orderId,
+                    $validated['razorpay_signature'],
+                    (string) $payment->reference_number,
+                    (int) round((float) $payment->amount * 100),
+                    (string) config('razorpay.currency', 'GBP'),
+                );
+
+                $payment = DB::transaction(function () use ($payment, $paymentId, $workflow, $application) {
+                    $lockedPayment = Payment::query()->lockForUpdate()->findOrFail($payment->id);
+
+                    if (! in_array($lockedPayment->status, ['completed', 'approved'], true)) {
+                        $lockedPayment->update([
+                            'status' => 'completed',
+                            'paid_at' => now(),
+                            'transaction_id' => $paymentId,
+                        ]);
+
+                        if ($this->paymentType($lockedPayment) === 'final') {
+                            $workflow->markFinalPaymentComplete($application->fresh());
+                        } else {
+                            $workflow->markAdvancePaymentComplete($application->fresh());
+                        }
+                    }
+
+                    return $lockedPayment->fresh();
+                });
+            }
 
             $paymentType = $this->paymentType($payment);
-
-            if ($paymentType === 'final') {
-                $workflow->markFinalPaymentComplete($application);
-            } else {
-                $workflow->markAdvancePaymentComplete($application);
-            }
 
             return response()->json([
                 'status' => 'success',
@@ -285,6 +309,11 @@ class PaymentController extends Controller
                 'payment_id' => $payment->id,
                 'redirect_url' => route('trademark.status', $application->id),
             ]);
+        } catch (PaymentVerificationException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Payment verification failed: '.$e->getMessage(),
+            ], $e->httpStatus());
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',

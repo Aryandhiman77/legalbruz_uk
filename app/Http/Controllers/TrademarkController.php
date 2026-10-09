@@ -74,7 +74,7 @@ class TrademarkController extends Controller
             'billing_address' => 'required|string|max:500',
             'billing_email' => 'required|email|max:255',
             'billing_mobile' => ['required', 'string', 'max:30', 'regex:' . self::MOBILE_NUMBER_REGEX],
-            'applicant_type' => 'required|in:individual,limited_company,llp,partnership,charity,other,joint_applicants',
+            'applicant_type' => ['required', Rule::in(array_keys(config('uk_site.applicant_types', [])))],
             'applicant_name' => 'required|string|max:255',
             'company_number' => 'nullable|required_if:applicant_type,limited_company,llp|string|max:40',
             'company_registration_country' => 'nullable|required_if:applicant_type,limited_company,llp|string|max:100',
@@ -794,7 +794,7 @@ HTML;
 HTML;
 
         $html .= '<p>I, <strong>' . htmlspecialchars($user->name) . '</strong>, resident of ______________, ';
-        $html .= 'do hereby authorise and appoint <strong>Legal Bruz Pvt. Ltd.</strong>, ';
+        $html .= 'do hereby authorise and appoint <strong>Legal Bruz Ltd.</strong>, ';
         $html .= 'at the address stated in the engagement letter, ';
         $html .= 'to act as my Attorney in the matter of registration of Trademark bearing ';
         $html .= 'Application No. <strong>' . htmlspecialchars($application->id) . '</strong>.</p>';
