@@ -52,6 +52,7 @@ class AdminDiscountCouponController extends Controller
                 'applies_to' => 'all_services',
                 'applicable_users' => 'all_users',
                 'per_user_limit' => 1,
+                'auto_apply' => true,
                 'show_on_website' => true,
                 'is_active' => true,
             ]),
@@ -113,7 +114,6 @@ class AdminDiscountCouponController extends Controller
             'per_user_limit' => ['nullable', 'integer', 'min:1'],
             'starts_at' => ['nullable', 'date'],
             'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
-            'auto_apply' => ['nullable', 'boolean'],
             'show_on_website' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
         ]);
@@ -122,10 +122,9 @@ class AdminDiscountCouponController extends Controller
         $data['selected_user_ids'] = $data['applicable_users'] === 'specific_users'
             ? collect($data['selected_user_ids'] ?? [])->map(fn ($id) => (int) $id)->unique()->values()->all()
             : null;
-        $data['auto_apply'] = $request->boolean('auto_apply');
-        if (in_array($data['applies_to'], ['trademark_filing', 'all_services'], true)) {
-            $data['auto_apply'] = true;
-        }
+        // Coupons are always applied automatically because the client
+        // checkout intentionally has no manual coupon-code input.
+        $data['auto_apply'] = true;
         $data['stackable'] = false;
         $data['show_on_website'] = $request->boolean('show_on_website');
         $data['is_active'] = $request->boolean('is_active');

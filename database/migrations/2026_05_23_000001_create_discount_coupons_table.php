@@ -22,7 +22,7 @@ return new class extends Migration
             $table->unsignedInteger('per_user_limit')->nullable();
             $table->timestamp('starts_at')->nullable();
             $table->timestamp('ends_at')->nullable();
-            $table->boolean('auto_apply')->default(false);
+            $table->boolean('auto_apply')->default(true);
             $table->boolean('stackable')->default(false);
             $table->boolean('show_on_website')->default(true);
             $table->boolean('is_active')->default(true);

@@ -361,13 +361,6 @@
                                 <div class="coupon-section">
                                     <div class="coupon-section-title">Advanced Options</div>
                                     <div class="form-check mb-3">
-                                        <input type="hidden" name="auto_apply" value="0">
-                                        <input class="form-check-input" type="checkbox" name="auto_apply" value="1"
-                                            id="autoApply" @checked(old('auto_apply', $coupon->auto_apply))>
-                                        <label class="form-check-label fw-bold" for="autoApply">Auto Apply</label>
-                                        <div class="coupon-help">Automatically apply this coupon when conditions are met.</div>
-                                    </div>
-                                    <div class="form-check mb-3">
                                         <input type="hidden" name="show_on_website" value="0">
                                         <input class="form-check-input" type="checkbox" name="show_on_website" value="1"
                                             id="showWebsite" @checked(old('show_on_website', $coupon->show_on_website))>
