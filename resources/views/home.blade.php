@@ -27,7 +27,7 @@
             'name' => 'Legal Bruz',
             'url' => route('landing'),
             'logo' => asset('legal-bruz-ltd-logo.png'),
-            'email' => 'info@legalbruz.com',
+            'email' => 'info@legalbruz.co.uk',
             'sameAs' => collect(config('social_links'))->pluck('url')->values()->all(),
             'address' => [
                 '@type' => 'PostalAddress',

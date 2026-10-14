@@ -33,7 +33,7 @@ class PublicInformationPagesTest extends TestCase
             ->assertSee('Service Interested In')
             ->assertSee('<option value="Examination Report"', false)
             ->assertSee('<option value="Opposition Service"', false)
-            ->assertSee('info@legalbruz.com')
+            ->assertSee('info@legalbruz.co.uk')
             ->assertDontSee('support@legalbruz.com')
             ->assertDontSee('Ambala Office')
             ->assertDontSee('Ambala District Court Office')

@@ -103,7 +103,7 @@
                 <p class="contact-panel-copy">Choose the most convenient way to reach us. We’re available during regular business hours.</p>
                 <div class="contact-detail">
                     <span><i class="bi bi-envelope"></i></span>
-                    <div><strong>Email</strong><a href="mailto:info@legalbruz.com">info@legalbruz.com</a></div>
+                    <div><strong>Email</strong><a href="mailto:info@legalbruz.co.uk">info@legalbruz.co.uk</a></div>
                 </div>
                 <div class="contact-detail">
                     <span><i class="bi bi-geo-alt"></i></span>

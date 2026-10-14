@@ -1,6 +1,6 @@
 @php
     $brandName = config('app.name', 'Legal Bruz Ltd.');
-    $brandEmail = config('mail.from.address', 'info@legalbruz.com');
+    $brandEmail = config('mail.from.address', 'info@legalbruz.co.uk');
     $brandUrl = config('app.url');
     $logoUrl = asset('legal-bruz-ltd-logo.png');
 @endphp

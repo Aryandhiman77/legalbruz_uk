@@ -17,7 +17,7 @@ return new class extends Migration
         DB::table('faqs')
             ->where('answer', 'like', '%support@legalbruz.com%')
             ->update([
-                'answer' => DB::raw("REPLACE(answer, 'support@legalbruz.com', 'info@legalbruz.com')"),
+                'answer' => DB::raw("REPLACE(answer, 'support@legalbruz.com', 'info@legalbruz.co.uk')"),
                 'updated_at' => now(),
             ]);
     }
@@ -25,9 +25,9 @@ return new class extends Migration
     public function down(): void
     {
         DB::table('faqs')
-            ->where('answer', 'like', '%info@legalbruz.com%')
+            ->where('answer', 'like', '%info@legalbruz.co.uk%')
             ->update([
-                'answer' => DB::raw("REPLACE(answer, 'info@legalbruz.com', 'support@legalbruz.com')"),
+                'answer' => DB::raw("REPLACE(answer, 'info@legalbruz.co.uk', 'support@legalbruz.com')"),
                 'updated_at' => now(),
             ]);
 

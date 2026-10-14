@@ -75,7 +75,7 @@ return new class extends Migration
             ],
             [
                 'question' => 'How can I contact the support team?',
-                'answer' => 'Use the Contact page to send us a message, or email info@legalbruz.com. Include your application number when contacting us about an existing matter.',
+                'answer' => 'Use the Contact page to send us a message, or email info@legalbruz.co.uk. Include your application number when contacting us about an existing matter.',
                 'category' => 'Support',
                 'sort_order' => 50,
                 'is_active' => true,

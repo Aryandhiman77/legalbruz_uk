@@ -70,7 +70,7 @@
                         <div class="alert alert-info mt-5">
                             <i class="bi bi-info-circle"></i>
                             <strong>Need Help?</strong> If you're unsure which option applies to you, contact our support
-                            team at <strong>info@legalbruz.com</strong>.
+                            team at <strong>info@legalbruz.co.uk</strong>.
                         </div>
                     </div>
                 </div>
