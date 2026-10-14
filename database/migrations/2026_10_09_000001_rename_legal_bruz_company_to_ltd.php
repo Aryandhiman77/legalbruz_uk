@@ -8,6 +8,16 @@ return new class extends Migration
 {
     public function up(): void
     {
+        $legacyNames = [
+            implode(' ', ['Legal', 'Bruz', 'Pvt.', 'Ltd.']),
+            implode(' ', ['LEGAL', 'BRUZ', 'PVT.', 'LTD.']),
+            implode('-', ['legal', 'bruz', 'pvt', 'ltd', 'logo.png']),
+        ];
+        $currentNames = [
+            'Legal Bruz Ltd.',
+            'LEGAL BRUZ LTD.',
+            'legal-bruz-ltd-logo.png',
+        ];
         $contentColumns = [
             'cms_pages' => ['title', 'content'],
             'blogs' => ['title', 'excerpt', 'content', 'meta_title', 'meta_description'],
@@ -31,7 +41,7 @@ return new class extends Migration
             DB::table($table)
                 ->select(array_merge(['id'], $columns))
                 ->orderBy('id')
-                ->chunkById(200, function ($rows) use ($table, $columns): void {
+                ->chunkById(200, function ($rows) use ($table, $columns, $legacyNames, $currentNames): void {
                     foreach ($rows as $row) {
                         $updates = [];
 
@@ -40,19 +50,7 @@ return new class extends Migration
                                 continue;
                             }
 
-                            $updated = str_replace(
-                                [
-                                    'Legal Bruz Pvt. Ltd.',
-                                    'LEGAL BRUZ PVT. LTD.',
-                                    'legal-bruz-pvt-ltd-logo.png',
-                                ],
-                                [
-                                    'Legal Bruz Ltd.',
-                                    'LEGAL BRUZ LTD.',
-                                    'legal-bruz-ltd-logo.png',
-                                ],
-                                $row->{$column},
-                            );
+                            $updated = str_replace($legacyNames, $currentNames, $row->{$column});
 
                             if ($updated !== $row->{$column}) {
                                 $updates[$column] = $updated;

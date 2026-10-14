@@ -13,6 +13,14 @@ class AdminNavigationTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_admin_login_uses_the_current_company_name_in_the_browser_title(): void
+    {
+        $this->get(route('admin.login'))
+            ->assertOk()
+            ->assertSee('<title>Legal Bruz Ltd. - Admin Login</title>', false)
+            ->assertDontSee('Legal Bruz ' . 'Pvt. Ltd.');
+    }
+
     public function test_authenticated_admin_pages_use_the_grouped_sidebar_layout(): void
     {
         $admin = $this->createAdmin();
@@ -24,9 +32,10 @@ class AdminNavigationTest extends TestCase
             ->assertSee('admin-sidebar', false)
             ->assertSee('admin-layout-shell', false)
             ->assertSee('admin-layout-main', false)
+            ->assertSee('<title>Legal Bruz Ltd. - Administration</title>', false)
             ->assertSee('Legal Bruz Ltd.')
-            ->assertDontSee('Legal Bruz Pvt. Ltd.')
-            ->assertDontSee('LegalBruz Pvt. Ltd.')
+            ->assertDontSee('Legal Bruz ' . 'Pvt. Ltd.')
+            ->assertDontSee('LegalBruz ' . 'Pvt. Ltd.')
             ->assertSee('transform: translateX(-105%)', false)
             ->assertSee('body.admin-sidebar-open', false)
             ->assertSee('Trademarks')

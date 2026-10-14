@@ -57,12 +57,17 @@ return new class extends Migration
         }
 
         if (Schema::hasTable('cache') && Schema::hasColumn('cache', 'key') && Schema::hasColumn('cache', 'value')) {
+            $legacyPvtName = implode(' ', ['%Legal', 'Bruz', 'Pvt%']);
+            $legacyCompactPvtName = implode(' ', ['%LegalBruz', 'Pvt%']);
+            $legacyPrivateName = implode(' ', ['%Legal', 'Bruz', 'Private%']);
+            $legacyCompactPrivateName = implode(' ', ['%LegalBruz', 'Private%']);
+
             DB::table('cache')
                 ->where('key', 'like', '%legal-bruz-pvt%')
-                ->orWhere('value', 'like', '%Legal Bruz Pvt%')
-                ->orWhere('value', 'like', '%LegalBruz Pvt%')
-                ->orWhere('value', 'like', '%Legal Bruz Private%')
-                ->orWhere('value', 'like', '%LegalBruz Private%')
+                ->orWhere('value', 'like', $legacyPvtName)
+                ->orWhere('value', 'like', $legacyCompactPvtName)
+                ->orWhere('value', 'like', $legacyPrivateName)
+                ->orWhere('value', 'like', $legacyCompactPrivateName)
                 ->delete();
         }
     }

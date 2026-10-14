@@ -8,6 +8,14 @@ return new class extends Migration
 {
     public function up(): void
     {
+        $legacyNames = [
+            implode(' ', ['Legal', 'Bruz', 'Private', 'Ltd']),
+            implode(' ', ['LEGAL', 'BRUZ', 'LLP', '(LAW FIRM)']),
+            'Legal Bruz ' . ' LLP',
+            implode(' ', ['Legal', 'Bruz', 'LLP']),
+            'Legal Bruz ' . '(LLP)',
+            implode(' ', ['LegalBruz', 'LLP']),
+        ];
         $publicContent = [
             'cms_pages' => ['title', 'content'],
             'blogs' => ['title', 'excerpt', 'content', 'meta_title', 'meta_description'],
@@ -31,7 +39,7 @@ return new class extends Migration
             DB::table($table)
                 ->select(array_merge(['id'], $columns))
                 ->orderBy('id')
-                ->chunkById(200, function ($rows) use ($table, $columns): void {
+                ->chunkById(200, function ($rows) use ($table, $columns, $legacyNames): void {
                     foreach ($rows as $row) {
                         $updates = [];
 
@@ -40,18 +48,7 @@ return new class extends Migration
                                 continue;
                             }
 
-                            $updated = str_replace(
-                                [
-                                    'Legal Bruz Private Ltd',
-                                    'LEGAL BRUZ LLP (LAW FIRM)',
-                                    'Legal Bruz  LLP',
-                                    'Legal Bruz LLP',
-                                    'Legal Bruz (LLP)',
-                                    'LegalBruz LLP',
-                                ],
-                                'Legal Bruz Ltd.',
-                                $row->{$column},
-                            );
+                            $updated = str_replace($legacyNames, 'Legal Bruz Ltd.', $row->{$column});
 
                             if ($updated !== $row->{$column}) {
                                 $updates[$column] = $updated;

@@ -38,6 +38,6 @@ return new class extends Migration
             || str_contains($content, 'Indian Rupees')
             || str_contains($content, 'Bar Council of India')
             || str_contains($content, 'operating in India')
-            || str_contains($content, 'Legal Bruz  LLP');
+            || str_contains($content, 'Legal Bruz ' . ' LLP');
     }
 };
