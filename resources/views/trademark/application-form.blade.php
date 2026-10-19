@@ -100,7 +100,7 @@
                                     <select class="form-select @error('usage_type') is-invalid @enderror" id="usage_type"
                                         name="usage_type" required>
                                         <option value="">Select usage type</option>
-                                        <option value="india" {{ old('usage_type') === 'india' ? 'selected' : '' }}>India
+                                        <option value="uk" {{ old('usage_type') === 'uk' ? 'selected' : '' }}>United Kingdom
                                             Only</option>
                                         <option value="international"
                                             {{ old('usage_type') === 'international' ? 'selected' : '' }}>International

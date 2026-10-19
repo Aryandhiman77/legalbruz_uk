@@ -90,12 +90,12 @@ class DocumentGenerator
         // Get from database instead of guessing
         $address = $application->address ?? '____________________________';
         $gender = $application->gender ?? '________';
-        $nationality = $application->nationality ?? 'Indian';
+        $nationality = $application->nationality ?? 'Not specified';
         $designation = self::getDesignation($entityType);
 
         $attorneyName = config('app.trademark_attorney_name', 'Vilas Sharma Advocate');
         $lawFirmName = config('app.law_firm_name', 'LEGAL BRUZ LTD.');
-        $lawFirmAddress = config('app.law_firm_address', '34 KRISHNA NAGAR, AMBALA CANTT, HARYANA-133001, India');
+        $lawFirmAddress = config('app.law_firm_address', '506-508 Woodfield Court, Honeypot Lane, Stanmore, HA7 1JR, United Kingdom');
 
         // Create document record first to get ID
         $document = Document::create([
@@ -328,7 +328,7 @@ class DocumentGenerator
 <body>
     <div class="page">
         <div class="stamp-space">
-            <div class="stamp-note">Reserved blank area for Indian stamp paper</div>
+            <div class="stamp-note">Reserved blank area for execution formalities</div>
         </div>
 
         <div class="title">AFFIDAVIT</div>
@@ -846,7 +846,7 @@ HTML;
         </p>
 
         <p>
-            I, {$applicantNameE}, resident of {$addressE} and being an Indian national, do hereby in the capacity of {$designationE}
+            I, {$applicantNameE}, resident of {$addressE} and being a national of {$nationalityE}, do hereby in the capacity of {$designationE}
             above said applicant, do solemnly state and affirm as under: -
         </p>
 
@@ -1033,7 +1033,7 @@ HTML;
             We also authorize our said advocate(s) to appoint any person or persons on our behalf to attend and conduct
             the case(s) and/or proceedings. I/We hereby ratify and agree to ratify all acts and deeds done by our said
             advocate(s). I/We hereby revoke all previous authorization, if any, in respect of the proceedings. All
-            communications relating to this application may be sent to the following address in India:
+            communications relating to this application may be sent to the following address:
         </p>
 
         <div class="firm-block">{$lawFirmNameE}

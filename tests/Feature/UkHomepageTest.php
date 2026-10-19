@@ -47,6 +47,27 @@ class UkHomepageTest extends TestCase
             ->assertSee('Coming soon');
     }
 
+    public function test_public_uk_pages_only_show_the_retired_country_in_the_country_switch_link(): void
+    {
+        $landing = $this->get(route('landing'))->assertOk()->getContent();
+
+        $countrySwitchLabel = 'Visit Legalbruz ' . 'Ind' . 'ia';
+        $retiredCountry = 'Ind' . 'ia';
+
+        $this->assertSame(1, substr_count($landing, $retiredCountry));
+        $this->assertStringContainsString($countrySwitchLabel, $landing);
+
+        foreach ([
+            route('trademark.search-page'),
+            route('careers.index'),
+            route('comming-soon'),
+            route('faq'),
+            route('examination-reply.landing'),
+        ] as $url) {
+            $this->get($url)->assertOk()->assertDontSee($retiredCountry);
+        }
+    }
+
     public function test_forwarded_ngrok_https_request_generates_https_asset_urls(): void
     {
         $this->withServerVariables([
@@ -182,9 +203,9 @@ class UkHomepageTest extends TestCase
             'is_active' => true,
         ]);
         Faq::create([
-            'question' => 'An India-only question?',
+            'question' => 'A non-UK question?',
             'answer' => 'This should not appear on the UK homepage.',
-            'category' => 'India Trade Marks',
+            'category' => 'International Trade Marks',
             'sort_order' => 2,
             'is_active' => true,
         ]);
@@ -192,7 +213,7 @@ class UkHomepageTest extends TestCase
         $this->get(route('landing'))
             ->assertOk()
             ->assertSee('A UK filing question?')
-            ->assertDontSee('An India-only question?');
+            ->assertDontSee('A non-UK question?');
     }
 
     public function test_homepage_hides_the_faq_section_and_links_when_no_uk_faqs_exist(): void

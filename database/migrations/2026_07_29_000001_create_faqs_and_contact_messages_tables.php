@@ -47,9 +47,9 @@ return new class extends Migration
                 'updated_at' => $now,
             ],
             [
-                'question' => 'How long does trademark registration take in India?',
-                'answer' => 'Timelines vary based on examination, objections, oppositions, and Registry processing. Filing can be completed quickly once the required information is ready, but final registration may take several months or longer.',
-                'category' => 'Trademark Registration',
+                'question' => 'How long does UK trade mark registration take?',
+                'answer' => 'Timelines vary depending on UKIPO examination, objections and any opposition. Filing can be completed once the required information is ready, but final registration depends on the issues raised and the applicable response periods.',
+                'category' => 'UK Trade Marks',
                 'sort_order' => 20,
                 'is_active' => true,
                 'created_at' => $now,

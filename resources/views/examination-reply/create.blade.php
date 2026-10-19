@@ -35,7 +35,7 @@
                             <option value="0" @selected(old('filed_through_legalbruz') === '0')>No</option>
                         </select>
                     </div>
-                    <div class="err-field"><label>Date of Receipt or Upload of Examination Report</label><input type="date" name="exam_report_receipt_date" value="{{ old('exam_report_receipt_date') }}" required></div>
+                    <div class="err-field"><label>Date on the Examination Report</label><input type="date" name="exam_report_receipt_date" value="{{ old('exam_report_receipt_date') }}" required><small>Enter the date shown on the UKIPO report. Always check the report for the exact response deadline.</small></div>
                     <div class="err-field err-full"><label>Upload Examination Report PDF</label><input type="file" name="exam_report" accept=".pdf,.jpg,.jpeg,.png" required><small>Please upload the Examination Report. Without it, legal analysis cannot be completed.</small></div>
                     <div class="err-field"><label>Upload TM-A Acknowledgment</label><input type="file" name="tma_acknowledgment" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"></div>
                     <div class="err-field"><label>Upload Logo / Device Mark</label><input type="file" name="logo_device_mark" accept=".pdf,.jpg,.jpeg,.png"></div>

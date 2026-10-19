@@ -53,8 +53,9 @@
                         @error('user_business_name')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
                     <div>
-                        <label class="oppose-label">Mobile Number</label>
-                        <input class="oppose-input @error('mobile_number') is-invalid @enderror" name="mobile_number" value="{{ old('mobile_number') }}" required>
+                        <label class="oppose-label" for="mobile_number">Mobile Number</label>
+                        <input class="oppose-input @error('mobile_number') is-invalid @enderror" id="mobile_number" type="tel" name="mobile_number" value="{{ old('mobile_number', \App\Support\UkMobileNumber::normalizeOrNull(auth()->user()->mobile)) }}" autocomplete="tel" inputmode="tel" maxlength="20" pattern="(?:\+44 ?7|07)(?:[0-9] ?){9}" placeholder="07123 456789" title="Enter a valid UK mobile number" required>
+                        <small>UK mobile numbers only: use 07 or +44 7.</small>
                         @error('mobile_number')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
                     <div>

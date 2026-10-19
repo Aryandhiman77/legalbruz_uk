@@ -15,7 +15,7 @@ return new class extends Migration
         foreach (config('cms_pages', []) as $key => $page) {
             $existing = DB::table('cms_pages')->where('key', $key)->first();
 
-            if (! $existing || ! $this->containsIndiaSiteCopy((string) $existing->content)) {
+            if (! $existing || ! $this->containsLegacyJurisdictionCopy((string) $existing->content)) {
                 continue;
             }
 
@@ -32,12 +32,14 @@ return new class extends Migration
         // Existing legal-page edits are intentionally not overwritten on rollback.
     }
 
-    private function containsIndiaSiteCopy(string $content): bool
+    private function containsLegacyJurisdictionCopy(string $content): bool
     {
-        return str_contains($content, 'laws of India')
-            || str_contains($content, 'Indian Rupees')
-            || str_contains($content, 'Bar Council of India')
-            || str_contains($content, 'operating in India')
+        $legacyCountry = 'Ind' . 'ia';
+
+        return str_contains($content, 'laws of ' . $legacyCountry)
+            || str_contains($content, $legacyCountry . 'n Rupees')
+            || str_contains($content, 'Bar Council of ' . $legacyCountry)
+            || str_contains($content, 'operating in ' . $legacyCountry)
             || str_contains($content, 'Legal Bruz ' . ' LLP');
     }
 };

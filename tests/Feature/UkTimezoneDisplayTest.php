@@ -38,7 +38,7 @@ class UkTimezoneDisplayTest extends TestCase
         $this->assertStringContainsString('15 Jul 2026, 01:00 PM BST', $html);
     }
 
-    public function test_application_sources_do_not_hard_code_indian_time(): void
+    public function test_application_sources_do_not_hard_code_a_non_uk_timezone(): void
     {
         $sourceFiles = collect([
             ...File::allFiles(app_path()),

@@ -194,7 +194,7 @@
                             <div class="admin-field"><span>Deadline</span><strong>{{ $case->reply_deadline->format('d M Y') }} · {{ $case->deadline_status_label }}</strong></div>
                             <div class="admin-field"><span>Client Stage</span><strong>{{ $case->current_client_stage }}</strong></div>
                             <div class="admin-field"><span>Risk</span><strong>{{ $case->risk_level ?: 'Not assessed' }}</strong></div>
-                            <div class="admin-field"><span>Package</span><strong>{{ $case->package_type ?: 'Not assigned' }} {{ $case->package_price ? '· ₹' . number_format((float) $case->package_price, 2) : '' }}</strong></div>
+                            <div class="admin-field"><span>Package</span><strong>{{ $case->package_type ?: 'Not assigned' }} {{ $case->package_price ? '· £' . number_format((float) $case->package_price, 2) : '' }}</strong></div>
                             <div class="admin-field"><span>Payment</span><strong>{{ ucfirst($case->payment_status) }}</strong></div>
                         </div>
                     </div>

@@ -92,14 +92,14 @@
                 <div class="err-hero-content">
                     <div class="err-hero-copy">
                         <span class="err-service-badge"><i class="bi bi-shield-check"></i> Trademark Service</span>
-                        <h1>Trademark Objection Reply in India</h1>
-                        <p>We help you analyse, draft, and file a strong legal reply to the Trademark Examination Report before the deadline.</p>
+                        <h1>UK Trademark Objection Reply</h1>
+                        <p>We help you analyse, draft, and file a strong legal reply to a UKIPO Examination Report before the deadline.</p>
                     </div>
 
                     <div class="err-hero-stats">
                         <div class="err-stat">
                             <span class="err-stat-icon"><i class="bi bi-calendar3"></i></span>
-                            <div><strong>30-Day Deadline</strong><span>Reply within time</span></div>
+                            <div><strong>2-Month Deadline</strong><span>Check your report</span></div>
                         </div>
                         <div class="err-stat">
                             <span class="err-stat-icon"><i class="bi bi-shield-check"></i></span>
@@ -107,7 +107,7 @@
                         </div>
                         <div class="err-stat">
                             <span class="err-stat-icon"><i class="bi bi-bank"></i></span>
-                            <div><strong>Registry Filing</strong><span>With Trademark Office</span></div>
+                            <div><strong>UKIPO Filing</strong><span>With the UK office</span></div>
                         </div>
                     </div>
                 </div>
@@ -122,7 +122,7 @@
                                     <span class="err-title-icon"><i class="bi bi-file-earmark-check"></i></span>
                                     <div>
                                         <h2>Trademark Objection Reply</h2>
-                                        <p>Comprehensive support to address examiner objections and file a well-drafted reply with the Trademark Registry to protect your application from abandonment.</p>
+                                        <p>Comprehensive support to address examiner objections and file a well-drafted reply with the UK Intellectual Property Office (UKIPO).</p>
                                     </div>
                                 </div>
 
@@ -153,8 +153,8 @@
                                     </article>
                                     <article class="err-feature">
                                         <span class="err-feature-icon"><i class="bi bi-send"></i></span>
-                                        <h3>Filing reply with Registry</h3>
-                                        <p>File the reply with the Trademark Registry within the deadline.</p>
+                                        <h3>Filing reply with UKIPO</h3>
+                                        <p>File the reply with UKIPO within the deadline stated in the Examination Report.</p>
                                         <span class="err-feature-arrow"><i class="bi bi-arrow-right"></i></span>
                                     </article>
                                     <article class="err-feature">
@@ -188,7 +188,7 @@
                                 <div class="err-step">
                                     <span class="err-step-icon"><i class="bi bi-bank"></i></span>
                                     <span class="err-step-num">4</span>
-                                    <div><strong>Filing</strong><p>We file the reply with the Trademark Registry.</p></div>
+                                    <div><strong>Filing</strong><p>We file the reply with UKIPO.</p></div>
                                 </div>
                                 <div class="err-step">
                                     <span class="err-step-icon"><i class="bi bi-graph-up-arrow"></i></span>
@@ -225,7 +225,7 @@
                                 </div>
                                 <div class="err-info">
                                     <span class="err-info-icon teal"><i class="bi bi-clock"></i></span>
-                                    <div><strong>Report receipt / upload date</strong><p>Date you received or uploaded the report.</p></div>
+                                    <div><strong>Examination Report date</strong><p>Date shown on the UKIPO Examination Report.</p></div>
                                 </div>
                             </div>
                         </section>
@@ -245,14 +245,14 @@
                         <span class="err-alert-icon"><i class="bi bi-exclamation-triangle-fill"></i></span>
                         <div>
                             <strong>Deadline Alert</strong>
-                            <p>In India, the reply is generally required within one month / 30 days from receipt or upload of the Examination Report, failing which the application may be treated as abandoned.</p>
+                            <p>UKIPO generally allows two months to resolve objections. Always follow the response deadline stated in your Examination Report, as missing it may result in refusal of the application.</p>
                         </div>
                     </section>
                     <section class="err-alert info">
                         <span class="err-alert-icon"><i class="bi bi-info-lg"></i></span>
                         <div>
                             <strong>Important Clarification</strong>
-                            <p>Trademark objection is not trademark opposition. Objection is raised by the Examiner during examination. Opposition is filed by a third party after advertisement in the Trademark Journal.</p>
+                            <p>A trade mark objection is not an opposition. An objection is raised by a UKIPO examiner during examination; an opposition may be filed by a third party after the application is published in the online trade marks journal.</p>
                         </div>
                     </section>
                 </div>

@@ -22,6 +22,7 @@ use App\Services\RazorpayPaymentVerifier;
 use App\Support\PostFilingJourney;
 use App\Support\TrademarkOppositionWorkflow;
 use App\Support\TrademarkWorkflow;
+use App\Support\UkMobileNumber;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -68,6 +69,8 @@ class TrademarkOppositionController extends Controller
 
     public function storeOpposeBasic(Request $request): RedirectResponse
     {
+        $this->normalizeUkMobile($request);
+
         $data = $request->validate([
             'trademark_you_own' => ['required', 'string', 'max:255'],
             'trademark_to_oppose' => ['required', 'string', 'max:255'],
@@ -76,8 +79,10 @@ class TrademarkOppositionController extends Controller
             'conflict_reason' => ['required', 'string', 'max:3000'],
             'opposed_applicant_name' => ['nullable', 'string', 'max:255'],
             'user_business_name' => ['required', 'string', 'max:255'],
-            'mobile_number' => ['required', 'string', 'max:30'],
+            'mobile_number' => ['required', 'string', 'max:30', 'regex:' . UkMobileNumber::REGEX],
             'email' => ['required', 'email', 'max:255'],
+        ], [
+            'mobile_number.regex' => UkMobileNumber::ERROR_MESSAGE,
         ]);
 
         $case = TrademarkOppositionCase::create([
@@ -263,7 +268,7 @@ class TrademarkOppositionController extends Controller
             curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
             curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
                 'amount' => $amountInPaise,
-                'currency' => config('razorpay.currency', 'INR'),
+                'currency' => config('razorpay.currency', 'GBP'),
                 'receipt' => $receipt,
                 'description' => ($case->package_name ?: 'Notice of Opposition Filing Package') . ' - ' . $case->case_number,
                 'notes' => [
@@ -310,10 +315,11 @@ class TrademarkOppositionController extends Controller
                 'status' => 'success',
                 'order_id' => $order['id'],
                 'amount' => $amountInPaise,
-                'currency' => $order['currency'] ?? config('razorpay.currency', 'INR'),
+                'currency' => $order['currency'] ?? config('razorpay.currency', 'GBP'),
                 'key' => $razorpayKeyId,
                 'user_email' => Auth::user()->email,
-                'user_phone' => Auth::user()->phone ?? $case->mobile_number,
+                'user_phone' => UkMobileNumber::normalizeOrNull($case->mobile_number)
+                    ?? UkMobileNumber::normalizeOrNull(Auth::user()->mobile),
                 'user_name' => Auth::user()->name ?? $case->applicant_name,
                 'description' => $case->package_name ?: 'Notice of Opposition Filing Package',
             ]);
@@ -440,14 +446,18 @@ class TrademarkOppositionController extends Controller
 
     public function storeBasic(Request $request): RedirectResponse
     {
+        $this->normalizeUkMobile($request);
+
         $data = $request->validate([
             'applicant_name' => ['required', 'string', 'max:255'],
             'trademark_name' => ['required', 'string', 'max:255'],
             'application_number' => ['required', 'string', 'max:120'],
             'trademark_class' => ['required', 'string', 'max:120'],
-            'mobile_number' => ['required', 'string', 'max:30'],
+            'mobile_number' => ['required', 'string', 'max:30', 'regex:' . UkMobileNumber::REGEX],
             'email' => ['required', 'email', 'max:255'],
             'notice_receipt_date' => ['required', 'date'],
+        ], [
+            'mobile_number.regex' => UkMobileNumber::ERROR_MESSAGE,
         ]);
 
         $receiptDate = Carbon::parse($data['notice_receipt_date'])->startOfDay();
@@ -826,7 +836,7 @@ class TrademarkOppositionController extends Controller
             curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
             curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
                 'amount' => $amountInPaise,
-                'currency' => config('razorpay.currency', 'INR'),
+                'currency' => config('razorpay.currency', 'GBP'),
                 'receipt' => $receipt,
                 'description' => ($case->package_name ?: 'Opposition Defence Package') . ' - ' . $case->case_number,
                 'notes' => [
@@ -875,10 +885,11 @@ class TrademarkOppositionController extends Controller
                 'status' => 'success',
                 'order_id' => $order['id'],
                 'amount' => $amountInPaise,
-                'currency' => $order['currency'] ?? config('razorpay.currency', 'INR'),
+                'currency' => $order['currency'] ?? config('razorpay.currency', 'GBP'),
                 'key' => $razorpayKeyId,
                 'user_email' => Auth::user()->email,
-                'user_phone' => Auth::user()->phone ?? $case->mobile_number,
+                'user_phone' => UkMobileNumber::normalizeOrNull($case->mobile_number)
+                    ?? UkMobileNumber::normalizeOrNull(Auth::user()->mobile),
                 'user_name' => Auth::user()->name ?? $case->applicant_name,
                 'description' => $case->package_name ?: 'Opposition Defence Package',
             ]);
@@ -3584,6 +3595,13 @@ class TrademarkOppositionController extends Controller
             TrademarkOppositionWorkflow::DEFENCE_CASE_FAILED_TO_SUCCEED => TrademarkOppositionWorkflow::APPLICATION_FINAL_RESULT_OPPOSITION_SUCCESSFUL,
             default => null,
         };
+    }
+
+    private function normalizeUkMobile(Request $request): void
+    {
+        $request->merge([
+            'mobile_number' => UkMobileNumber::normalize($request->input('mobile_number')),
+        ]);
     }
 
     private function applyLinkedOppositionDecisionOutcome(TrademarkOppositionCase $case, array $decisionResolution): void

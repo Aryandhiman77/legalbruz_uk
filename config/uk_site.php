@@ -2,7 +2,7 @@
 
 return [
     /*
-    | Legacy India-only case-management services are retained in the codebase so
+    | Legacy jurisdiction-specific case-management services remain in the codebase so
     | historical records remain readable, but they are not offered on the UK site.
     */
     'legacy_services_enabled' => env('UK_LEGACY_SERVICES_ENABLED', false),

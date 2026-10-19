@@ -22,11 +22,6 @@ return [
         'key' => env('RESEND_API_KEY'),
     ],
 
-    'zipcodebase' => [
-        'key' => env('ZIPCODEBASE_API_KEY', '3217f330-56b8-11f1-b40d-2b2135e73d23'),
-        'search_url' => env('ZIPCODEBASE_SEARCH_URL', 'https://app.zipcodebase.com/api/v1/search'),
-    ],
-
     'gemini' => [
         'enabled' => env('GEMINI_ENABLED', true),
         'api_key' => env('GEMINI_API_KEY'),

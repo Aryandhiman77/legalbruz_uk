@@ -47,7 +47,7 @@
                 <strong>Billed To</strong><br>
                 {{ $case->applicant_name ?: $user?->name }}<br>
                 {{ $case->email ?: $user?->email }}<br>
-                {{ $case->mobile_number ?: $user?->phone }}
+                {{ \App\Support\UkMobileNumber::normalizeOrNull($case->mobile_number) ?? \App\Support\UkMobileNumber::normalizeOrNull($user?->mobile) }}
             </td>
             <td width="50%" class="text-right">
                 <strong>{{ $serviceTitle }}</strong><br>
@@ -73,7 +73,7 @@
                     <td>{{ $case->package_name ?: $defaultPackageName }}</td>
                     <td>{{ $case->transaction_id ?: ($case->payment_reference ?: 'N/A') }}</td>
                     <td>{{ $case->paid_at?->timezone(config('app.timezone', 'Europe/London'))->format('d M Y') }}</td>
-                    <td class="text-right">INR {{ number_format($paidAmount, 2) }}</td>
+                    <td class="text-right">GBP {{ number_format($paidAmount, 2) }}</td>
                 </tr>
             </tbody>
         </table>
@@ -86,15 +86,15 @@
                 <table>
                     <tr>
                         <td>Original amount</td>
-                        <td class="text-right">INR {{ number_format($originalAmount, 2) }}</td>
+                        <td class="text-right">GBP {{ number_format($originalAmount, 2) }}</td>
                     </tr>
                     <tr class="discount-row">
                         <td>Discount{{ $case->coupon_label ? ' (' . $case->coupon_label . ')' : '' }}</td>
-                        <td class="text-right">- INR {{ number_format($discountAmount, 2) }}</td>
+                        <td class="text-right">- GBP {{ number_format($discountAmount, 2) }}</td>
                     </tr>
                     <tr>
                         <td class="grand-total">Amount paid</td>
-                        <td class="text-right grand-total">INR {{ number_format($paidAmount, 2) }}</td>
+                        <td class="text-right grand-total">GBP {{ number_format($paidAmount, 2) }}</td>
                     </tr>
                 </table>
             </td>

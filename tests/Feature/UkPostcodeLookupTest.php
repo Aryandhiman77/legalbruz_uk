@@ -136,6 +136,9 @@ class UkPostcodeLookupTest extends TestCase
             ->assertSee('<option value="Authorised Signatory"', false)
             ->assertSee('id="ukTrademarkForm" novalidate', false)
             ->assertSee('client-error')
+            ->assertSee('placeholder="SW1A 1AA"', false)
+            ->assertDontSee('6-digit pincode')
+            ->assertSee('/api/uk-postcodes', false)
             ->assertDontSee('name="gst_number"', false)
             ->assertDontSee('GST Certificate');
 

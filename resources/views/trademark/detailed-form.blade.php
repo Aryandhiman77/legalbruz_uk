@@ -121,13 +121,13 @@
                                         @enderror
                                     </div>
                                     <div class="col-md-4">
-                                        <label for="applicant_pincode" class="form-label required">Pin Code</label>
+                                        <label for="applicant_pincode" class="form-label required">Postcode</label>
                                         <input type="text" id="applicant_pincode" name="applicant_pincode"
                                             class="form-control @error('applicant_pincode') is-invalid @enderror"
                                             value="{{ old('applicant_pincode', $applicant['pin_code'] ?? '') }}"
-                                            inputmode="numeric" maxlength="6" pattern="[0-9]{6}"
-                                            title="Enter a 6-digit pincode"
-                                            oninput="this.value = this.value.replace(/\D/g, '').slice(0, 6)" required>
+                                            maxlength="10" autocomplete="postal-code" placeholder="SW1A 1AA"
+                                            pattern="(?:GIR\s?0AA|[A-Za-z]{1,2}[0-9][A-Za-z0-9]?\s?[0-9][A-Za-z]{2})"
+                                            title="Enter a valid UK postcode" required>
                                         @error('applicant_pincode')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -158,12 +158,11 @@
                                     </div>
                                     <div class="col-md-6">
                                         <label for="applicant_phone" class="form-label required">Mobile Number</label>
-                                        <input type="text" id="applicant_phone" name="applicant_phone"
+                                        <input type="tel" id="applicant_phone" name="applicant_phone"
                                             class="form-control @error('applicant_phone') is-invalid @enderror"
                                             value="{{ old('applicant_phone', $applicant['phone_mobile_number'] ?? $application->phone ?? '') }}"
-                                            inputmode="numeric" maxlength="10" pattern="[6789][0-9]{9}"
-                                            title="Enter a 10-digit Indian mobile number"
-                                            oninput="this.value = this.value.replace(/\D/g, '').slice(0, 10)" required>
+                                            maxlength="20" pattern="(?:\+44|0)7[0-9\s()\-]{9,14}"
+                                            title="Enter a valid UK mobile number beginning with 07 or +44 7" required>
                                         @error('applicant_phone')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -246,13 +245,13 @@
                                         @enderror
                                     </div>
                                     <div class="col-md-4">
-                                        <label for="signatory_pincode" class="form-label required">Pin Code</label>
+                                        <label for="signatory_pincode" class="form-label required">Postcode</label>
                                         <input type="text" id="signatory_pincode" name="signatory_pincode"
                                             class="form-control @error('signatory_pincode') is-invalid @enderror"
                                             value="{{ old('signatory_pincode', $signatory['pin_code'] ?? '') }}"
-                                            inputmode="numeric" maxlength="6" pattern="[0-9]{6}"
-                                            title="Enter a 6-digit pincode"
-                                            oninput="this.value = this.value.replace(/\D/g, '').slice(0, 6)" required>
+                                            maxlength="10" autocomplete="postal-code" placeholder="SW1A 1AA"
+                                            pattern="(?:GIR\s?0AA|[A-Za-z]{1,2}[0-9][A-Za-z0-9]?\s?[0-9][A-Za-z]{2})"
+                                            title="Enter a valid UK postcode" required>
                                         @error('signatory_pincode')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -283,12 +282,11 @@
                                     </div>
                                     <div class="col-md-6">
                                         <label for="signatory_phone" class="form-label">Mobile Number</label>
-                                        <input type="text" id="signatory_phone" name="signatory_phone"
+                                        <input type="tel" id="signatory_phone" name="signatory_phone"
                                             class="form-control @error('signatory_phone') is-invalid @enderror"
                                             value="{{ old('signatory_phone', $signatory['phone_mobile_number'] ?? '') }}"
-                                            inputmode="numeric" maxlength="10" pattern="[6789][0-9]{9}"
-                                            title="Enter a 10-digit Indian mobile number"
-                                            oninput="this.value = this.value.replace(/\D/g, '').slice(0, 10)">
+                                            maxlength="20" pattern="(?:\+44|0)7[0-9\s()\-]{9,14}"
+                                            title="Enter a valid UK mobile number beginning with 07 or +44 7">
                                         @error('signatory_phone')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -363,13 +361,13 @@
                                         @enderror
                                     </div>
                                     <div class="col-md-4">
-                                        <label for="co_applicant_pincode" class="form-label">Pin Code</label>
+                                        <label for="co_applicant_pincode" class="form-label">Postcode</label>
                                         <input type="text" id="co_applicant_pincode" name="co_applicant_pincode"
                                             class="form-control @error('co_applicant_pincode') is-invalid @enderror"
                                             value="{{ old('co_applicant_pincode', $coApplicant['pin_code'] ?? '') }}"
-                                            inputmode="numeric" maxlength="6" pattern="[0-9]{6}"
-                                            title="Enter a 6-digit pincode"
-                                            oninput="this.value = this.value.replace(/\D/g, '').slice(0, 6)">
+                                            maxlength="10" autocomplete="postal-code" placeholder="SW1A 1AA"
+                                            pattern="(?:GIR\s?0AA|[A-Za-z]{1,2}[0-9][A-Za-z0-9]?\s?[0-9][A-Za-z]{2})"
+                                            title="Enter a valid UK postcode">
                                         @error('co_applicant_pincode')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -400,12 +398,11 @@
                                     </div>
                                     <div class="col-md-6">
                                         <label for="co_applicant_mobile" class="form-label">Mobile Number</label>
-                                        <input type="text" id="co_applicant_mobile" name="co_applicant_mobile"
+                                        <input type="tel" id="co_applicant_mobile" name="co_applicant_mobile"
                                             class="form-control @error('co_applicant_mobile') is-invalid @enderror"
                                             value="{{ old('co_applicant_mobile', $coApplicant['mobile_number'] ?? '') }}"
-                                            inputmode="numeric" maxlength="10" pattern="[6789][0-9]{9}"
-                                            title="Enter a 10-digit Indian mobile number"
-                                            oninput="this.value = this.value.replace(/\D/g, '').slice(0, 10)">
+                                            maxlength="20" pattern="(?:\+44|0)7[0-9\s()\-]{9,14}"
+                                            title="Enter a valid UK mobile number beginning with 07 or +44 7">
                                         @error('co_applicant_mobile')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -661,12 +658,11 @@
                                     </div>
                                     <div class="col-md-4">
                                         <label for="billing_mobile" class="form-label required">Mobile Number</label>
-                                        <input type="text" id="billing_mobile" name="billing_mobile"
+                                        <input type="tel" id="billing_mobile" name="billing_mobile"
                                             class="form-control @error('billing_mobile') is-invalid @enderror"
                                             value="{{ old('billing_mobile', $billing['billing_mobile'] ?? '') }}"
-                                            inputmode="numeric" maxlength="10" pattern="[6789][0-9]{9}"
-                                            title="Enter a 10-digit Indian mobile number"
-                                            oninput="this.value = this.value.replace(/\D/g, '').slice(0, 10)" required>
+                                            maxlength="20" pattern="(?:\+44|0)7[0-9\s()\-]{9,14}"
+                                            title="Enter a valid UK mobile number beginning with 07 or +44 7" required>
                                         @error('billing_mobile')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -822,10 +818,10 @@
                 }
 
                 async function loadLocation() {
-                    const pincode = pincodeInput.value.replace(/\D/g, '').slice(0, 6);
+                    const pincode = pincodeInput.value.trim().toUpperCase().replace(/\s+/g, ' ');
                     pincodeInput.value = pincode;
 
-                    if (pincode.length !== 6) {
+                    if (!/^(?:GIR\s?0AA|[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2})$/.test(pincode)) {
                         resetLocationFields(stateSelect, districtSelect);
                         return;
                     }
@@ -834,7 +830,7 @@
                     resetLocationFields(stateSelect, districtSelect, 'Loading...');
 
                     try {
-                        const response = await fetch(`{{ url('/api/indian-postal-codes') }}/${pincode}`, {
+                        const response = await fetch(`{{ url('/api/uk-postcodes') }}/${encodeURIComponent(pincode)}`, {
                             headers: {
                                 'Accept': 'application/json'
                             }
@@ -845,8 +841,8 @@
                             return;
                         }
 
-                        const states = result?.status === 'success' ? uniqueValues(result.states || []) : [];
-                        const districts = result?.status === 'success' ? uniqueValues(result.districts || []) : [];
+                        const states = result?.status === 'success' ? uniqueValues([result.nation]) : [];
+                        const districts = result?.status === 'success' ? uniqueValues([result.town_city]) : [];
 
                         if (!states.length || !districts.length) {
                             resetLocationFields(stateSelect, districtSelect, 'No location found');
@@ -865,7 +861,7 @@
                 pincodeInput.addEventListener('input', loadLocation);
                 pincodeInput.addEventListener('blur', loadLocation);
 
-                if (pincodeInput.value.replace(/\D/g, '').length === 6) {
+                if (/^(?:GIR\s?0AA|[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2})$/i.test(pincodeInput.value.trim())) {
                     loadLocation();
                 }
             }

@@ -2621,14 +2621,14 @@
                                             <div class="opp-use-field">
                                                 <label class="opp-label">Annual Sales (if any)</label>
                                                 <div class="opp-input-group">
-                                                    <span class="opp-input-prefix">₹</span>
+                                                    <span class="opp-input-prefix">£</span>
                                                     <input class="opp-input" type="text" name="annual_sales" value="{{ $annualSalesValue }}" placeholder="Enter amount">
                                                 </div>
                                             </div>
                                             <div class="opp-use-field">
                                                 <label class="opp-label">Marketing Spend (if any)</label>
                                                 <div class="opp-input-group">
-                                                    <span class="opp-input-prefix">₹</span>
+                                                    <span class="opp-input-prefix">£</span>
                                                     <input class="opp-input" type="text" name="marketing_spend" value="{{ $marketingSpendValue }}" placeholder="Enter amount">
                                                 </div>
                                             </div>
@@ -2743,9 +2743,9 @@
                                     </div>
                                     <div class="opp-package-card-price">
                                         @if ($oppositionDiscountAmount > 0)
-                                            <span class="opp-price-original">₹{{ number_format($oppositionOriginalAmount, 2) }}</span>
+                                            <span class="opp-price-original">£{{ number_format($oppositionOriginalAmount, 2) }}</span>
                                         @endif
-                                        <strong>₹<span data-opposition-payable>{{ number_format($oppositionPayableAmount, 2) }}</span></strong>
+                                        <strong>£<span data-opposition-payable>{{ number_format($oppositionPayableAmount, 2) }}</span></strong>
                                     </div>
                                 </div>
                                 @if (!empty($case->included_services))
@@ -2770,7 +2770,7 @@
                                             <input type="radio" name="opposition_discount_coupon_id" value="{{ $coupon->id }}" data-payable-amount="{{ number_format($discountedAmount, 2, '.', '') }}" @checked($oppositionAutoCoupon?->id === $coupon->id)>
                                             <span>
                                                 <span class="opp-coupon-code">{{ $coupon->code }}</span>
-                                                {{ $coupon->discount_label }} · Pay ₹{{ number_format($discountedAmount, 2) }}
+                                                {{ $coupon->discount_label }} · Pay £{{ number_format($discountedAmount, 2) }}
                                             </span>
                                         </label>
                                     @endforeach
@@ -2780,7 +2780,7 @@
                                 @csrf
                                 @include('partials.government-fee-notice')
                                 <label class="opp-payment-consent"><input type="checkbox" name="success_disclaimer" value="1" required><span>I understand Legal Bruz cannot guarantee success in opposition proceedings.</span></label>
-                                <div class="opp-actions"><button class="opp-btn opp-btn-green" type="submit"><i class="bi bi-credit-card"></i> Pay & Continue with ₹<span data-opposition-button-amount>{{ number_format($oppositionPayableAmount, 2) }}</span></button></div>
+                                <div class="opp-actions"><button class="opp-btn opp-btn-green" type="submit"><i class="bi bi-credit-card"></i> Pay & Continue with £<span data-opposition-button-amount>{{ number_format($oppositionPayableAmount, 2) }}</span></button></div>
                             </form>
                         @elseif ($actionType === 'draft')
                             @php
@@ -2903,7 +2903,7 @@
                                 <p>Your opposition defence package payment has been received.</p>
                                 <div class="opp-field">
                                     <span>Opposition Defence Package</span>
-                                    <strong>{{ $case->package_name }} · ₹{{ number_format((float) ($case->paid_amount ?: $case->package_price), 2) }}</strong>
+                                    <strong>{{ $case->package_name }} · £{{ number_format((float) ($case->paid_amount ?: $case->package_price), 2) }}</strong>
                                 </div>
                                 <a class="opp-btn opp-btn-green" href="{{ route('trademark-opposition.payment.invoice', $case) }}" target="_blank"><i class="bi bi-receipt"></i> Download Invoice</a>
                             </div>
@@ -3430,7 +3430,7 @@
             const updateAmountText = () => {
                 const selected = selectedCoupon();
                 const amount = selected?.dataset.payableAmount || form.dataset.amount || '0.00';
-                const formatted = Number(amount).toLocaleString('en-IN', {
+                const formatted = Number(amount).toLocaleString('en-GB', {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                 });
@@ -3452,7 +3452,7 @@
 
                 const confirmed = await confirmClientStageAction({
                     title: 'Proceed to payment?',
-                    text: `You will be redirected to Razorpay checkout for ₹${amountText?.textContent || form.dataset.amount}.`,
+                    text: `You will be redirected to Razorpay checkout for £${amountText?.textContent || form.dataset.amount}.`,
                     confirmButtonText: 'Yes, pay now',
                 });
 

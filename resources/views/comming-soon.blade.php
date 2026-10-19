@@ -300,7 +300,7 @@
                 <h1>Coming <span>Soon</span></h1>
                 
                 <p class="coming-soon-subtitle">
-                    We're crafting something extraordinary. Legal Bruz is preparing to revolutionize trademark registration and IP protection in India. Stay tuned!
+                    We're crafting something extraordinary. Legal Bruz is preparing to simplify trade mark registration and IP protection in the UK. Stay tuned!
                 </p>
 
                 <div class="features-grid">
@@ -344,7 +344,7 @@
                 </div>
 
                 <p class="footer-text">
-                    &copy; 2026 Legal Bruz Ltd. Revolutionizing IPR & Trademark Registration in India.
+                    &copy; 2026 Legal Bruz Ltd. Simplifying IP and trade mark services in the UK.
                 </p>
             </div>
         </div>

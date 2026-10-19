@@ -109,6 +109,12 @@ class WebsiteVisitorTrackingTest extends TestCase
     {
         $this->get(route('stuck-trademark.landing'))->assertNotFound();
         $this->get(route('trademark.opposition-management'))->assertOk()->assertSee('OPTION A')->assertSee('OPTION B');
-        $this->get(route('examination-reply.landing'))->assertOk()->assertSee('Trademark Objection Reply');
+        $this->get(route('examination-reply.landing'))
+            ->assertOk()
+            ->assertSee('UK Trademark Objection Reply')
+            ->assertSee('2-Month Deadline')
+            ->assertSee('UKIPO generally allows two months')
+            ->assertDontSee('30-Day Deadline')
+            ->assertDontSee('one month / 30 days');
     }
 }

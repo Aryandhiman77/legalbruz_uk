@@ -17,6 +17,7 @@ use App\Models\ExaminationReportReplyCase;
 use App\Models\Notification;
 use App\Services\RazorpayPaymentVerifier;
 use App\Support\ExaminationReportReplyWorkflow as Workflow;
+use App\Support\UkMobileNumber;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -61,7 +62,7 @@ class ExaminationReportReplyController extends Controller
             'exam_report_receipt_date' => ['required', 'date', 'after_or_equal:application_filing_date', 'before_or_equal:today'],
         ]);
 
-        $deadline = Carbon::parse($data['exam_report_receipt_date'])->addDays(30);
+        $deadline = Carbon::parse($data['exam_report_receipt_date'])->addMonthsNoOverflow(2);
         $caseData = collect($data)->except([
             'exam_report',
             'tma_acknowledgment',
@@ -326,7 +327,7 @@ class ExaminationReportReplyController extends Controller
             curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
             curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
                 'amount' => $amountInPaise,
-                'currency' => config('razorpay.currency', 'INR'),
+                'currency' => config('razorpay.currency', 'GBP'),
                 'receipt' => $receipt,
                 'description' => 'Examination Report Reply - ' . $case->case_number,
                 'notes' => [
@@ -369,10 +370,11 @@ class ExaminationReportReplyController extends Controller
                 'status' => 'success',
                 'order_id' => $order['id'],
                 'amount' => $amountInPaise,
-                'currency' => config('razorpay.currency', 'INR'),
+                'currency' => config('razorpay.currency', 'GBP'),
                 'key' => $razorpayKeyId,
                 'user_name' => Auth::user()->name,
                 'user_email' => Auth::user()->email,
+                'user_phone' => UkMobileNumber::normalizeOrNull(Auth::user()->mobile),
             ]);
         } catch (\Throwable $exception) {
             return response()->json(['status' => 'error', 'message' => $exception->getMessage()], 500);

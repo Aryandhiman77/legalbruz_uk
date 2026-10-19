@@ -53,9 +53,9 @@ class BlogTest extends TestCase
     public function test_article_outputs_metadata_and_only_manually_supplied_schema(): void
     {
         $blog = $this->createBlog([
-            'seo_title' => 'Indian Trademark Filing Guide',
-            'seo_description' => 'A practical guide to filing and protecting a trademark in India.',
-            'seo_keywords' => 'trademark filing, India trademark',
+            'seo_title' => 'UK Trade Mark Filing Guide',
+            'seo_description' => 'A practical guide to filing and protecting a trade mark in the UK.',
+            'seo_keywords' => 'trade mark filing, UK trade mark',
             'og_title' => 'Trademark Filing Made Clear',
             'og_description' => 'Understand the trademark filing process.',
             'schema_markup' => json_encode([
@@ -69,12 +69,12 @@ class BlogTest extends TestCase
 
         $response->assertOk()
             ->assertSee('<link rel="canonical" href="'.route('blog.show', $blog).'">', false)
-            ->assertSee('Indian Trademark Filing Guide | Legal Bruz')
+            ->assertSee('UK Trade Mark Filing Guide | Legal Bruz')
             ->assertSee('property="og:type" content="article"', false)
             ->assertSee('property="article:published_time"', false)
             ->assertSee('"@type":"BlogPosting"', false)
             ->assertSee('Manual trademark schema')
-            ->assertSee('name="keywords" content="trademark filing, India trademark"', false);
+            ->assertSee('name="keywords" content="trade mark filing, UK trade mark"', false);
 
         $withoutSchema = $this->createBlog(['title' => 'Article Without Schema']);
         $this->get(route('blog.show', $withoutSchema))
@@ -103,7 +103,7 @@ class BlogTest extends TestCase
         $this->actingAs($admin, 'admin')
             ->put(route('admin.blogs.update', $blog), $this->blogPayload([
                 'title' => 'How to Protect Your Brand',
-                'seo_title' => 'How to Protect Your Brand in India',
+                'seo_title' => 'How to Protect Your Brand in the UK',
                 'remove_og_image' => '1',
             ]))
             ->assertRedirect(route('admin.blogs.edit', $blog));
@@ -111,7 +111,7 @@ class BlogTest extends TestCase
         $this->assertDatabaseHas('blogs', [
             'id' => $blog->id,
             'title' => 'How to Protect Your Brand',
-            'seo_title' => 'How to Protect Your Brand in India',
+            'seo_title' => 'How to Protect Your Brand in the UK',
             'og_image_path' => null,
         ]);
 
@@ -179,7 +179,7 @@ class BlogTest extends TestCase
     {
         $admin = $this->createAdmin();
         $content = '<h2>Protecting a growing brand</h2>'
-            .'<p>'.str_repeat('Useful guidance for Indian business owners. ', 5).'</p>'
+            .'<p>'.str_repeat('Useful guidance for UK business owners. ', 5).'</p>'
             .'<script>alert("unsafe")</script>'
             .'<p><a href="javascript:alert(1)" onclick="alert(1)">Read the guide</a></p>';
 
@@ -206,7 +206,7 @@ class BlogTest extends TestCase
     {
         return Blog::create(array_merge([
             'title' => 'A Practical Trademark Guide',
-            'excerpt' => 'A concise introduction to the trademark registration process for Indian businesses.',
+            'excerpt' => 'A concise introduction to the trade mark registration process for UK businesses.',
             'content' => str_repeat("## Trademark protection\n\nUseful guidance for business owners and growing brands.\n\n", 3),
             'category' => 'Trademarks',
             'tags' => ['trademarks', 'brand protection'],
@@ -221,7 +221,7 @@ class BlogTest extends TestCase
     {
         return array_merge([
             'title' => 'A Practical Trademark Guide',
-            'excerpt' => 'A concise introduction to the trademark registration process for Indian businesses.',
+            'excerpt' => 'A concise introduction to the trade mark registration process for UK businesses.',
             'content' => str_repeat("## Trademark protection\n\nUseful guidance for business owners and growing brands.\n\n", 3),
             'category' => 'Trademarks',
             'tags' => 'trademarks, brand protection',

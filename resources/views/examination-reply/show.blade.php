@@ -521,7 +521,7 @@
                         @if ($case->hearing_package_price)
                             <div class="risk-card">
                                 <strong>Hearing Support Package</strong>
-                                <p>₹{{ number_format((float) $case->hearing_package_price, 2) }} · {{ $case->hearing_payment_status === 'paid' ? 'Paid' : 'Payment pending' }}</p>
+                                <p>£{{ number_format((float) $case->hearing_package_price, 2) }} · {{ $case->hearing_payment_status === 'paid' ? 'Paid' : 'Payment pending' }}</p>
                             </div>
                             @include('partials.government-fee-notice')
                         @endif
@@ -732,7 +732,7 @@
                             </label>
 
                             <div class="flowb-pay-actions">
-                                <button class="flowb-btn" type="button" id="payObjectionReply"><i class="bi bi-lock"></i> Pay ₹<span data-objection-pay-amount>{{ number_format($objectionReplyPayableAmount, 2) }}</span> &amp; Continue</button>
+                                <button class="flowb-btn" type="button" id="payObjectionReply"><i class="bi bi-lock"></i> Pay £<span data-objection-pay-amount>{{ number_format($objectionReplyPayableAmount, 2) }}</span> &amp; Continue</button>
                                 <span class="flowb-secure"><i class="bi bi-shield-check"></i> Secure payment</span>
                             </div>
                         </div>
@@ -1068,7 +1068,7 @@
                 const selected = objectionCouponInputs.find((input) => input.checked);
                 const amount = selected?.dataset.payableAmount || @json($objectionReplyPayableAmountForJs);
                 if (objectionPayAmount) {
-                    objectionPayAmount.textContent = Number(amount).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    objectionPayAmount.textContent = Number(amount).toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2});
                 }
             };
             objectionCouponInputs.forEach((input) => input.addEventListener('change', updateObjectionPayAmount));

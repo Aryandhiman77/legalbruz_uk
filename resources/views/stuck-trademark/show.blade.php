@@ -3287,7 +3287,7 @@
                         <div class="client-approval-insights">
                             <div class="client-approval-insight">
                                 <div class="client-approval-insight-label">
-                                    <x-lucide-indian-rupee />
+                                    <span aria-hidden="true">£</span>
                                     Package Fee
                                 </div>
                                 <p class="client-approval-insight-value">
@@ -3500,7 +3500,7 @@
                             <div class="client-approval-insights">
                                 <div class="client-approval-insight">
                                     <div class="client-approval-insight-label">
-                                        <x-lucide-indian-rupee />
+                                        <span aria-hidden="true">£</span>
                                         Quoted Fee
                                     </div>
                                     <p class="client-approval-insight-value">
@@ -3555,7 +3555,7 @@
                             <div class="client-approval-insights">
                                 <div class="client-approval-insight">
                                     <div class="client-approval-insight-label">
-                                        <x-lucide-indian-rupee />
+                                        <span aria-hidden="true">£</span>
                                         Amount Payable
                                     </div>
                                     <p class="client-approval-insight-value">
@@ -4038,7 +4038,7 @@
                                     </div>
                                 </div>
                                 <div class="summary-row">
-                                    <span class="summary-row-icon is-payment"><x-lucide-indian-rupee /></span>
+                                    <span class="summary-row-icon is-payment"><span aria-hidden="true">£</span></span>
                                     <div>
                                         <span class="summary-label">Package Fee:</span>
                                         <p class="summary-value">
@@ -4087,7 +4087,7 @@
                                     </div>
                                 </div>
                                 <div class="summary-row">
-                                    <span class="summary-row-icon is-payment"><x-lucide-indian-rupee /></span>
+                                    <span class="summary-row-icon is-payment"><span aria-hidden="true">£</span></span>
                                     <div>
                                         <span class="summary-label">Package Fee:</span>
                                         <p class="summary-value">{{ $case->execution_fee ? '₹' . number_format((float) $case->execution_fee, 2) : 'Not quoted yet' }}</p>

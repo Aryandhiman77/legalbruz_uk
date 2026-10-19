@@ -42,7 +42,7 @@
                 <strong>Billed To</strong><br>
                 {{ $case->applicant_name ?: $user?->name }}<br>
                 {{ $user?->email }}<br>
-                {{ $user?->phone }}
+                {{ \App\Support\UkMobileNumber::normalizeOrNull($user?->mobile) }}
             </td>
             <td width="50%" class="text-right">
                 <strong>Trademark Objection Reply</strong><br>
@@ -68,7 +68,7 @@
                     <td>{{ $case->package_type ?: 'Trademark Objection Reply Package' }}</td>
                     <td>{{ $case->transaction_id }}</td>
                     <td>{{ $issuedAt->format('d M Y') }}</td>
-                    <td class="text-right">INR {{ number_format($paidAmount, 2) }}</td>
+                    <td class="text-right">GBP {{ number_format($paidAmount, 2) }}</td>
                 </tr>
             </tbody>
         </table>
@@ -79,9 +79,9 @@
             <td width="70%"></td>
             <td width="30%">
                 <table>
-                    <tr><td>Original amount</td><td class="text-right">INR {{ number_format($originalAmount, 2) }}</td></tr>
-                    <tr class="discount-row"><td>Discount{{ $case->coupon_label ? ' (' . $case->coupon_label . ')' : '' }}</td><td class="text-right">- INR {{ number_format($discountAmount, 2) }}</td></tr>
-                    <tr><td class="grand-total">Amount paid</td><td class="text-right grand-total">INR {{ number_format($paidAmount, 2) }}</td></tr>
+                    <tr><td>Original amount</td><td class="text-right">GBP {{ number_format($originalAmount, 2) }}</td></tr>
+                    <tr class="discount-row"><td>Discount{{ $case->coupon_label ? ' (' . $case->coupon_label . ')' : '' }}</td><td class="text-right">- GBP {{ number_format($discountAmount, 2) }}</td></tr>
+                    <tr><td class="grand-total">Amount paid</td><td class="text-right grand-total">GBP {{ number_format($paidAmount, 2) }}</td></tr>
                 </table>
             </td>
         </tr>

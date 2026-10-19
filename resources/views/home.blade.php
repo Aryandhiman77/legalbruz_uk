@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Legal Bruz Ltd. - IPR & Trademark Registration | India's Fastest Platform</title>
+    <title>Legal Bruz Ltd. - UK Trade Mark &amp; Intellectual Property Services</title>
     <link rel="icon" type="image/png" href="{{ asset('legal-bruz-ltd-logo.png') }}">
     <meta name="description" content="Protect your brand with Legal Bruz. Search trademarks, file applications, respond to objections, and manage intellectual property matters online.">
     <meta name="robots" content="index, follow, max-image-preview:large">
@@ -29,14 +29,6 @@
             'logo' => asset('legal-bruz-ltd-logo.png'),
             'email' => 'info@legalbruz.co.uk',
             'sameAs' => collect(config('social_links'))->pluck('url')->values()->all(),
-            'address' => [
-                '@type' => 'PostalAddress',
-                'streetAddress' => '34 Krishna Nagar',
-                'addressLocality' => 'Ambala Cantt',
-                'addressRegion' => 'Haryana',
-                'postalCode' => '133001',
-                'addressCountry' => 'IN',
-            ],
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}
     </script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -1092,11 +1084,6 @@
                         Expert assisted Trademark, Copyright, Patent services with transparent pricing & hassle-free
                         filing.
                     </p>
-                    <!-- <p class="hero-subtitle">
-                        India's fastest IPR platform. File Trademark, Copyright & Patent with expert guidance.
-                        Get approved 50% faster with our hassle-free process.
-                    </p> -->
-
                     <div class="hero-cta">
                         @auth
                             <a href="{{ route('trademark.type-selection') }}" class="btn-hero btn-hero-primary">

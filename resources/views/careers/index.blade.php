@@ -3,7 +3,7 @@
 @section('meta_description', 'Explore open legal, client success, operations, and growth roles at Legal Bruz.')
 @section('canonical_url', route('careers.index'))
 @section('og_title', 'Careers at Legal Bruz')
-@section('og_description', 'Join the team making intellectual property protection simpler for businesses across India.')
+@section('og_description', 'Join the team making intellectual property protection simpler for businesses across the UK.')
 
 @section('content')
     <link rel="stylesheet" href="{{ asset('css/careers.css') }}">
@@ -14,7 +14,7 @@
                 <div>
                     <span class="careers-eyebrow">Careers at Legal Bruz</span>
                     <h1>Do meaningful work.<br><span>Build what’s next.</span></h1>
-                    <p class="careers-hero-copy">Join a team combining legal expertise, thoughtful service, and technology to make intellectual property protection simpler for businesses across India.</p>
+                    <p class="careers-hero-copy">Join a team combining legal expertise, thoughtful service, and technology to make intellectual property protection simpler for businesses across the UK.</p>
                 </div>
             </div>
         </header>

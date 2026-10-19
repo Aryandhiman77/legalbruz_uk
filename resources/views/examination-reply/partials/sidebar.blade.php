@@ -38,11 +38,11 @@
                     <span class="flowb-price-label">Selected Package</span>
                     <strong>{{ $case->package_type ?: 'Trademark Objection Reply' }}</strong>
                     @if ($objectionReplyDiscountAmount > 0)
-                        <span class="flowb-price-original">₹{{ number_format($objectionReplyOriginalAmount, 2) }}</span>
+                        <span class="flowb-price-original">£{{ number_format($objectionReplyOriginalAmount, 2) }}</span>
                     @endif
-                    <span class="flowb-price-amount">₹{{ number_format($objectionReplyPayableAmount, 2) }}</span>
+                    <span class="flowb-price-amount">£{{ number_format($objectionReplyPayableAmount, 2) }}</span>
                     @if ($objectionReplyDiscountAmount > 0)
-                        <p class="flowb-price-description">Discount{{ $case->payment_status === 'paid' && $case->coupon_label ? ' (' . $case->coupon_label . ')' : '' }}: −₹{{ number_format($objectionReplyDiscountAmount, 2) }}</p>
+                        <p class="flowb-price-description">Discount{{ $case->payment_status === 'paid' && $case->coupon_label ? ' (' . $case->coupon_label . ')' : '' }}: −£{{ number_format($objectionReplyDiscountAmount, 2) }}</p>
                     @endif
                     @if ($case->package_description)
                         <p class="flowb-price-description">{{ $case->package_description }}</p>

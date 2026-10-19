@@ -24,7 +24,7 @@ return new class extends Migration
             $table->string('logo_path')->nullable();
             $table->text('description')->nullable();
             $table->string('industry')->nullable();
-            $table->string('usage_type')->nullable(); // india, international, both
+            $table->string('usage_type')->nullable(); // domestic, international, or both
             $table->date('first_use_date')->nullable();
             $table->boolean('currently_selling')->default(false);
             $table->string('website')->nullable();

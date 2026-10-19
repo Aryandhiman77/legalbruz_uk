@@ -168,7 +168,7 @@ class QuickCompanyTrademarkScraper
 
     private function extractStatus(string $pageText): string
     {
-        if (preg_match('/As per IP India,\s*trademark application status is\s+(.+?)\./i', $pageText, $matches)) {
+        if (preg_match('/trademark application status is\s+(.+?)\./i', $pageText, $matches)) {
             return $this->cleanText($matches[1] ?? '');
         }
 

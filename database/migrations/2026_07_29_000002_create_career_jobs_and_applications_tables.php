@@ -85,11 +85,11 @@ return new class extends Migration
             ],
             [
                 'title' => 'Digital Marketing Specialist',
-                'location' => 'India',
+                'location' => 'United Kingdom',
                 'employment_type' => 'Full-time',
                 'workplace_type' => 'Remote',
                 'experience_level' => '2–4 years',
-                'summary' => 'Build campaigns and educational content that help Indian businesses understand and protect their intellectual property.',
+                'summary' => 'Build campaigns and educational content that help UK businesses understand and protect their intellectual property.',
                 'description' => 'You will own performance marketing and content distribution across key digital channels, working closely with leadership to turn complex legal topics into useful, measurable campaigns.',
                 'responsibilities' => "Plan and optimise paid search and social campaigns.\nBuild content calendars with the legal team.\nTrack acquisition, conversion, and campaign performance.\nImprove landing pages through testing and insight.\nMaintain consistent brand messaging across channels.",
                 'requirements' => "2–4 years of hands-on digital marketing experience.\nWorking knowledge of paid media, analytics, SEO, and conversion optimisation.\nStrong copy and communication judgment.\nAbility to turn performance data into practical actions.\nExperience in legal, fintech, or professional services is a plus.",
