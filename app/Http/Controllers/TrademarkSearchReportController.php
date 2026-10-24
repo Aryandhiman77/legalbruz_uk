@@ -2,20 +2,19 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\TrademarkPricing;
-use App\Models\TrademarkSearchReportRequest;
-use App\Models\TrademarkSearchReportDocument;
 use App\Exceptions\PaymentVerificationException;
-use App\Services\RazorpayPaymentVerifier;
+use App\Models\PaymentTransaction;
+use App\Models\TrademarkPricing;
+use App\Models\TrademarkSearchReportDocument;
+use App\Models\TrademarkSearchReportRequest;
+use App\Services\RevolutMerchantService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
-use Throwable;
 
 class TrademarkSearchReportController extends Controller
 {
@@ -60,99 +59,64 @@ class TrademarkSearchReportController extends Controller
         return view('pages.trademark-search-report-payment', compact('reportRequest'));
     }
 
-    public function createOrder(TrademarkSearchReportRequest $reportRequest): JsonResponse
+    public function createOrder(TrademarkSearchReportRequest $reportRequest, RevolutMerchantService $revolut): JsonResponse
     {
         if ($reportRequest->payment_status === 'paid') {
             return response()->json(['status' => 'error', 'message' => 'This report request has already been paid.'], 422);
         }
 
-        $keyId = (string) config('razorpay.key_id');
-        $secret = (string) config('razorpay.key_secret');
-
-        if ($keyId === '' || $secret === '') {
-            return response()->json(['status' => 'error', 'message' => 'Online payment is temporarily unavailable. Please contact us for assistance.'], 503);
-        }
-
         try {
-            $response = Http::withBasicAuth($keyId, $secret)
-                ->acceptJson()
-                ->timeout((int) config('razorpay.timeout', 30))
-                ->post('https://api.razorpay.com/v1/orders', [
-                    'amount' => (int) round((float) $reportRequest->amount * 100),
-                    'currency' => $reportRequest->currency,
-                    'receipt' => 'search_'.$reportRequest->id.'_'.now()->timestamp,
-                    'notes' => [
-                        'report_request_id' => $reportRequest->public_id,
-                        'service' => 'Trademark Search Report',
-                    ],
-                ]);
-        } catch (Throwable) {
-            return response()->json(['status' => 'error', 'message' => 'The payment service is temporarily unavailable. Please try again.'], 502);
-        }
-
-        if (! $response->successful() || blank($response->json('id'))) {
-            return response()->json(['status' => 'error', 'message' => 'The payment order could not be created. Please try again.'], 502);
-        }
-
-        $reportRequest->update(['razorpay_order_id' => $response->json('id')]);
-
-        return response()->json([
-            'status' => 'success',
-            'order_id' => $response->json('id'),
-            'amount' => (int) round((float) $reportRequest->amount * 100),
-            'currency' => $reportRequest->currency,
-            'key' => $keyId,
-            'description' => 'Legal Bruz trademark search report',
-            'name' => $reportRequest->name,
-            'email' => $reportRequest->email,
-            'phone' => $reportRequest->phone,
-        ]);
-    }
-
-    public function verify(Request $request, TrademarkSearchReportRequest $reportRequest, RazorpayPaymentVerifier $verifier): JsonResponse
-    {
-        $validated = $request->validate([
-            'razorpay_payment_id' => ['required', 'string', 'max:255'],
-            'razorpay_order_id' => ['required', 'string', 'max:255'],
-            'razorpay_signature' => ['required', 'string', 'max:255'],
-        ]);
-
-        if ($reportRequest->payment_status === 'paid') {
-            if (! hash_equals((string) $reportRequest->razorpay_order_id, $validated['razorpay_order_id'])
-                || ! hash_equals((string) $reportRequest->transaction_id, $validated['razorpay_payment_id'])) {
-                return response()->json(['status' => 'error', 'message' => 'This report request is already linked to a different payment.'], 422);
-            }
-
-            return response()->json([
-                'status' => 'success',
-                'redirect_url' => route('trademark-search-report.success', $reportRequest),
-            ]);
-        }
-
-        try {
-            $verifier->verifyCaptured(
-                $validated['razorpay_payment_id'],
-                $validated['razorpay_order_id'],
-                $validated['razorpay_signature'],
-                (string) $reportRequest->razorpay_order_id,
-                (int) round((float) $reportRequest->amount * 100),
+            $transaction = $revolut->createHostedOrder(
+                $reportRequest,
+                'trademark_search_report',
+                (float) $reportRequest->amount,
                 $reportRequest->currency,
+                'Legal Bruz trade mark search report',
+                route('trademark-search-report.payment.confirm', $reportRequest),
+                $reportRequest->user_id,
+                $reportRequest->email,
+                ['report_request_id' => $reportRequest->public_id],
             );
         } catch (PaymentVerificationException $exception) {
             return response()->json(['status' => 'error', 'message' => $exception->getMessage()], $exception->httpStatus());
         }
 
-        $reportRequest->update([
-            'payment_status' => 'paid',
-            'report_status' => TrademarkSearchReportRequest::PAYMENT_RECEIVED,
-            'transaction_id' => $validated['razorpay_payment_id'],
-            'paid_at' => now(),
-        ]);
+        $reportRequest->update(['payment_reference' => $transaction->provider_order_id]);
 
         return response()->json([
             'status' => 'success',
-            'redirect_url' => route('trademark-search-report.success', $reportRequest),
+            'order_id' => $transaction->provider_order_id,
+            'checkout_url' => $transaction->checkout_url,
+            'amount' => (int) round((float) $reportRequest->amount * 100),
+            'currency' => $reportRequest->currency,
         ]);
+    }
+
+    public function confirm(TrademarkSearchReportRequest $reportRequest, RevolutMerchantService $revolut): RedirectResponse
+    {
+        if ($reportRequest->payment_status === 'paid') {
+            return redirect()->route('trademark-search-report.success', $reportRequest);
+        }
+
+        $transaction = PaymentTransaction::query()->whereMorphedTo('payable', $reportRequest)->latest('id')->first();
+        if (! $transaction) {
+            return redirect()->route('trademark-search-report.payment', $reportRequest)->with('error', 'No payment order was found.');
+        }
+        try {
+            $transaction = $revolut->verifyCompleted($reportRequest, $transaction->provider_order_id);
+        } catch (PaymentVerificationException $exception) {
+            return redirect()->route('trademark-search-report.payment', $reportRequest)->with('error', $exception->getMessage());
+        }
+
+        $reportRequest->update([
+            'payment_status' => 'paid',
+            'report_status' => TrademarkSearchReportRequest::PAYMENT_RECEIVED,
+            'payment_reference' => $transaction->provider_order_id,
+            'transaction_id' => $transaction->provider_payment_id,
+            'paid_at' => $transaction->paid_at ?? now(),
+        ]);
+
+        return redirect()->route('trademark-search-report.success', $reportRequest)->with('success', 'Payment confirmed successfully.');
     }
 
     public function success(TrademarkSearchReportRequest $reportRequest): View|RedirectResponse

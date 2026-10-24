@@ -32,7 +32,6 @@
     </style>
 
     @if ($reportRequest->payment_status !== 'paid')
-        <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
         <script>
             (() => {
                 const button = document.querySelector('[data-pay-report]');
@@ -46,7 +45,6 @@
 
                 button.addEventListener('click', async () => {
                     errorBox.hidden = true;
-                    if (!window.Razorpay) return showError('Secure checkout could not be loaded. Please refresh and try again.');
                     const original = button.innerHTML;
                     button.disabled = true;
                     button.textContent = 'Preparing secure payment…';
@@ -59,32 +57,8 @@
                         const order = await orderResponse.json();
                         if (!orderResponse.ok || order.status !== 'success') throw new Error(order.message || 'Payment could not be started.');
 
-                        const checkout = new Razorpay({
-                            key: order.key,
-                            amount: order.amount,
-                            currency: order.currency,
-                            name: 'Legal Bruz Ltd.',
-                            description: order.description,
-                            order_id: order.order_id,
-                            prefill: {name: order.name, email: order.email, contact: order.phone},
-                            theme: {color: '#129486'},
-                            handler: async response => {
-                                button.textContent = 'Verifying payment…';
-                                const verifyResponse = await fetch(@json(route('trademark-search-report.payment.verify', $reportRequest)), {
-                                    method: 'POST',
-                                    headers: {'Content-Type':'application/json','Accept':'application/json','X-Requested-With':'XMLHttpRequest','X-CSRF-TOKEN':@json(csrf_token())},
-                                    body: JSON.stringify(response),
-                                });
-                                const verified = await verifyResponse.json();
-                                if (!verifyResponse.ok || verified.status !== 'success') throw new Error(verified.message || 'Payment verification failed.');
-                                window.location.href = verified.redirect_url;
-                            },
-                            modal: {ondismiss: () => {button.disabled = false; button.innerHTML = original;}},
-                        });
-                        checkout.on('payment.failed', response => showError(response.error?.description || 'Payment failed. Please try again.'));
-                        checkout.open();
-                        button.disabled = false;
-                        button.innerHTML = original;
+                        if (!order.checkout_url) throw new Error('Secure checkout URL was not returned.');
+                        window.location.assign(order.checkout_url);
                     } catch (error) {
                         showError(error.message || 'Payment could not be processed.');
                         button.disabled = false;

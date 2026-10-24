@@ -1000,7 +1000,6 @@
     @endif
 
     @if ($case->current_client_stage === $workflow::CLIENT_PRICING_PAYMENT && $case->package_price && $case->payment_status !== 'paid')
-        <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
         <script>
             document.getElementById('payObjectionReply')?.addEventListener('click', async () => {
                 const couponInputs = Array.from(document.querySelectorAll('input[name="objection_reply_discount_coupon_id"]'));
@@ -1032,25 +1031,8 @@
                         button.innerHTML = oldText;
                         return;
                     }
-                    new Razorpay({
-                        key: order.key,
-                        amount: order.amount,
-                        currency: order.currency,
-                        name: 'Legal Bruz',
-                        description: 'Trademark Objection Reply',
-                        order_id: order.order_id,
-                        handler: async function (payment) {
-                            const verify = await fetch(@json(route('examination-reply.payment.verify-signature', $case)), {
-                                method: 'POST',
-                                headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': @json(csrf_token()), 'X-Requested-With': 'XMLHttpRequest'},
-                                body: JSON.stringify(payment)
-                            });
-                            const result = await verify.json();
-                            if (result.status === 'success') window.location.href = result.redirect_url;
-                            else alert(result.message || 'Payment verification failed.');
-                        },
-                        modal: {ondismiss: () => { button.disabled = false; button.innerHTML = oldText; }}
-                    }).open();
+                    if (!order.checkout_url) throw new Error('Secure checkout URL was not returned.');
+                    window.location.assign(order.checkout_url);
                 } catch (error) {
                     alert('Payment checkout could not be started. Please try again.');
                     button.disabled = false;

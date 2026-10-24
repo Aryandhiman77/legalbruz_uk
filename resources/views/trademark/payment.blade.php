@@ -60,10 +60,10 @@
                             <div class="mb-3">
                                 <label class="form-label"><strong>Payment Method</strong></label>
                                 <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="payment_method" value="razorpay"
-                                        id="razorpay" checked required>
-                                    <label class="form-check-label" for="razorpay">
-                                        Razorpay (UPI, Cards, Net Banking)
+                                    <input class="form-check-input" type="radio" name="payment_method" value="revolut"
+                                        id="revolut" checked required>
+                                    <label class="form-check-label" for="revolut">
+                                        Revolut secure checkout
                                     </label>
                                 </div>
                                 <div class="form-check">

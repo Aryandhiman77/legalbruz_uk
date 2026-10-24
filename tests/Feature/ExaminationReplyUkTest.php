@@ -13,11 +13,11 @@ class ExaminationReplyUkTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_examination_reply_payment_prefill_uses_the_registered_uk_mobile_field(): void
+    public function test_examination_reply_uses_revolut_hosted_checkout_without_exposing_customer_phone_data(): void
     {
         $source = file_get_contents(app_path('Http/Controllers/ExaminationReportReplyController.php'));
 
-        $this->assertStringContainsString("UkMobileNumber::normalizeOrNull(Auth::user()->mobile)", $source);
+        $this->assertStringContainsString('RevolutMerchantService $revolut', $source);
         $this->assertStringNotContainsString('Auth::user()->phone', $source);
     }
 

@@ -21,7 +21,7 @@ return new class extends Migration
             $table->char('currency', 3)->default('GBP');
             $table->string('payment_status', 30)->default('pending');
             $table->string('report_status', 40)->default('awaiting_payment');
-            $table->string('razorpay_order_id')->nullable()->index();
+            $table->string('payment_reference')->nullable()->index();
             $table->string('transaction_id')->nullable()->unique();
             $table->timestamp('paid_at')->nullable();
             $table->timestamps();

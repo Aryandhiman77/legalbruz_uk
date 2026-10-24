@@ -474,7 +474,6 @@
     </div>
 
     @if (! $auditIsPaid)
-        <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
         <script>
             document.addEventListener('DOMContentLoaded', () => {
                 const auditPayButton = document.getElementById('audit-pay-button');
@@ -488,7 +487,7 @@
                     return;
                 }
 
-                const formatCurrency = (amount) => `₹${Number(amount || 0).toLocaleString('en-IN', {
+                const formatCurrency = (amount) => `£${Number(amount || 0).toLocaleString('en-GB', {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2
                 })}`;
@@ -553,70 +552,11 @@
                         .then((response) => response.json())
                         .then((data) => {
                             if (data.status !== 'success') {
-                                throw new Error(data.message || 'Unable to create Razorpay order.');
+                                throw new Error(data.message || 'Unable to create Revolut order.');
                             }
 
-                            const checkout = new Razorpay({
-                                key: data.key,
-                                amount: data.amount,
-                                currency: data.currency,
-                                name: '{{ config('app.name') }}',
-                                description: data.description,
-                                order_id: data.order_id,
-                                prefill: {
-                                    name: data.user_name,
-                                    email: data.user_email,
-                                    contact: data.user_phone
-                                },
-                                theme: {
-                                    color: '#2A9D8F'
-                                },
-                                modal: {
-                                    ondismiss: resetButton
-                                },
-                                handler: (response) => {
-                                    window.LegalBruzButtonLoading?.set(auditPayButton, 'Verifying Payment...');
-
-                                    fetch('{{ route('stuck-trademark.audit-payment.verify-signature', $case) }}', {
-                                        method: 'POST',
-                                        headers: {
-                                            'Content-Type': 'application/json',
-                                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                                            'Accept': 'application/json'
-                                        },
-                                        body: JSON.stringify({
-                                            razorpay_payment_id: response.razorpay_payment_id,
-                                            razorpay_order_id: response.razorpay_order_id,
-                                            razorpay_signature: response.razorpay_signature
-                                        })
-                                    })
-                                        .then((verifyResponse) => verifyResponse.json())
-                                        .then((verifyData) => {
-                                            if (verifyData.status !== 'success') {
-                                                throw new Error(verifyData.message || 'Payment verification failed.');
-                                            }
-
-                                            if (window.Swal) {
-                                                Swal.fire({
-                                                    icon: 'success',
-                                                    title: 'Payment Successful',
-                                                    text: 'Your audit package is active. Redirecting...',
-                                                    allowOutsideClick: false
-                                                }).then(() => {
-                                                    window.location.href = verifyData.redirect_url;
-                                                });
-                                            } else {
-                                                window.location.href = verifyData.redirect_url;
-                                            }
-                                        })
-                                        .catch((error) => {
-                                            showPaymentError(error.message);
-                                            resetButton();
-                                        });
-                                }
-                            });
-
-                            checkout.open();
+                            if (!data.checkout_url) throw new Error('Secure checkout URL was not returned.');
+                            window.location.assign(data.checkout_url);
                         })
                         .catch((error) => {
                             showPaymentError(error.message);

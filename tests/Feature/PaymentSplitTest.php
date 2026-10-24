@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Application;
 use App\Models\Payment;
+use App\Models\PaymentTransaction;
 use App\Models\User;
 use App\Support\TrademarkWorkflow;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -23,8 +24,8 @@ class PaymentSplitTest extends TestCase
             ->get(route('payment.show', $application->id))
             ->assertOk()
             ->assertSee('50% Advance Payment')
+            ->assertSee('Full Payment')
             ->assertSee('£199.50')
-            ->assertDontSee('Full Payment')
             ->assertDontSee('Final 50% Balance');
     }
 
@@ -53,9 +54,68 @@ class PaymentSplitTest extends TestCase
             ->assertJsonValidationErrors('payment_type');
     }
 
-    public function test_full_payment_option_cannot_be_created_from_the_order_api(): void
+    public function test_full_payment_option_creates_an_exact_server_verified_order(): void
     {
+        Mail::fake();
+        config([
+            'revolut.secret_key' => 'sk_test_secret',
+            'revolut.environment' => 'sandbox',
+            'revolut.api_version' => '2026-08-17',
+        ]);
+        Http::fake([
+            'sandbox-merchant.revolut.com/api/orders' => Http::response([
+                'id' => 'order_application_full_1',
+                'state' => 'pending',
+                'checkout_url' => 'https://checkout.revolut.test/application-full',
+            ], 201),
+            'sandbox-merchant.revolut.com/api/orders/order_application_full_1' => Http::response([
+                'id' => 'order_application_full_1',
+                'amount' => 39900,
+                'currency' => 'GBP',
+                'state' => 'completed',
+                'payments' => [['id' => 'pay_application_full_1', 'state' => 'completed']],
+            ]),
+        ]);
         [$user, $application] = $this->application(TrademarkWorkflow::DRAFT);
+
+        $this->actingAs($user)
+            ->postJson(route('payment.create-order', $application->id), [
+                'amount' => 1,
+                'payment_type' => 'full',
+            ])
+            ->assertOk()
+            ->assertJson([
+                'status' => 'success',
+                'order_id' => 'order_application_full_1',
+                'amount' => 39900,
+            ]);
+
+        $this->assertDatabaseHas('payments', [
+            'application_id' => $application->id,
+            'payment_type' => 'full',
+            'percentage' => '100%',
+            'amount' => 399,
+            'status' => 'pending',
+        ]);
+        Http::assertSent(fn ($request) => $request['amount'] === 39900
+            && $request['currency'] === 'GBP'
+            && data_get($request->data(), 'metadata.payment_type') === 'full');
+
+        $payment = Payment::where('application_id', $application->id)->latest('id')->firstOrFail();
+        $this->actingAs($user)
+            ->get(route('payment.confirm', ['id' => $application->id, 'payment' => $payment->id]))
+            ->assertRedirect(route('trademark.status', $application->id))
+            ->assertSessionHas('success', 'Full payment verified successfully. Your application has been sent for admin review.');
+
+        $this->assertSame('completed', $payment->fresh()->status);
+        $this->assertSame('pay_application_full_1', $payment->fresh()->transaction_id);
+        $this->assertSame(TrademarkWorkflow::UNDER_REVIEW, $application->fresh()->current_status);
+    }
+
+    public function test_full_payment_cannot_be_created_after_an_advance_payment(): void
+    {
+        [$user, $application] = $this->application(TrademarkWorkflow::UNDER_REVIEW);
+        $this->completedPayment($user, $application, 'advance', 199.50, '50%');
 
         $this->actingAs($user)
             ->postJson(route('payment.create-order', $application->id), [
@@ -80,13 +140,13 @@ class PaymentSplitTest extends TestCase
             ->assertJsonValidationErrors('payment_type');
     }
 
-    public function test_application_is_not_advanced_until_razorpay_confirms_exact_captured_payment(): void
+    public function test_application_is_not_advanced_until_revolut_confirms_exact_completed_payment(): void
     {
         Mail::fake();
         config([
-            'razorpay.key_id' => 'rzp_test_key',
-            'razorpay.key_secret' => 'test_secret',
-            'razorpay.currency' => 'GBP',
+            'revolut.secret_key' => 'sk_test_secret',
+            'revolut.environment' => 'sandbox',
+            'revolut.api_version' => '2026-08-17',
         ]);
 
         [$user, $application] = $this->application(TrademarkWorkflow::DRAFT);
@@ -97,53 +157,50 @@ class PaymentSplitTest extends TestCase
             'total_amount' => 399,
             'payment_type' => 'advance',
             'percentage' => '50%',
-            'payment_method' => 'razorpay',
+            'payment_method' => 'revolut',
             'status' => 'pending',
             'reference_number' => 'order_application_secure_1',
         ]);
-        $signature = hash_hmac('sha256', 'order_application_secure_1|pay_application_secure_1', 'test_secret');
+        PaymentTransaction::create([
+            'user_id' => $user->id,
+            'payable_type' => Payment::class,
+            'payable_id' => $payment->id,
+            'service' => 'trademark_application_advance',
+            'provider' => 'revolut',
+            'provider_order_id' => 'order_application_secure_1',
+            'amount' => 199.50,
+            'currency' => 'GBP',
+            'status' => 'pending',
+        ]);
 
         Http::fake([
-            'api.razorpay.com/v1/payments/pay_application_secure_1' => Http::sequence()
+            'sandbox-merchant.revolut.com/api/orders/order_application_secure_1' => Http::sequence()
                 ->push([
-                    'id' => 'pay_application_secure_1',
-                    'order_id' => 'order_application_secure_1',
+                    'id' => 'order_application_secure_1',
                     'amount' => 1,
                     'currency' => 'GBP',
-                    'status' => 'captured',
-                    'captured' => true,
-                    'amount_refunded' => 0,
+                    'state' => 'completed',
+                    'payments' => [['id' => 'pay_application_secure_1', 'state' => 'completed']],
                 ])
                 ->push([
-                    'id' => 'pay_application_secure_1',
-                    'order_id' => 'order_application_secure_1',
+                    'id' => 'order_application_secure_1',
                     'amount' => 19950,
                     'currency' => 'GBP',
-                    'status' => 'captured',
-                    'captured' => true,
-                    'amount_refunded' => 0,
+                    'state' => 'completed',
+                    'payments' => [['id' => 'pay_application_secure_1', 'state' => 'completed']],
                 ]),
         ]);
 
         $this->actingAs($user)
-            ->postJson(route('payment.verify-signature', $application), [
-                'razorpay_payment_id' => 'pay_application_secure_1',
-                'razorpay_order_id' => 'order_application_secure_1',
-                'razorpay_signature' => $signature,
-            ])
-            ->assertUnprocessable();
+            ->get(route('payment.confirm', ['id' => $application->id, 'payment' => $payment->id]))
+            ->assertRedirect(route('payment.show', $application->id));
 
         $this->assertSame('pending', $payment->fresh()->status);
         $this->assertSame(TrademarkWorkflow::DRAFT, $application->fresh()->current_status);
 
         $this->actingAs($user)
-            ->postJson(route('payment.verify-signature', $application), [
-                'razorpay_payment_id' => 'pay_application_secure_1',
-                'razorpay_order_id' => 'order_application_secure_1',
-                'razorpay_signature' => $signature,
-            ])
-            ->assertOk()
-            ->assertJson(['status' => 'success']);
+            ->get(route('payment.confirm', ['id' => $application->id, 'payment' => $payment->id]))
+            ->assertRedirect(route('trademark.status', $application->id));
 
         $this->assertSame('completed', $payment->fresh()->status);
         $this->assertSame('pay_application_secure_1', $payment->fresh()->transaction_id);
@@ -164,7 +221,7 @@ class PaymentSplitTest extends TestCase
             'discount_amount' => 25,
             'discounted_total_amount' => 349,
             'percentage' => '50%',
-            'payment_method' => 'razorpay',
+            'payment_method' => 'revolut',
             'status' => 'completed',
             'reference_number' => 'order_discount_snapshot',
             'transaction_id' => 'pay_discount_snapshot',
@@ -222,9 +279,9 @@ class PaymentSplitTest extends TestCase
             'total_amount' => 399,
             'payment_type' => $type,
             'percentage' => $percentage,
-            'payment_method' => 'razorpay',
+            'payment_method' => 'revolut',
             'status' => 'completed',
-            'reference_number' => 'test_' . $type . '_' . $application->id,
+            'reference_number' => 'test_'.$type.'_'.$application->id,
             'paid_at' => now(),
         ]);
     }

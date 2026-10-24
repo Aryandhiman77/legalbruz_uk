@@ -2776,7 +2776,7 @@
                                     @endforeach
                                 </div>
                             @endif
-                            <form method="POST" action="{{ route('trademark-opposition.payment', $case) }}" class="js-opposition-payment-form" data-create-order-url="{{ route('trademark-opposition.payment.create-order', $case) }}" data-verify-url="{{ route('trademark-opposition.payment.verify-signature', $case) }}" data-amount="{{ number_format($oppositionPayableAmount, 2, '.', '') }}">
+                            <form method="POST" action="{{ route('trademark-opposition.payment', $case) }}" class="js-opposition-payment-form" data-create-order-url="{{ route('trademark-opposition.payment.create-order', $case) }}" data-amount="{{ number_format($oppositionPayableAmount, 2, '.', '') }}">
                                 @csrf
                                 @include('partials.government-fee-notice')
                                 <label class="opp-payment-consent"><input type="checkbox" name="success_disclaimer" value="1" required><span>I understand Legal Bruz cannot guarantee success in opposition proceedings.</span></label>
@@ -3033,7 +3033,6 @@
         </div>
     @endif
 
-    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <script>
         const showClientFallbackAlert = ({ title, text, confirmButtonText }) => {
             return new Promise((resolve) => {
@@ -3452,7 +3451,7 @@
 
                 const confirmed = await confirmClientStageAction({
                     title: 'Proceed to payment?',
-                    text: `You will be redirected to Razorpay checkout for £${amountText?.textContent || form.dataset.amount}.`,
+                    text: `You will be redirected to Revolut checkout for £${amountText?.textContent || form.dataset.amount}.`,
                     confirmButtonText: 'Yes, pay now',
                 });
 
@@ -3482,57 +3481,8 @@
                         throw new Error(orderData.message || 'Unable to create payment order.');
                     }
 
-                    const razorpay = new Razorpay({
-                        key: orderData.key,
-                        amount: orderData.amount,
-                        currency: orderData.currency,
-                        name: '{{ config('app.name') }}',
-                        description: orderData.description,
-                        order_id: orderData.order_id,
-                        prefill: {
-                            name: orderData.user_name,
-                            email: orderData.user_email,
-                            contact: orderData.user_phone,
-                        },
-                        theme: { color: '#2A9D8F' },
-                        handler: async (paymentResponse) => {
-                            window.LegalBruzButtonLoading?.set(button, 'Verifying payment...');
-                            const verifyResponse = await fetch(form.dataset.verifyUrl, {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'Accept': 'application/json',
-                                    'X-CSRF-TOKEN': form.querySelector('input[name="_token"]')?.value || '',
-                                    'X-Requested-With': 'XMLHttpRequest',
-                                },
-                                body: JSON.stringify(paymentResponse),
-                            });
-                            const verifyData = await verifyResponse.json();
-
-                            if (!verifyResponse.ok || verifyData.status !== 'success') {
-                                throw new Error(verifyData.message || 'Payment verification failed.');
-                            }
-
-                            if (window.Swal) {
-                                await Swal.fire({
-                                    icon: 'success',
-                                    title: 'Payment Successful',
-                                    text: 'Your payment has been received. Redirecting...',
-                                    confirmButtonColor: '#2A9D8F',
-                                });
-                            }
-
-                            window.location.href = verifyData.redirect_url;
-                        },
-                        modal: {
-                            ondismiss: () => {
-                                window.LegalBruzButtonLoading?.reset(button);
-                            },
-                        },
-                    });
-
-                    razorpay.open();
-                    window.LegalBruzButtonLoading?.reset(button);
+                    if (!orderData.checkout_url) throw new Error('Secure checkout URL was not returned.');
+                    window.location.assign(orderData.checkout_url);
                 } catch (error) {
                     if (window.Swal) {
                         Swal.fire({

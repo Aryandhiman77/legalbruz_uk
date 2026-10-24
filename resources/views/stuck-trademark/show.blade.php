@@ -4143,10 +4143,6 @@
         </div>
     </div>
 
-    @if ($case->status === \App\Support\StuckTrademarkWorkflow::EXECUTION_PAYMENT_PENDING && $case->execution_payment_status === 'pending')
-        <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-    @endif
-
     <div class="modal fade recovery-documents-modal" id="recoveryDocumentsModal" tabindex="-1" aria-labelledby="recoveryDocumentsModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-xl">
             <div class="modal-content">
@@ -4345,11 +4341,6 @@
             };
 
             executionPayButton?.addEventListener('click', () => {
-                if (!window.Razorpay) {
-                    showExecutionPaymentError('Razorpay checkout is not available. Please refresh and try again.');
-                    return;
-                }
-
                 const selectedCoupon = document.querySelector('input[name="execution_discount_coupon_id"]:checked');
                 executionPayButton.disabled = true;
                 window.LegalBruzButtonLoading?.set(executionPayButton, 'Creating Order...');
@@ -4368,70 +4359,11 @@
                     .then((response) => response.json())
                     .then((data) => {
                         if (data.status !== 'success') {
-                            throw new Error(data.message || 'Unable to create Razorpay order.');
+                            throw new Error(data.message || 'Unable to create Revolut order.');
                         }
 
-                        const checkout = new Razorpay({
-                            key: data.key,
-                            amount: data.amount,
-                            currency: data.currency,
-                            name: '{{ config('app.name') }}',
-                            description: data.description,
-                            order_id: data.order_id,
-                            prefill: {
-                                name: data.user_name,
-                                email: data.user_email,
-                                contact: data.user_phone
-                            },
-                            theme: {
-                                color: '#2A9D8F'
-                            },
-                            modal: {
-                                ondismiss: resetExecutionPayButton
-                            },
-                            handler: (response) => {
-                                window.LegalBruzButtonLoading?.set(executionPayButton, 'Verifying Payment...');
-
-                                fetch('{{ route('stuck-trademark.execution-payment.verify-signature', $case) }}', {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                                        'Accept': 'application/json'
-                                    },
-                                    body: JSON.stringify({
-                                        razorpay_payment_id: response.razorpay_payment_id,
-                                        razorpay_order_id: response.razorpay_order_id,
-                                        razorpay_signature: response.razorpay_signature
-                                    })
-                                })
-                                    .then((verifyResponse) => verifyResponse.json())
-                                    .then((verifyData) => {
-                                        if (verifyData.status !== 'success') {
-                                            throw new Error(verifyData.message || 'Payment verification failed.');
-                                        }
-
-                                        if (window.Swal) {
-                                            Swal.fire({
-                                                icon: 'success',
-                                                title: 'Payment Successful',
-                                                text: 'Execution work is now active. Redirecting...',
-                                                allowOutsideClick: false
-                                            }).then(() => {
-                                                window.location.href = verifyData.redirect_url;
-                                            });
-                                        } else {
-                                            window.location.href = verifyData.redirect_url;
-                                        }
-                                    })
-                                    .catch((error) => {
-                                        resetExecutionPayButton();
-                                        showExecutionPaymentError(error.message || 'Payment verification failed.');
-                                    });
-                            }
-                        });
-
-                        checkout.open();
+                        if (!data.checkout_url) throw new Error('Secure checkout URL was not returned.');
+                        window.location.assign(data.checkout_url);
                     })
                     .catch((error) => {
                         resetExecutionPayButton();

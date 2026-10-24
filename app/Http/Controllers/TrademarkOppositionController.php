@@ -17,8 +17,9 @@ use App\Models\OppositionDocument;
 use App\Models\OppositionEvidence;
 use App\Models\OppositionGround;
 use App\Models\OppositionRegistryUpdate;
+use App\Models\PaymentTransaction;
 use App\Models\TrademarkOppositionCase;
-use App\Services\RazorpayPaymentVerifier;
+use App\Services\RevolutMerchantService;
 use App\Support\PostFilingJourney;
 use App\Support\TrademarkOppositionWorkflow;
 use App\Support\TrademarkWorkflow;
@@ -40,7 +41,9 @@ use Throwable;
 class TrademarkOppositionController extends Controller
 {
     private const ALLOWED_UPLOADS = 'pdf,jpg,jpeg,png,doc,docx';
+
     private const CLIENT_DOCUMENT_UPLOAD_MAX_KB = 7680;
+
     private const ADMIN_ADDITIONAL_DOCUMENT_TYPES = [
         'legal_review_optional_document',
         'counter_statement_additional_document',
@@ -79,7 +82,7 @@ class TrademarkOppositionController extends Controller
             'conflict_reason' => ['required', 'string', 'max:3000'],
             'opposed_applicant_name' => ['nullable', 'string', 'max:255'],
             'user_business_name' => ['required', 'string', 'max:255'],
-            'mobile_number' => ['required', 'string', 'max:30', 'regex:' . UkMobileNumber::REGEX],
+            'mobile_number' => ['required', 'string', 'max:30', 'regex:'.UkMobileNumber::REGEX],
             'email' => ['required', 'email', 'max:255'],
         ], [
             'mobile_number.regex' => UkMobileNumber::ERROR_MESSAGE,
@@ -88,7 +91,7 @@ class TrademarkOppositionController extends Controller
         $case = TrademarkOppositionCase::create([
             ...$data,
             'user_id' => Auth::id(),
-            'case_number' => 'OPP-B-' . now()->format('Ymd') . '-' . str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT),
+            'case_number' => 'OPP-B-'.now()->format('Ymd').'-'.str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT),
             'flow_type' => TrademarkOppositionWorkflow::FLOW_OPPOSE,
             'applicant_name' => $data['user_business_name'],
             'trademark_name' => $data['trademark_you_own'],
@@ -160,10 +163,10 @@ class TrademarkOppositionController extends Controller
         $messages = [];
         foreach (TrademarkOppositionWorkflow::opposeEvidenceTypes() as $evidenceType => $evidenceLabel) {
             $rules[$evidenceType] = ['nullable', 'array'];
-            $rules[$evidenceType . '.*'] = ['file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:10240'];
-            $messages[$evidenceType . '.*.uploaded'] = $evidenceLabel . ' could not be uploaded. Please keep each file at 10 MB or smaller and try again.';
-            $messages[$evidenceType . '.*.max'] = $evidenceLabel . ' must be 10 MB or smaller.';
-            $messages[$evidenceType . '.*.mimes'] = $evidenceLabel . ' must be a PDF, JPG, PNG, DOC, or DOCX file.';
+            $rules[$evidenceType.'.*'] = ['file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:10240'];
+            $messages[$evidenceType.'.*.uploaded'] = $evidenceLabel.' could not be uploaded. Please keep each file at 10 MB or smaller and try again.';
+            $messages[$evidenceType.'.*.max'] = $evidenceLabel.' must be 10 MB or smaller.';
+            $messages[$evidenceType.'.*.mimes'] = $evidenceLabel.' must be a PDF, JPG, PNG, DOC, or DOCX file.';
         }
 
         $request->validate($rules, $messages);
@@ -178,7 +181,7 @@ class TrademarkOppositionController extends Controller
 
         if ($uploadedCount === 0) {
             return redirect()
-                ->to(route('trademark-opposition.oppose.show', $case) . '#action-center')
+                ->to(route('trademark-opposition.oppose.show', $case).'#action-center')
                 ->with('error', 'Please select at least one evidence document before submitting.');
         }
 
@@ -210,11 +213,11 @@ class TrademarkOppositionController extends Controller
             ->values();
 
         $message = $requiredEvidenceComplete
-            ? $uploadedCount . ' evidence document' . ($uploadedCount === 1 ? '' : 's') . ' uploaded successfully. Your evidence is now waiting for admin review.'
-            : $uploadedCount . ' evidence document' . ($uploadedCount === 1 ? '' : 's') . ' uploaded successfully. Still required: ' . $missingEvidence->join(', ') . '.';
+            ? $uploadedCount.' evidence document'.($uploadedCount === 1 ? '' : 's').' uploaded successfully. Your evidence is now waiting for admin review.'
+            : $uploadedCount.' evidence document'.($uploadedCount === 1 ? '' : 's').' uploaded successfully. Still required: '.$missingEvidence->join(', ').'.';
 
         return redirect()
-            ->to(route('trademark-opposition.oppose.show', $case) . '#action-center')
+            ->to(route('trademark-opposition.oppose.show', $case).'#action-center')
             ->with('success', $message);
     }
 
@@ -223,10 +226,10 @@ class TrademarkOppositionController extends Controller
         $this->authorizeClient($case);
         abort_unless($case->flow_type === TrademarkOppositionWorkflow::FLOW_OPPOSE, 404);
 
-        return back()->with('error', 'Please complete the Razorpay checkout to continue.');
+        return back()->with('error', 'Please complete the Revolut checkout to continue.');
     }
 
-    public function createOpposePaymentOrder(Request $request, TrademarkOppositionCase $case): JsonResponse
+    public function createOpposePaymentOrder(Request $request, TrademarkOppositionCase $case, RevolutMerchantService $revolut): JsonResponse
     {
         $this->authorizeClient($case);
         abort_unless($case->flow_type === TrademarkOppositionWorkflow::FLOW_OPPOSE, 404);
@@ -253,128 +256,62 @@ class TrademarkOppositionController extends Controller
         }
 
         try {
-            $razorpayKeyId = config('razorpay.key_id');
-            $razorpaySecret = config('razorpay.key_secret');
-
-            if (!$razorpayKeyId || !$razorpaySecret) {
-                throw new \Exception('Razorpay credentials are not configured.');
-            }
-
-            $amountInPaise = (int) round($amount * 100);
-            $receipt = 'opp_flow_b_' . $case->id . '_' . time();
-
-            $ch = curl_init('https://api.razorpay.com/v1/orders');
-            curl_setopt($ch, CURLOPT_USERPWD, "$razorpayKeyId:$razorpaySecret");
-            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
-                'amount' => $amountInPaise,
-                'currency' => config('razorpay.currency', 'GBP'),
-                'receipt' => $receipt,
-                'description' => ($case->package_name ?: 'Notice of Opposition Filing Package') . ' - ' . $case->case_number,
-                'notes' => [
-                    'case_id' => (string) $case->id,
-                    'case_number' => (string) $case->case_number,
-                    'payment_type' => 'opposition_notice_filing_package',
-                    'original_amount' => (string) $pricing['original_amount'],
-                    'discount_amount' => (string) $pricing['discount_amount'],
-                    'coupon' => (string) ($pricing['coupon_label'] ?? ''),
-                ],
-            ]));
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $curlError = curl_error($ch);
-            curl_close($ch);
-
-            if ($response === false || $curlError) {
-                throw new \Exception($curlError ?: 'Unable to contact Razorpay.');
-            }
-            if (!in_array($httpCode, [200, 201], true)) {
-                throw new \Exception('Failed to create Razorpay order.');
-            }
-
-            $order = json_decode($response, true);
-            if (!is_array($order) || empty($order['id'])) {
-                throw new \Exception('Razorpay returned an invalid order response.');
-            }
-
-            $orders = $request->session()->get('trademark_opposition_oppose_payment_orders', []);
-            $orders[$order['id']] = [
-                'case_id' => $case->id,
-                'amount' => $amountInPaise,
-                'original_amount' => $pricing['original_amount'],
-                'payable_amount' => $pricing['payable_amount'],
-                'discount_amount' => $pricing['discount_amount'],
-                'coupon_label' => $pricing['coupon_label'],
-            ];
-            $request->session()->put('trademark_opposition_oppose_payment_orders', $orders);
+            $transaction = $revolut->createHostedOrder(
+                $case,
+                'opposition_filing',
+                $amount,
+                (string) config('revolut.currency', 'GBP'),
+                ($case->package_name ?: 'Notice of Opposition Filing Package').' - '.$case->case_number,
+                route('trademark-opposition.oppose.payment.confirm', $case),
+                Auth::id(),
+                Auth::user()->email,
+                array_merge($pricing, ['case_number' => $case->case_number]),
+            );
 
             return response()->json([
                 'status' => 'success',
-                'order_id' => $order['id'],
-                'amount' => $amountInPaise,
-                'currency' => $order['currency'] ?? config('razorpay.currency', 'GBP'),
-                'key' => $razorpayKeyId,
-                'user_email' => Auth::user()->email,
-                'user_phone' => UkMobileNumber::normalizeOrNull($case->mobile_number)
-                    ?? UkMobileNumber::normalizeOrNull(Auth::user()->mobile),
-                'user_name' => Auth::user()->name ?? $case->applicant_name,
+                'order_id' => $transaction->provider_order_id,
+                'checkout_url' => $transaction->checkout_url,
+                'amount' => (int) round($amount * 100),
+                'currency' => $transaction->currency,
                 'description' => $case->package_name ?: 'Notice of Opposition Filing Package',
             ]);
+        } catch (PaymentVerificationException $e) {
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], $e->httpStatus());
         } catch (Throwable $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Failed to create payment order: ' . $e->getMessage(),
+                'message' => 'Failed to create payment order: '.$e->getMessage(),
             ], 500);
         }
     }
 
-    public function verifyOpposePaymentSignature(Request $request, TrademarkOppositionCase $case, RazorpayPaymentVerifier $verifier): JsonResponse
+    public function confirmOpposePayment(TrademarkOppositionCase $case, RevolutMerchantService $revolut): RedirectResponse
     {
         $this->authorizeClient($case);
         abort_unless($case->flow_type === TrademarkOppositionWorkflow::FLOW_OPPOSE, 404);
 
         if ($case->payment_status === 'paid') {
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Payment is already complete.',
-                'redirect_url' => route('trademark-opposition.oppose.show', $case),
-            ]);
+            return redirect()->route('trademark-opposition.oppose.show', $case)->with('success', 'Payment is already complete.');
         }
 
-        $validated = $request->validate([
-            'razorpay_payment_id' => ['required', 'string'],
-            'razorpay_order_id' => ['required', 'string'],
-            'razorpay_signature' => ['required', 'string'],
-        ]);
-
-        $orders = $request->session()->get('trademark_opposition_oppose_payment_orders', []);
-        $order = $orders[$validated['razorpay_order_id']] ?? null;
-
-        if (!$order || (int) ($order['case_id'] ?? 0) !== (int) $case->id) {
-            return response()->json(['status' => 'error', 'message' => 'This Razorpay order does not belong to the current opposition case.'], 422);
+        $transaction = PaymentTransaction::query()->whereMorphedTo('payable', $case)->where('service', 'opposition_filing')->latest('id')->first();
+        if (! $transaction) {
+            return redirect()->route('trademark-opposition.oppose.show', $case)->with('error', 'No payment order was found.');
         }
 
         try {
-            $verifier->verifyCaptured(
-                $validated['razorpay_payment_id'],
-                $validated['razorpay_order_id'],
-                $validated['razorpay_signature'],
-                $validated['razorpay_order_id'],
-                (int) ($order['amount'] ?? 0),
-                (string) config('razorpay.currency', 'GBP'),
-            );
+            $transaction = $revolut->verifyCompleted($case, $transaction->provider_order_id);
         } catch (PaymentVerificationException $exception) {
-            return response()->json(['status' => 'error', 'message' => $exception->getMessage()], $exception->httpStatus());
+            return redirect()->route('trademark-opposition.oppose.show', $case)->with('error', $exception->getMessage());
         }
+        $order = $transaction->metadata ?? [];
 
         $case->update([
             'payment_status' => 'paid',
-            'payment_reference' => $validated['razorpay_order_id'],
-            'transaction_id' => $validated['razorpay_payment_id'],
-            'paid_at' => now(),
+            'payment_reference' => $transaction->provider_order_id,
+            'transaction_id' => $transaction->provider_payment_id,
+            'paid_at' => $transaction->paid_at ?? now(),
             'original_package_price' => $order['original_amount'] ?? $case->package_price,
             'paid_amount' => $order['payable_amount'] ?? $case->package_price,
             'discount_amount' => $order['discount_amount'] ?? 0,
@@ -383,14 +320,7 @@ class TrademarkOppositionController extends Controller
 
         $this->transition($case, 'Payment Completed', 'Client completed Notice of Opposition filing package payment.', 'client');
 
-        unset($orders[$validated['razorpay_order_id']]);
-        $request->session()->put('trademark_opposition_oppose_payment_orders', $orders);
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Payment verified successfully.',
-            'redirect_url' => route('trademark-opposition.oppose.show', $case),
-        ]);
+        return redirect()->route('trademark-opposition.oppose.show', $case)->with('success', 'Payment verified successfully.');
     }
 
     public function viewOpposePaymentInvoice(TrademarkOppositionCase $case)
@@ -439,7 +369,7 @@ class TrademarkOppositionController extends Controller
             'client_approval_note' => null,
             'client_change_request' => $data['client_change_request'],
         ]);
-        $this->transition($case, TrademarkOppositionWorkflow::ADMIN_NOTICE_DRAFTING, 'Client requested draft reupload: ' . $data['client_change_request'], 'client');
+        $this->transition($case, TrademarkOppositionWorkflow::ADMIN_NOTICE_DRAFTING, 'Client requested draft reupload: '.$data['client_change_request'], 'client');
 
         return back()->with('success', 'Your change request has been sent to the team.');
     }
@@ -453,7 +383,7 @@ class TrademarkOppositionController extends Controller
             'trademark_name' => ['required', 'string', 'max:255'],
             'application_number' => ['required', 'string', 'max:120'],
             'trademark_class' => ['required', 'string', 'max:120'],
-            'mobile_number' => ['required', 'string', 'max:30', 'regex:' . UkMobileNumber::REGEX],
+            'mobile_number' => ['required', 'string', 'max:30', 'regex:'.UkMobileNumber::REGEX],
             'email' => ['required', 'email', 'max:255'],
             'notice_receipt_date' => ['required', 'date'],
         ], [
@@ -466,7 +396,7 @@ class TrademarkOppositionController extends Controller
         $case = TrademarkOppositionCase::create([
             ...$data,
             'user_id' => Auth::id(),
-            'case_number' => 'OPP-A-' . now()->format('Ymd') . '-' . str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT),
+            'case_number' => 'OPP-A-'.now()->format('Ymd').'-'.str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT),
             'flow_type' => TrademarkOppositionWorkflow::FLOW_DEFEND,
             'notice_receipt_date' => $receiptDate,
             'counter_statement_deadline' => $deadline,
@@ -536,13 +466,13 @@ class TrademarkOppositionController extends Controller
         $rules = [];
 
         foreach ($documentKeys as $documentKey) {
-            $rules[$documentKey] = ['nullable', 'file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:' . self::CLIENT_DOCUMENT_UPLOAD_MAX_KB];
+            $rules[$documentKey] = ['nullable', 'file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:'.self::CLIENT_DOCUMENT_UPLOAD_MAX_KB];
         }
 
         $request->validate($rules);
 
         foreach ($documentKeys as $documentKey) {
-            if (!$request->hasFile($documentKey)) {
+            if (! $request->hasFile($documentKey)) {
                 continue;
             }
 
@@ -598,7 +528,7 @@ class TrademarkOppositionController extends Controller
 
         foreach (array_keys(TrademarkOppositionWorkflow::evidenceTypes()) as $evidenceType) {
             $rules[$evidenceType] = ['nullable', 'array'];
-            $rules[$evidenceType . '.*'] = ['file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:10240'];
+            $rules[$evidenceType.'.*'] = ['file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:10240'];
         }
 
         foreach (($case->requested_evidence_types ?? []) as $evidenceLabel) {
@@ -610,13 +540,13 @@ class TrademarkOppositionController extends Controller
                 $existingEvidenceQuery->where('review_status', '!=', 'rejected');
             }
             $hasExistingEvidence = $existingEvidenceQuery->exists();
-            $rules['requested_evidence.' . $evidenceKey] = [($isDraft || $hasExistingEvidence) ? 'nullable' : 'required', 'array', 'min:1'];
-            $rules['requested_evidence.' . $evidenceKey . '.*'] = ['file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:10240'];
+            $rules['requested_evidence.'.$evidenceKey] = [($isDraft || $hasExistingEvidence) ? 'nullable' : 'required', 'array', 'min:1'];
+            $rules['requested_evidence.'.$evidenceKey.'.*'] = ['file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:10240'];
         }
 
         $data = $request->validate($rules);
 
-        if (!empty($data['first_use_date'])) {
+        if (! empty($data['first_use_date'])) {
             $case->update(['first_use_date' => $data['first_use_date']]);
         }
 
@@ -642,7 +572,7 @@ class TrademarkOppositionController extends Controller
 
         foreach (array_keys(TrademarkOppositionWorkflow::evidenceTypes()) as $evidenceType) {
             foreach ($request->file($evidenceType, []) as $file) {
-                $path = $file->store('opposition/evidence/' . $case->id, 'public');
+                $path = $file->store('opposition/evidence/'.$case->id, 'public');
                 OppositionEvidence::create([
                     'case_id' => $case->id,
                     'evidence_type' => $evidenceType,
@@ -657,8 +587,8 @@ class TrademarkOppositionController extends Controller
 
         foreach (($case->requested_evidence_types ?? []) as $evidenceLabel) {
             $evidenceKey = $this->evidenceRequestKey($evidenceLabel);
-            foreach ($request->file('requested_evidence.' . $evidenceKey, []) as $file) {
-                $path = $file->store('opposition/evidence/' . $case->id, 'public');
+            foreach ($request->file('requested_evidence.'.$evidenceKey, []) as $file) {
+                $path = $file->store('opposition/evidence/'.$case->id, 'public');
                 OppositionEvidence::create([
                     'case_id' => $case->id,
                     'evidence_type' => $evidenceKey,
@@ -715,8 +645,8 @@ class TrademarkOppositionController extends Controller
 
         $rules = [];
         foreach ($requests as $index => $label) {
-            $rules['requested_documents.' . $index] = ['required', 'array', 'min:1'];
-            $rules['requested_documents.' . $index . '.*'] = ['file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:10240'];
+            $rules['requested_documents.'.$index] = ['required', 'array', 'min:1'];
+            $rules['requested_documents.'.$index.'.*'] = ['file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:10240'];
         }
         $rules['note_to_admin'] = ['nullable', 'string', 'max:3000'];
 
@@ -724,10 +654,10 @@ class TrademarkOppositionController extends Controller
         $noteToAdmin = trim((string) ($data['note_to_admin'] ?? ''));
 
         foreach ($requests as $index => $label) {
-            foreach ($request->file('requested_documents.' . $index, []) as $file) {
+            foreach ($request->file('requested_documents.'.$index, []) as $file) {
                 $document = $this->storeEvidence(
                     $case,
-                    'third_party_requested_evidence_' . Str::slug($label, '_'),
+                    'third_party_requested_evidence_'.Str::slug($label, '_'),
                     $file,
                     'client'
                 );
@@ -740,7 +670,7 @@ class TrademarkOppositionController extends Controller
             ? 'Client submitted the registry-stage documents requested by admin.'
             : 'Client submitted the additional evidence requested during Evidence Stage.';
         if ($noteToAdmin !== '') {
-            $statusNote .= ' Note to admin: ' . $noteToAdmin;
+            $statusNote .= ' Note to admin: '.$noteToAdmin;
         }
 
         if ($case->flow_type === TrademarkOppositionWorkflow::FLOW_DEFEND) {
@@ -785,10 +715,10 @@ class TrademarkOppositionController extends Controller
     {
         $this->authorizeClient($case);
 
-        return back()->with('error', 'Please complete the Razorpay checkout to continue.');
+        return back()->with('error', 'Please complete the Revolut checkout to continue.');
     }
 
-    public function createPaymentOrder(Request $request, TrademarkOppositionCase $case): JsonResponse
+    public function createPaymentOrder(Request $request, TrademarkOppositionCase $case, RevolutMerchantService $revolut): JsonResponse
     {
         $this->authorizeClient($case);
 
@@ -821,139 +751,68 @@ class TrademarkOppositionController extends Controller
         }
 
         try {
-            $razorpayKeyId = config('razorpay.key_id');
-            $razorpaySecret = config('razorpay.key_secret');
-
-            if (!$razorpayKeyId || !$razorpaySecret) {
-                throw new \Exception('Razorpay credentials are not configured.');
-            }
-
-            $amountInPaise = (int) round($amount * 100);
-            $receipt = 'opp_pkg_' . $case->id . '_' . time();
-
-            $ch = curl_init('https://api.razorpay.com/v1/orders');
-            curl_setopt($ch, CURLOPT_USERPWD, "$razorpayKeyId:$razorpaySecret");
-            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
-                'amount' => $amountInPaise,
-                'currency' => config('razorpay.currency', 'GBP'),
-                'receipt' => $receipt,
-                'description' => ($case->package_name ?: 'Opposition Defence Package') . ' - ' . $case->case_number,
-                'notes' => [
-                    'case_id' => (string) $case->id,
-                    'case_number' => (string) $case->case_number,
-                    'payment_type' => 'opposition_defence_package',
-                    'original_amount' => (string) $pricing['original_amount'],
-                    'discount_amount' => (string) $pricing['discount_amount'],
-                    'coupon' => (string) ($pricing['coupon_label'] ?? ''),
-                ],
-            ]));
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $curlError = curl_error($ch);
-            curl_close($ch);
-
-            if ($response === false || $curlError) {
-                throw new \Exception($curlError ?: 'Unable to contact Razorpay.');
-            }
-
-            if (!in_array($httpCode, [200, 201], true)) {
-                throw new \Exception('Failed to create Razorpay order.');
-            }
-
-            $order = json_decode($response, true);
-
-            if (!is_array($order) || empty($order['id'])) {
-                throw new \Exception('Razorpay returned an invalid order response.');
-            }
-
-            $orders = $request->session()->get('trademark_opposition_payment_orders', []);
-            $orders[$order['id']] = [
-                'case_id' => $case->id,
-                'amount' => $amountInPaise,
-                'original_amount' => $pricing['original_amount'],
-                'payable_amount' => $pricing['payable_amount'],
-                'discount_amount' => $pricing['discount_amount'],
-                'coupon_label' => $pricing['coupon_label'],
-            ];
-            $request->session()->put('trademark_opposition_payment_orders', $orders);
+            $transaction = $revolut->createHostedOrder(
+                $case,
+                'opposition_defence',
+                $amount,
+                (string) config('revolut.currency', 'GBP'),
+                ($case->package_name ?: 'Opposition Defence Package').' - '.$case->case_number,
+                route('trademark-opposition.payment.confirm', $case),
+                Auth::id(),
+                Auth::user()->email,
+                array_merge($pricing, ['case_number' => $case->case_number]),
+            );
 
             return response()->json([
                 'status' => 'success',
-                'order_id' => $order['id'],
-                'amount' => $amountInPaise,
-                'currency' => $order['currency'] ?? config('razorpay.currency', 'GBP'),
-                'key' => $razorpayKeyId,
-                'user_email' => Auth::user()->email,
-                'user_phone' => UkMobileNumber::normalizeOrNull($case->mobile_number)
-                    ?? UkMobileNumber::normalizeOrNull(Auth::user()->mobile),
-                'user_name' => Auth::user()->name ?? $case->applicant_name,
+                'order_id' => $transaction->provider_order_id,
+                'checkout_url' => $transaction->checkout_url,
+                'amount' => (int) round($amount * 100),
+                'currency' => $transaction->currency,
                 'description' => $case->package_name ?: 'Opposition Defence Package',
             ]);
+        } catch (PaymentVerificationException $e) {
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], $e->httpStatus());
         } catch (Throwable $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Failed to create payment order: ' . $e->getMessage(),
+                'message' => 'Failed to create payment order: '.$e->getMessage(),
             ], 500);
         }
     }
 
-    public function verifyPaymentSignature(Request $request, TrademarkOppositionCase $case, RazorpayPaymentVerifier $verifier): JsonResponse
+    public function confirmPayment(TrademarkOppositionCase $case, RevolutMerchantService $revolut): RedirectResponse
     {
         $this->authorizeClient($case);
 
         if ($case->payment_status === 'paid') {
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Payment is already complete.',
-                'redirect_url' => route('trademark-opposition.show', $case),
-            ]);
+            return redirect()->route('trademark-opposition.show', $case)->with('success', 'Payment is already complete.');
         }
 
-        $validated = $request->validate([
-            'razorpay_payment_id' => ['required', 'string'],
-            'razorpay_order_id' => ['required', 'string'],
-            'razorpay_signature' => ['required', 'string'],
-        ]);
-
-        $orders = $request->session()->get('trademark_opposition_payment_orders', []);
-        $order = $orders[$validated['razorpay_order_id']] ?? null;
-
-        if (!$order || (int) ($order['case_id'] ?? 0) !== (int) $case->id) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'This Razorpay order does not belong to the current opposition case.',
-            ], 422);
+        $transaction = PaymentTransaction::query()->whereMorphedTo('payable', $case)->where('service', 'opposition_defence')->latest('id')->first();
+        if (! $transaction) {
+            return redirect()->route('trademark-opposition.show', $case)->with('error', 'No payment order was found.');
         }
 
         try {
-            $verifier->verifyCaptured(
-                $validated['razorpay_payment_id'],
-                $validated['razorpay_order_id'],
-                $validated['razorpay_signature'],
-                $validated['razorpay_order_id'],
-                (int) ($order['amount'] ?? 0),
-                (string) config('razorpay.currency', 'GBP'),
-            );
+            $transaction = $revolut->verifyCompleted($case, $transaction->provider_order_id);
         } catch (PaymentVerificationException $exception) {
-            return response()->json(['status' => 'error', 'message' => $exception->getMessage()], $exception->httpStatus());
+            return redirect()->route('trademark-opposition.show', $case)->with('error', $exception->getMessage());
         }
+        $order = $transaction->metadata ?? [];
 
         $updates = ['payment_status' => 'paid'];
 
         if (Schema::hasColumn('trademark_opposition_cases', 'payment_reference')) {
-            $updates['payment_reference'] = $validated['razorpay_order_id'];
+            $updates['payment_reference'] = $transaction->provider_order_id;
         }
 
         if (Schema::hasColumn('trademark_opposition_cases', 'transaction_id')) {
-            $updates['transaction_id'] = $validated['razorpay_payment_id'];
+            $updates['transaction_id'] = $transaction->provider_payment_id;
         }
 
         if (Schema::hasColumn('trademark_opposition_cases', 'paid_at')) {
-            $updates['paid_at'] = now();
+            $updates['paid_at'] = $transaction->paid_at ?? now();
         }
 
         if (Schema::hasColumn('trademark_opposition_cases', 'original_package_price')) {
@@ -975,14 +834,7 @@ class TrademarkOppositionController extends Controller
         $case->update($updates);
         $this->transition($case, 'Payment Completed', 'Client completed opposition defence package payment.', 'client');
 
-        unset($orders[$validated['razorpay_order_id']]);
-        $request->session()->put('trademark_opposition_payment_orders', $orders);
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Payment verified successfully.',
-            'redirect_url' => route('trademark-opposition.show', $case),
-        ]);
+        return redirect()->route('trademark-opposition.show', $case)->with('success', 'Payment verified successfully.');
     }
 
     public function viewPaymentInvoice(TrademarkOppositionCase $case)
@@ -1005,13 +857,13 @@ class TrademarkOppositionController extends Controller
         $pdf = \PDF::loadView('trademark-opposition.payment-invoice', [
             'case' => $case,
             'user' => $case->user,
-            'invoiceNumber' => $invoicePrefix . $issuedAt->format('Y') . '-' . $case->id,
+            'invoiceNumber' => $invoicePrefix.$issuedAt->format('Y').'-'.$case->id,
             'issuedAt' => $issuedAt,
             'firmName' => config('app.name', 'Legal Bruz'),
             'firmEmail' => config('mail.from.address'),
         ])->setPaper('a4');
 
-        return $pdf->stream($invoiceFilePrefix . $case->case_number . '.pdf');
+        return $pdf->stream($invoiceFilePrefix.$case->case_number.'.pdf');
     }
 
     public function approveDraft(Request $request, TrademarkOppositionCase $case): RedirectResponse
@@ -1032,7 +884,7 @@ class TrademarkOppositionController extends Controller
         $this->transition(
             $case,
             TrademarkOppositionWorkflow::ADMIN_READY_FOR_FILING,
-            'Client approved counter statement draft.' . ($note !== '' ? ' Approval note: ' . $note : ''),
+            'Client approved counter statement draft.'.($note !== '' ? ' Approval note: '.$note : ''),
             'client'
         );
 
@@ -1056,7 +908,7 @@ class TrademarkOppositionController extends Controller
         $this->transition(
             $case,
             TrademarkOppositionWorkflow::ADMIN_COUNTER_STATEMENT_DRAFTING,
-            'Client requested draft reupload: ' . $data['client_change_request'],
+            'Client requested draft reupload: '.$data['client_change_request'],
             'client'
         );
 
@@ -1136,7 +988,7 @@ class TrademarkOppositionController extends Controller
             $case,
             $case->current_admin_status,
             $case->current_admin_status,
-            'Admin removed additional document: ' . ($document->review_note ?: $document->file_name),
+            'Admin removed additional document: '.($document->review_note ?: $document->file_name),
             'admin'
         );
 
@@ -1273,7 +1125,7 @@ class TrademarkOppositionController extends Controller
                     'third_party_evidence_message' => $reviewNote ?: $case->third_party_evidence_message,
                 ]);
 
-                $statusNote = 'Evidence Stage document(s) rejected for reupload: ' . implode(', ', $selectedLabels);
+                $statusNote = 'Evidence Stage document(s) rejected for reupload: '.implode(', ', $selectedLabels);
                 if ($restoreEvidenceStageStatus) {
                     $this->transition($case, TrademarkOppositionWorkflow::ADMIN_EVIDENCE_BY_OPPONENT, $statusNote, 'admin');
                 } else {
@@ -1287,8 +1139,8 @@ class TrademarkOppositionController extends Controller
                 }
 
                 $message = "The following Evidence Stage document(s) need to be reuploaded:\n\n- "
-                    . implode("\n- ", $selectedLabels)
-                    . "\n\nIssues to fix:\n" . $reviewNote;
+                    .implode("\n- ", $selectedLabels)
+                    ."\n\nIssues to fix:\n".$reviewNote;
 
                 $this->notifyClient(
                     $case,
@@ -1296,17 +1148,17 @@ class TrademarkOppositionController extends Controller
                     $message,
                     [],
                     'Reupload Evidence',
-                    route('trademark-opposition.oppose.show', $case) . '#action-center'
+                    route('trademark-opposition.oppose.show', $case).'#action-center'
                 );
 
                 return back()->with('success', 'Rejected Evidence Stage document(s) were sent back to the client for reupload.');
             }
 
-            $this->transition($case, TrademarkOppositionWorkflow::ADMIN_DOCUMENTS_PENDING, 'Opposition evidence rejected for reupload: ' . implode(', ', $selectedLabels), 'admin');
+            $this->transition($case, TrademarkOppositionWorkflow::ADMIN_DOCUMENTS_PENDING, 'Opposition evidence rejected for reupload: '.implode(', ', $selectedLabels), 'admin');
 
             $message = "The following evidence document(s) need to be reuploaded:\n\n- "
-                . implode("\n- ", $selectedLabels)
-                . "\n\nIssues to fix:\n" . $reviewNote;
+                .implode("\n- ", $selectedLabels)
+                ."\n\nIssues to fix:\n".$reviewNote;
 
             $this->notifyClient($case, 'Evidence Needs Reupload', $message, [], 'Reupload Evidence', route('trademark-opposition.oppose.show', $case));
 
@@ -1315,7 +1167,7 @@ class TrademarkOppositionController extends Controller
 
         if ($isEvidenceStageEvidence) {
             $case->update(['third_party_evidence_pending' => false]);
-            $statusNote = 'Evidence Stage document(s) reviewed and accepted: ' . implode(', ', $selectedLabels);
+            $statusNote = 'Evidence Stage document(s) reviewed and accepted: '.implode(', ', $selectedLabels);
             if ($restoreEvidenceStageStatus) {
                 $this->transition($case, TrademarkOppositionWorkflow::ADMIN_EVIDENCE_BY_OPPONENT, $statusNote, 'admin');
             } else {
@@ -1344,7 +1196,7 @@ class TrademarkOppositionController extends Controller
         if ($allLatestEvidenceReviewed) {
             $this->transition($case, TrademarkOppositionWorkflow::ADMIN_LEGAL_ANALYSIS, 'All opposition evidence reviewed. Legal review is ready.', 'admin');
         } else {
-            $this->recordStatus($case, $case->current_admin_status, $case->current_admin_status, 'Opposition evidence reviewed and accepted: ' . implode(', ', $selectedLabels), 'admin');
+            $this->recordStatus($case, $case->current_admin_status, $case->current_admin_status, 'Opposition evidence reviewed and accepted: '.implode(', ', $selectedLabels), 'admin');
         }
 
         return back()->with('success', 'Evidence marked as reviewed.');
@@ -1376,7 +1228,7 @@ class TrademarkOppositionController extends Controller
         $data = $request->validate([
             'note' => ['required', 'string', 'max:3000'],
             'optional_documents' => ['nullable', 'array', 'max:10'],
-            'optional_documents.*' => ['nullable', 'file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:15360'],
+            'optional_documents.*' => ['nullable', 'file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:15360'],
             'optional_document_names' => ['nullable', 'array', 'max:10'],
             'optional_document_names.*' => ['nullable', 'string', 'max:255'],
         ], [
@@ -1398,7 +1250,7 @@ class TrademarkOppositionController extends Controller
         }
 
         $requestNote = trim($data['note']);
-        $message = "Please upload the requested documents to avoid procedural delays.\n\nRequest note: " . $requestNote;
+        $message = "Please upload the requested documents to avoid procedural delays.\n\nRequest note: ".$requestNote;
 
         $case->forceFill([
             'evidence_request_note' => $requestNote,
@@ -1432,7 +1284,7 @@ class TrademarkOppositionController extends Controller
             'document_title' => ['nullable', 'string', 'max:255'],
             'document_note' => ['nullable', 'string', 'max:3000'],
             'additional_documents' => ['required', 'array', 'max:10'],
-            'additional_documents.*' => ['file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:15360'],
+            'additional_documents.*' => ['file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:15360'],
         ], [
             'additional_documents.required' => 'Please attach at least one document to send.',
             'additional_documents.*.uploaded' => 'An additional document could not be uploaded. Ensure every file is below 15 MB and your PHP upload limit supports it.',
@@ -1473,14 +1325,14 @@ class TrademarkOppositionController extends Controller
             $case,
             $case->current_admin_status,
             $case->current_admin_status,
-            'Admin sent additional document' . ($storedDocuments->count() === 1 ? '' : 's') . ' to client.',
+            'Admin sent additional document'.($storedDocuments->count() === 1 ? '' : 's').' to client.',
             'admin'
         );
 
         return back()->with(
             $emailSent ? 'success' : 'warning',
             $emailSent
-                ? 'Additional document' . ($storedDocuments->count() === 1 ? ' was' : 's were') . ' sent to the client.'
+                ? 'Additional document'.($storedDocuments->count() === 1 ? ' was' : 's were').' sent to the client.'
                 : 'Additional documents were saved, but the email could not be sent. Check mail configuration or logs.'
         );
     }
@@ -1520,11 +1372,11 @@ class TrademarkOppositionController extends Controller
     public function adminOpposeUploadDraft(Request $request, TrademarkOppositionCase $case): RedirectResponse
     {
         $data = $request->validate([
-            'draft' => ['required', 'file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:10240'],
+            'draft' => ['required', 'file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:10240'],
             'admin_internal_note' => ['nullable', 'string', 'max:3000'],
             'client_note' => ['nullable', 'string', 'max:3000'],
             'optional_documents' => ['nullable', 'array', 'max:10'],
-            'optional_documents.*' => ['nullable', 'file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:15360'],
+            'optional_documents.*' => ['nullable', 'file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:15360'],
             'optional_document_names' => ['nullable', 'array', 'max:10'],
             'optional_document_names.*' => ['nullable', 'string', 'max:255'],
         ], [
@@ -1533,7 +1385,7 @@ class TrademarkOppositionController extends Controller
             'optional_documents.max' => 'You can attach a maximum of 10 additional documents at a time.',
         ]);
 
-        $path = $data['draft']->store('opposition/oppose-drafts/' . $case->id, 'public');
+        $path = $data['draft']->store('opposition/oppose-drafts/'.$case->id, 'public');
         $version = ((int) $case->draftDocuments()->max('version')) + 1;
 
         DraftDocument::create([
@@ -1579,8 +1431,8 @@ class TrademarkOppositionController extends Controller
             $case,
             TrademarkOppositionWorkflow::ADMIN_CLIENT_APPROVAL_PENDING,
             'Notice of Opposition draft uploaded for client approval.'
-                . ($adminNote !== '' ? ' Internal note: ' . $adminNote : '')
-                . ($clientNote !== '' ? ' Client note: ' . $clientNote : ''),
+                .($adminNote !== '' ? ' Internal note: '.$adminNote : '')
+                .($clientNote !== '' ? ' Client note: '.$clientNote : ''),
             'admin'
         );
         $case->load('evidence');
@@ -1600,25 +1452,25 @@ class TrademarkOppositionController extends Controller
             $case,
             'Draft Ready',
             'Your Notice of Opposition draft'
-                . ($allDraftAdditionalDocuments->isNotEmpty() ? ' and supporting documents are' : ' is')
-                . ' ready for review and approval.'
-                . ($clientNote !== '' ? "\n\nAdmin note:\n" . $clientNote : ''),
+                .($allDraftAdditionalDocuments->isNotEmpty() ? ' and supporting documents are' : ' is')
+                .' ready for review and approval.'
+                .($clientNote !== '' ? "\n\nAdmin note:\n".$clientNote : ''),
             $mailAttachments,
             'Review Notice of Opposition Draft',
             route('trademark-opposition.oppose.show', $case)
         );
 
         return back()->with('success', 'Draft'
-            . ($allDraftAdditionalDocuments->isNotEmpty() ? ' and supporting documents were' : ' was')
-            . ' uploaded for client review.');
+            .($allDraftAdditionalDocuments->isNotEmpty() ? ' and supporting documents were' : ' was')
+            .' uploaded for client review.');
     }
 
     public function adminOpposeFile(Request $request, TrademarkOppositionCase $case): RedirectResponse
     {
         $data = $request->validate([
-            'filing_acknowledgment' => ['required', 'file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:10240'],
+            'filing_acknowledgment' => ['required', 'file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:10240'],
             'optional_documents' => ['nullable', 'array', 'max:10'],
-            'optional_documents.*' => ['nullable', 'file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:15360'],
+            'optional_documents.*' => ['nullable', 'file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:15360'],
             'optional_document_names' => ['nullable', 'array', 'max:10'],
             'optional_document_names.*' => ['nullable', 'string', 'max:255'],
         ], [
@@ -1627,7 +1479,7 @@ class TrademarkOppositionController extends Controller
             'optional_documents.max' => 'You can attach a maximum of 10 additional documents at a time.',
         ]);
 
-        $path = $data['filing_acknowledgment']->store('opposition/oppose-filing-acknowledgments/' . $case->id, 'public');
+        $path = $data['filing_acknowledgment']->store('opposition/oppose-filing-acknowledgments/'.$case->id, 'public');
 
         $counterStatementDeadline = $case->counter_statement_deadline ?: now()->addMonths(2);
 
@@ -1666,7 +1518,7 @@ class TrademarkOppositionController extends Controller
             ->where('application_number', $case->application_number)
             ->first();
 
-        if (!$application || $application->current_status !== TrademarkWorkflow::POST_FILING) {
+        if (! $application || $application->current_status !== TrademarkWorkflow::POST_FILING) {
             return;
         }
 
@@ -1719,7 +1571,7 @@ class TrademarkOppositionController extends Controller
             'admin_internal_notes' => ['nullable', 'string', 'max:5000'],
             'action' => ['nullable', Rule::in(['save', 'move_to_evidence', 'close_matter'])],
             'optional_documents' => ['nullable', 'array', 'max:10'],
-            'optional_documents.*' => ['nullable', 'file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:15360'],
+            'optional_documents.*' => ['nullable', 'file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:15360'],
             'optional_document_names' => ['nullable', 'array', 'max:10'],
             'optional_document_names.*' => ['nullable', 'string', 'max:255'],
             'evidence_items' => ['nullable', 'array', 'max:10'],
@@ -1770,13 +1622,13 @@ class TrademarkOppositionController extends Controller
             ]);
 
             $message = $messageToClient
-                . "\n\nRequested evidence:\n- " . implode("\n- ", $requestedEvidenceItems);
+                ."\n\nRequested evidence:\n- ".implode("\n- ", $requestedEvidenceItems);
 
             $this->recordStatus(
                 $case,
                 $case->current_admin_status,
                 $case->current_admin_status,
-                'Additional evidence requested from client: ' . implode(', ', $requestedEvidenceItems),
+                'Additional evidence requested from client: '.implode(', ', $requestedEvidenceItems),
                 'admin'
             );
             $this->notifyClient(
@@ -1785,7 +1637,7 @@ class TrademarkOppositionController extends Controller
                 $message,
                 [],
                 'Upload Additional Evidence',
-                route('trademark-opposition.oppose.show', $case) . '#action-center'
+                route('trademark-opposition.oppose.show', $case).'#action-center'
             );
         }
 
@@ -1883,13 +1735,13 @@ class TrademarkOppositionController extends Controller
         ]);
 
         $message = trim($data['message_to_client'])
-            . "\n\nRequested evidence:\n- " . implode("\n- ", $items);
+            ."\n\nRequested evidence:\n- ".implode("\n- ", $items);
 
         $this->recordStatus(
             $case,
             $case->current_admin_status,
             $case->current_admin_status,
-            'Additional evidence requested from client: ' . implode(', ', $items),
+            'Additional evidence requested from client: '.implode(', ', $items),
             'admin'
         );
         $this->notifyClient(
@@ -1898,7 +1750,7 @@ class TrademarkOppositionController extends Controller
             $message,
             [],
             'Upload Additional Evidence',
-            route('trademark-opposition.oppose.show', $case) . '#action-center'
+            route('trademark-opposition.oppose.show', $case).'#action-center'
         );
 
         return back()->with('success', 'Additional evidence request sent to the client.');
@@ -1932,7 +1784,7 @@ class TrademarkOppositionController extends Controller
         $data = $request->validate([
             'note' => ['nullable', 'string', 'max:3000'],
             'optional_documents' => ['nullable', 'array', 'max:10'],
-            'optional_documents.*' => ['nullable', 'file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:15360'],
+            'optional_documents.*' => ['nullable', 'file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:15360'],
             'optional_document_names' => ['nullable', 'array', 'max:10'],
             'optional_document_names.*' => ['nullable', 'string', 'max:255'],
         ], [
@@ -2023,14 +1875,14 @@ class TrademarkOppositionController extends Controller
             'hearing_outcome' => ['nullable', Rule::in(['Further Hearing Required', 'Matter Concluded'])],
             'adjournment_reason' => ['nullable', 'string', 'max:3000'],
             'final_outcome' => ['nullable', 'string', 'max:160'],
-            'decision_status' => ['required_if:status,' . TrademarkOppositionWorkflow::ADMIN_DECISION_AWAITED, Rule::in($decisionStatuses)],
+            'decision_status' => ['required_if:status,'.TrademarkOppositionWorkflow::ADMIN_DECISION_AWAITED, Rule::in($decisionStatuses)],
             'withdrawn_by' => ['nullable', Rule::in(array_keys(TrademarkOppositionWorkflow::withdrawnByOptions()))],
             'decision_date' => ['nullable', 'date'],
             'decision_order' => ['nullable', 'file', 'mimes:pdf', 'max:15360'],
-            'decision_note' => ['nullable', 'required_if:decision_status,' . TrademarkOppositionWorkflow::ADMIN_OTHER, 'string', 'max:3000'],
+            'decision_note' => ['nullable', 'required_if:decision_status,'.TrademarkOppositionWorkflow::ADMIN_OTHER, 'string', 'max:3000'],
             'note' => ['nullable', 'string', 'max:3000'],
             'optional_documents' => ['nullable', 'array', 'max:10'],
-            'optional_documents.*' => ['nullable', 'file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:15360'],
+            'optional_documents.*' => ['nullable', 'file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:15360'],
             'optional_document_names' => ['nullable', 'array', 'max:10'],
             'optional_document_names.*' => ['nullable', 'string', 'max:255'],
         ], [
@@ -2084,7 +1936,7 @@ class TrademarkOppositionController extends Controller
             return back()->withErrors(['decision_date' => 'Please select the decision date before closing the matter.'])->withInput();
         }
 
-        if ($hasFinalDecision && !$request->hasFile('decision_order')) {
+        if ($hasFinalDecision && ! $request->hasFile('decision_order')) {
             return back()->withErrors(['decision_order' => 'Please upload the Registry Decision / Order PDF before closing the matter.'])->withInput();
         }
 
@@ -2126,10 +1978,10 @@ class TrademarkOppositionController extends Controller
 
         $note = $data['note'] ?? ($isHearingUpdate ? 'Admin updated hearing status.' : 'Admin updated Flow B tracking.');
         if ($isHearingUpdate && filled($data['adjournment_reason'] ?? null)) {
-            $note = trim($note . ' Adjournment reason: ' . $data['adjournment_reason']);
+            $note = trim($note.' Adjournment reason: '.$data['adjournment_reason']);
         }
         if ($isHearingUpdate && filled($data['hearing_outcome'] ?? null)) {
-            $note = trim($note . ' Hearing outcome: ' . $data['hearing_outcome']);
+            $note = trim($note.' Hearing outcome: '.$data['hearing_outcome']);
         }
 
         if ($isDecisionUpdate) {
@@ -2139,7 +1991,7 @@ class TrademarkOppositionController extends Controller
                     $data['withdrawn_by'] ?? null
                 );
 
-                if (!$decisionResolution) {
+                if (! $decisionResolution) {
                     return back()->withErrors(['decision_status' => 'Please select final outcome.'])->withInput();
                 }
 
@@ -2147,13 +1999,13 @@ class TrademarkOppositionController extends Controller
                 $document->update(['review_note' => 'Registry Decision / Order']);
 
                 $decisionNote = trim((string) ($data['decision_note'] ?? ''));
-                $transitionNote = 'Decision issued: ' . $selectedDecisionStatus
-                    . '. Decision date: ' . Carbon::parse($data['decision_date'])->format('d M Y') . '.';
+                $transitionNote = 'Decision issued: '.$selectedDecisionStatus
+                    .'. Decision date: '.Carbon::parse($data['decision_date'])->format('d M Y').'.';
                 if (($data['decision_status'] ?? null) === TrademarkOppositionWorkflow::ADMIN_WITHDRAWN && filled($data['withdrawn_by'] ?? null)) {
-                    $transitionNote .= ' Withdrawn by: ' . ucfirst((string) $data['withdrawn_by']) . '.';
+                    $transitionNote .= ' Withdrawn by: '.ucfirst((string) $data['withdrawn_by']).'.';
                 }
                 if ($decisionNote !== '') {
-                    $transitionNote .= ' Client note: ' . $decisionNote;
+                    $transitionNote .= ' Client note: '.$decisionNote;
                 }
 
                 $finalCaseUpdates = [
@@ -2184,7 +2036,7 @@ class TrademarkOppositionController extends Controller
 
                 $this->notifyClient($case, 'Matter Closed', $clientMessage);
 
-                return back()->with('success', 'Matter closed with the outcome ' . TrademarkOppositionWorkflow::finalOutcomeLabel($decisionResolution['stored_final_outcome']) . '.');
+                return back()->with('success', 'Matter closed with the outcome '.TrademarkOppositionWorkflow::finalOutcomeLabel($decisionResolution['stored_final_outcome']).'.');
             }
 
             if (filled($data['decision_note'] ?? null)) {
@@ -2246,7 +2098,7 @@ class TrademarkOppositionController extends Controller
             ->latest('id')
             ->first();
 
-        if (!$linkedOppositionCase && filled($case->application_number)) {
+        if (! $linkedOppositionCase && filled($case->application_number)) {
             $linkedApplication = Application::query()
                 ->where('application_number', $case->application_number)
                 ->first();
@@ -2302,11 +2154,11 @@ class TrademarkOppositionController extends Controller
         }
 
         if ($data['action'] === 'rejected') {
-            $this->transition($case, TrademarkOppositionWorkflow::ADMIN_DOCUMENTS_PENDING, 'Documents rejected for reupload: ' . implode(', ', $selectedLabels), 'admin');
+            $this->transition($case, TrademarkOppositionWorkflow::ADMIN_DOCUMENTS_PENDING, 'Documents rejected for reupload: '.implode(', ', $selectedLabels), 'admin');
 
             $message = "The following opposition document(s) need to be reuploaded:\n\n- "
-                . implode("\n- ", $selectedLabels)
-                . "\n\nIssues to fix:\n" . $reviewNote;
+                .implode("\n- ", $selectedLabels)
+                ."\n\nIssues to fix:\n".$reviewNote;
 
             $this->notifyClient($case, 'Documents Need Reupload', $message);
             Mail::to($case->email)->send(new EventNotification(
@@ -2321,9 +2173,9 @@ class TrademarkOppositionController extends Controller
             return back()->with('success', 'Rejected documents were sent back to the client for reupload.');
         }
 
-        $message = "The following opposition document(s) have been reviewed and accepted:\n\n- " . implode("\n- ", $selectedLabels);
+        $message = "The following opposition document(s) have been reviewed and accepted:\n\n- ".implode("\n- ", $selectedLabels);
         if ($reviewNote !== '') {
-            $message .= "\n\nReview note:\n" . $reviewNote;
+            $message .= "\n\nReview note:\n".$reviewNote;
         }
 
         $freshCase = $case->fresh('documents');
@@ -2334,7 +2186,7 @@ class TrademarkOppositionController extends Controller
         if ($allLatestDocumentsReviewed) {
             $this->transition($case, TrademarkOppositionWorkflow::ADMIN_EVIDENCE_COLLECTION, 'All opposition documents reviewed. Evidence collection is ready.', 'admin');
         } else {
-            $this->recordStatus($case, $case->current_admin_status, $case->current_admin_status, 'Opposition documents reviewed and accepted: ' . implode(', ', $selectedLabels), 'admin');
+            $this->recordStatus($case, $case->current_admin_status, $case->current_admin_status, 'Opposition documents reviewed and accepted: '.implode(', ', $selectedLabels), 'admin');
         }
 
         $this->notifyClient($case, 'Documents Reviewed', $message);
@@ -2415,10 +2267,10 @@ class TrademarkOppositionController extends Controller
         $this->transition($case, TrademarkOppositionWorkflow::ADMIN_EVIDENCE_COLLECTION, $data['note'], 'admin');
 
         $message = "Opposition grounds noted by the legal team:\n\n- "
-            . implode("\n- ", $selectedGrounds)
-            . "\n\nThe legal team has requested the following evidence documents:\n\n- "
-            . implode("\n- ", $selectedEvidenceTypes)
-            . "\n\nAdmin note:\n" . $data['note'];
+            .implode("\n- ", $selectedGrounds)
+            ."\n\nThe legal team has requested the following evidence documents:\n\n- "
+            .implode("\n- ", $selectedEvidenceTypes)
+            ."\n\nAdmin note:\n".$data['note'];
 
         $this->notifyClient($case, 'Evidence Required', $message);
         Mail::to($case->email)->send(new EventNotification(
@@ -2493,13 +2345,13 @@ class TrademarkOppositionController extends Controller
                     $case,
                     $case->current_admin_status,
                     $case->current_admin_status,
-                    'Evidence Stage document(s) rejected for reupload: ' . implode(', ', $selectedLabels),
+                    'Evidence Stage document(s) rejected for reupload: '.implode(', ', $selectedLabels),
                     'admin'
                 );
 
                 $message = "The following Evidence Stage document(s) need to be reuploaded:\n\n- "
-                    . implode("\n- ", $selectedLabels)
-                    . "\n\nIssues to fix:\n" . $reviewNote;
+                    .implode("\n- ", $selectedLabels)
+                    ."\n\nIssues to fix:\n".$reviewNote;
 
                 $this->notifyClient(
                     $case,
@@ -2507,17 +2359,17 @@ class TrademarkOppositionController extends Controller
                     $message,
                     [],
                     'Reupload Evidence',
-                    route('trademark-opposition.show', $case) . '#action-center'
+                    route('trademark-opposition.show', $case).'#action-center'
                 );
 
                 return back()->with('success', 'Rejected Evidence Stage document(s) were sent back to the client for reupload.');
             }
 
-            $this->transition($case, TrademarkOppositionWorkflow::ADMIN_EVIDENCE_COLLECTION, 'Evidence rejected for reupload: ' . implode(', ', $selectedLabels), 'admin');
+            $this->transition($case, TrademarkOppositionWorkflow::ADMIN_EVIDENCE_COLLECTION, 'Evidence rejected for reupload: '.implode(', ', $selectedLabels), 'admin');
 
             $message = "The following evidence file(s) need to be reuploaded:\n\n- "
-                . implode("\n- ", $selectedLabels)
-                . "\n\nIssues to fix:\n" . $reviewNote;
+                .implode("\n- ", $selectedLabels)
+                ."\n\nIssues to fix:\n".$reviewNote;
 
             $this->notifyClient($case, 'Evidence Needs Reupload', $message);
             Mail::to($case->email)->send(new EventNotification(
@@ -2564,7 +2416,7 @@ class TrademarkOppositionController extends Controller
                 $case,
                 $case->current_admin_status,
                 $case->current_admin_status,
-                'Evidence Stage document(s) reviewed and accepted: ' . implode(', ', $selectedLabels),
+                'Evidence Stage document(s) reviewed and accepted: '.implode(', ', $selectedLabels),
                 'admin'
             );
 
@@ -2581,7 +2433,7 @@ class TrademarkOppositionController extends Controller
         if ($allLatestEvidenceReviewed) {
             $this->transition($case, TrademarkOppositionWorkflow::ADMIN_LEGAL_ANALYSIS, 'All requested evidence reviewed. Legal review is ready.', 'admin');
         } else {
-            $this->recordStatus($case, $case->current_admin_status, $case->current_admin_status, 'Evidence reviewed and accepted: ' . implode(', ', $selectedLabels), 'admin');
+            $this->recordStatus($case, $case->current_admin_status, $case->current_admin_status, 'Evidence reviewed and accepted: '.implode(', ', $selectedLabels), 'admin');
         }
 
         return back()->with('success', 'Evidence marked as reviewed.');
@@ -2597,7 +2449,7 @@ class TrademarkOppositionController extends Controller
             'package_price' => ['required', 'numeric', 'min:1'],
             'included_services' => ['nullable', 'string', 'max:3000'],
             'optional_documents' => ['nullable', 'array'],
-            'optional_documents.*' => ['file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:10240'],
+            'optional_documents.*' => ['file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:10240'],
         ]);
 
         $clientVisibleNote = $data['client_visible_note'] ?: TrademarkOppositionWorkflow::riskNotes()[$data['risk_level']];
@@ -2643,9 +2495,9 @@ class TrademarkOppositionController extends Controller
     public function adminUploadDraft(Request $request, TrademarkOppositionCase $case): RedirectResponse
     {
         $data = $request->validate([
-            'draft' => [$case->draft_path ? 'nullable' : 'required', 'file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:10240'],
+            'draft' => [$case->draft_path ? 'nullable' : 'required', 'file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:10240'],
             'optional_documents' => ['nullable', 'array', 'max:10'],
-            'optional_documents.*' => ['nullable', 'file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:15360'],
+            'optional_documents.*' => ['nullable', 'file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:15360'],
             'optional_document_names' => ['nullable', 'array', 'max:10'],
             'optional_document_names.*' => ['nullable', 'string', 'max:255'],
         ], [
@@ -2656,7 +2508,7 @@ class TrademarkOppositionController extends Controller
         ]);
 
         if (isset($data['draft'])) {
-            $path = $data['draft']->store('opposition/drafts/' . $case->id, 'public');
+            $path = $data['draft']->store('opposition/drafts/'.$case->id, 'public');
 
             $case->update([
                 'draft_path' => $path,
@@ -2714,20 +2566,20 @@ class TrademarkOppositionController extends Controller
 
     public function adminFile(Request $request, TrademarkOppositionCase $case): RedirectResponse
     {
-        if (!Schema::hasColumn('trademark_opposition_cases', 'defence_case_status')) {
+        if (! Schema::hasColumn('trademark_opposition_cases', 'defence_case_status')) {
             return back()
                 ->withErrors(['defence_case_status' => 'The defence status field is not available yet. Please run the latest database migration and try again.'])
                 ->withInput();
         }
 
         $filingAcknowledgmentRules = $case->filing_acknowledgment_path
-            ? ['nullable', 'file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:10240']
-            : ['required', 'file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:10240'];
+            ? ['nullable', 'file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:10240']
+            : ['required', 'file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:10240'];
 
         $data = $request->validate([
             'filing_acknowledgment' => $filingAcknowledgmentRules,
             'optional_documents' => ['nullable', 'array', 'max:10'],
-            'optional_documents.*' => ['nullable', 'file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:15360'],
+            'optional_documents.*' => ['nullable', 'file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:15360'],
             'optional_document_names' => ['nullable', 'array', 'max:10'],
             'optional_document_names.*' => ['nullable', 'string', 'max:255'],
         ], [
@@ -2741,7 +2593,7 @@ class TrademarkOppositionController extends Controller
         $name = $case->filing_acknowledgment_name;
 
         if ($filingAcknowledgment) {
-            $path = $filingAcknowledgment->store('opposition/filing-acknowledgments/' . $case->id, 'public');
+            $path = $filingAcknowledgment->store('opposition/filing-acknowledgments/'.$case->id, 'public');
             $name = $filingAcknowledgment->getClientOriginalName();
         }
 
@@ -2776,7 +2628,7 @@ class TrademarkOppositionController extends Controller
 
     public function adminTracking(Request $request, TrademarkOppositionCase $case): RedirectResponse
     {
-        if (!Schema::hasColumn('trademark_opposition_cases', 'defence_case_status')) {
+        if (! Schema::hasColumn('trademark_opposition_cases', 'defence_case_status')) {
             return back()
                 ->withErrors(['defence_case_status' => 'The defence status field is not available yet. Please run the latest database migration and try again.'])
                 ->withInput();
@@ -2796,9 +2648,9 @@ class TrademarkOppositionController extends Controller
             'evidence_items.*' => ['nullable', 'string', 'max:255'],
             'message_to_client' => ['nullable', 'string', 'max:3000'],
             'resend_registry_request' => ['nullable', 'boolean'],
-            'final_order' => ['nullable', 'file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:15360'],
+            'final_order' => ['nullable', 'file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:15360'],
             'optional_documents' => ['nullable', 'array', 'max:10'],
-            'optional_documents.*' => ['nullable', 'file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:15360'],
+            'optional_documents.*' => ['nullable', 'file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:15360'],
             'optional_document_names' => ['nullable', 'array', 'max:10'],
             'optional_document_names.*' => ['nullable', 'string', 'max:255'],
             'optional_document_visibilities' => ['nullable', 'array', 'max:10'],
@@ -2835,7 +2687,7 @@ class TrademarkOppositionController extends Controller
             ], true);
         $isMatterClosedUpdate = $case->current_admin_status === TrademarkOppositionWorkflow::ADMIN_MATTER_CLOSED
             && ($data['status'] ?? null) === TrademarkOppositionWorkflow::ADMIN_MATTER_CLOSED;
-        if (($data['status'] ?? null) !== $nextStage && !$isRegistryRequestResend && !$isHearingUpdate && !$isMatterClosedUpdate) {
+        if (($data['status'] ?? null) !== $nextStage && ! $isRegistryRequestResend && ! $isHearingUpdate && ! $isMatterClosedUpdate) {
             return back()
                 ->withErrors(['status' => 'Please move this matter through the next sequential stage.'])
                 ->withInput();
@@ -2869,7 +2721,7 @@ class TrademarkOppositionController extends Controller
         $shouldRequestDocuments = $requestedEvidenceItems !== [];
 
         if (($data['status'] ?? null) === TrademarkOppositionWorkflow::ADMIN_MATTER_CLOSED) {
-            if (!in_array($case->current_admin_status, [
+            if (! in_array($case->current_admin_status, [
                 TrademarkOppositionWorkflow::ADMIN_FINAL_OUTCOME,
                 TrademarkOppositionWorkflow::ADMIN_MATTER_CLOSED,
             ], true)) {
@@ -2920,13 +2772,13 @@ class TrademarkOppositionController extends Controller
             ]);
 
             $message = ($messageToClient !== '' ? $messageToClient : 'Please upload the requested documents for the current Registry stage.')
-                . "\n\nRequested documents:\n- " . implode("\n- ", $requestedEvidenceItems);
+                ."\n\nRequested documents:\n- ".implode("\n- ", $requestedEvidenceItems);
 
             $this->recordStatus(
                 $case,
                 $case->current_admin_status,
                 $case->current_admin_status,
-                'Registry-stage documents requested from client: ' . implode(', ', $requestedEvidenceItems),
+                'Registry-stage documents requested from client: '.implode(', ', $requestedEvidenceItems),
                 'admin'
             );
             $this->notifyClient(
@@ -2935,7 +2787,7 @@ class TrademarkOppositionController extends Controller
                 $message,
                 [],
                 'Upload Requested Documents',
-                route('trademark-opposition.show', $case) . '#action-center'
+                route('trademark-opposition.show', $case).'#action-center'
             );
         } elseif ($messageToClient !== '') {
             $case->update(['third_party_evidence_message' => $messageToClient]);
@@ -2953,10 +2805,10 @@ class TrademarkOppositionController extends Controller
 
             $note = $data['note'] ?? 'Admin updated hearing status.';
             if (filled($data['adjournment_reason'] ?? null)) {
-                $note = trim($note . ' Adjournment reason: ' . $data['adjournment_reason']);
+                $note = trim($note.' Adjournment reason: '.$data['adjournment_reason']);
             }
             if (filled($data['hearing_outcome'] ?? null)) {
-                $note = trim($note . ' Hearing outcome: ' . $data['hearing_outcome']);
+                $note = trim($note.' Hearing outcome: '.$data['hearing_outcome']);
             }
 
             if ($data['status'] === TrademarkOppositionWorkflow::ADMIN_HEARING_COMPLETED) {
@@ -3008,9 +2860,9 @@ class TrademarkOppositionController extends Controller
             $this->syncLinkedApplicationOppositionStatuses($case);
 
             $outcomeLabel = TrademarkOppositionWorkflow::defenceFinalOutcomeOptions()[$finalOutcome] ?? Str::headline((string) $finalOutcome);
-            $transitionNote = 'Matter closed with final outcome: ' . $outcomeLabel . '.';
+            $transitionNote = 'Matter closed with final outcome: '.$outcomeLabel.'.';
             if (filled($data['note'] ?? null)) {
-                $transitionNote .= ' Note: ' . $data['note'];
+                $transitionNote .= ' Note: '.$data['note'];
             }
 
             if ($case->current_admin_status === TrademarkOppositionWorkflow::ADMIN_MATTER_CLOSED) {
@@ -3025,7 +2877,7 @@ class TrademarkOppositionController extends Controller
                 $case,
                 'Matter Closed',
                 ($data['final_client_message'] ?? null)
-                    ?: 'The Registry matter has been closed with final outcome: ' . $outcomeLabel . '.'
+                    ?: 'The Registry matter has been closed with final outcome: '.$outcomeLabel.'.'
             );
 
             return redirect()
@@ -3058,7 +2910,7 @@ class TrademarkOppositionController extends Controller
             ? $case->evidence()->findOrFail($id)
             : $case->documents()->findOrFail($id);
 
-        if (!Storage::disk('public')->exists($record->file_path)) {
+        if (! Storage::disk('public')->exists($record->file_path)) {
             abort(404);
         }
 
@@ -3080,7 +2932,7 @@ class TrademarkOppositionController extends Controller
             default => null,
         };
 
-        if (!$path || !Storage::disk('public')->exists($path)) {
+        if (! $path || ! Storage::disk('public')->exists($path)) {
             abort(404);
         }
 
@@ -3099,7 +2951,7 @@ class TrademarkOppositionController extends Controller
 
     private function storeDocument(TrademarkOppositionCase $case, string $documentType, $file, string $uploadedBy, bool $required, string $reviewStatus = 'pending'): OppositionDocument
     {
-        $path = $file->store('opposition/documents/' . $case->id, 'public');
+        $path = $file->store('opposition/documents/'.$case->id, 'public');
 
         return OppositionDocument::create([
             'case_id' => $case->id,
@@ -3116,7 +2968,7 @@ class TrademarkOppositionController extends Controller
 
     private function storeEvidence(TrademarkOppositionCase $case, string $evidenceType, $file, string $uploadedBy): OppositionEvidence
     {
-        $path = $file->store('opposition/evidence/' . $case->id, 'public');
+        $path = $file->store('opposition/evidence/'.$case->id, 'public');
         $reviewStatus = 'pending';
 
         if ($uploadedBy === 'client') {
@@ -3230,7 +3082,7 @@ class TrademarkOppositionController extends Controller
             ],
             TrademarkOppositionWorkflow::ADMIN_HEARING_SCHEDULED => [
                 'title' => 'Hearing Scheduled',
-                'message' => 'A hearing has been scheduled by the Trademark Registry' . ($case->hearing_date ? ' for ' . $case->hearing_date->format('d M Y') : '') . '.',
+                'message' => 'A hearing has been scheduled by the Trademark Registry'.($case->hearing_date ? ' for '.$case->hearing_date->format('d M Y') : '').'.',
             ],
             TrademarkOppositionWorkflow::ADMIN_HEARING_COMPLETED => [
                 'title' => 'Hearing Completed',
@@ -3329,7 +3181,7 @@ class TrademarkOppositionController extends Controller
 
     private function logOppositionDefenceCaseStarted(Application $application, TrademarkOppositionCase $case): void
     {
-        if (!Schema::hasTable('application_status_logs')) {
+        if (! Schema::hasTable('application_status_logs')) {
             return;
         }
 
@@ -3351,15 +3203,15 @@ class TrademarkOppositionController extends Controller
     private function notifyAdminsOfOppositionDefenceCase(Application $application, TrademarkOppositionCase $case): void
     {
         try {
-            $applicationLabel = $application->application_number ?: ('Application #' . $application->id);
-            $title = 'Opposition Defence Case Started for ' . $applicationLabel;
+            $applicationLabel = $application->application_number ?: ('Application #'.$application->id);
+            $title = 'Opposition Defence Case Started for '.$applicationLabel;
             $body = implode(PHP_EOL, array_filter([
                 'A client has started an opposition defence case for an opposed filing.',
                 '',
-                'Application: ' . $applicationLabel,
-                'Trademark: ' . ($application->brand_name ?: 'N/A'),
-                'Opposition Case: ' . $case->case_number,
-                'Opposition Defence Case ID: ' . $case->id,
+                'Application: '.$applicationLabel,
+                'Trademark: '.($application->brand_name ?: 'N/A'),
+                'Opposition Case: '.$case->case_number,
+                'Opposition Defence Case ID: '.$case->id,
                 '',
                 'Open the filing detail page to review the case and stage action.',
             ]));
@@ -3369,7 +3221,7 @@ class TrademarkOppositionController extends Controller
                     $mail->to($email)->subject($title);
                 });
             });
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // Keep defence-case creation resilient if admin mail is unavailable.
         }
     }
@@ -3538,7 +3390,7 @@ class TrademarkOppositionController extends Controller
             )
             ->first();
 
-        if (!$application) {
+        if (! $application) {
             return;
         }
 
@@ -3617,7 +3469,7 @@ class TrademarkOppositionController extends Controller
         if ($application) {
             $defenceCase = $application->oppositionDefenceCase;
         }
-        if (!$defenceCase) {
+        if (! $defenceCase) {
             $defenceCase = TrademarkOppositionCase::query()
                 ->where('flow_type', TrademarkOppositionWorkflow::FLOW_DEFEND)
                 ->where('application_number', $case->application_number)
@@ -3625,7 +3477,7 @@ class TrademarkOppositionController extends Controller
                 ->first();
         }
 
-        if (!$application) {
+        if (! $application) {
             return;
         }
 
@@ -3643,7 +3495,7 @@ class TrademarkOppositionController extends Controller
 
         $workflowMeta = $application->workflow_meta ?? [];
         $acceptedAdvertisedMeta = data_get($workflowMeta, 'post_filing_journey.stages.accepted_advertised', []);
-        if (!empty($case->final_outcome)) {
+        if (! empty($case->final_outcome)) {
             $acceptedAdvertisedMeta['final_opposition_outcome'] = $case->final_outcome;
         }
         data_set($workflowMeta, 'post_filing_journey.stages.accepted_advertised', $acceptedAdvertisedMeta);

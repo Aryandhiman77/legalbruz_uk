@@ -25,6 +25,7 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PublicPageController;
+use App\Http\Controllers\RevolutWebhookController;
 use App\Http\Controllers\SeoController;
 use App\Http\Controllers\StuckTrademarkController;
 use App\Http\Controllers\TrademarkController;
@@ -100,6 +101,9 @@ Route::get('/contact', [PublicPageController::class, 'contact'])->name('contact'
 Route::post('/contact', [PublicPageController::class, 'submitContact'])
     ->middleware('throttle:5,1')
     ->name('contact.submit');
+Route::post('/webhooks/revolut', RevolutWebhookController::class)
+    ->middleware('throttle:120,1')
+    ->name('webhooks.revolut');
 Route::get('/book-a-call', [ConsultationBookingController::class, 'create'])->name('book-call.create');
 Route::post('/book-a-call', [ConsultationBookingController::class, 'store'])
     ->middleware('throttle:5,1')
@@ -108,9 +112,9 @@ Route::get('/book-a-call/{booking}/payment', [ConsultationBookingController::cla
 Route::post('/book-a-call/{booking}/payment/order', [ConsultationBookingController::class, 'createOrder'])
     ->middleware('throttle:10,1')
     ->name('book-call.payment.order');
-Route::post('/book-a-call/{booking}/payment/verify', [ConsultationBookingController::class, 'verify'])
+Route::get('/book-a-call/{booking}/payment/confirm', [ConsultationBookingController::class, 'confirm'])
     ->middleware('throttle:10,1')
-    ->name('book-call.payment.verify');
+    ->name('book-call.payment.confirm');
 Route::get('/book-a-call/{booking}/success', [ConsultationBookingController::class, 'success'])->name('book-call.success');
 Route::get('/trademark-search-report', [TrademarkSearchReportController::class, 'create'])->name('trademark-search-report.create');
 Route::post('/trademark-search-report', [TrademarkSearchReportController::class, 'store'])
@@ -120,9 +124,9 @@ Route::get('/trademark-search-report/{reportRequest}/payment', [TrademarkSearchR
 Route::post('/trademark-search-report/{reportRequest}/payment/order', [TrademarkSearchReportController::class, 'createOrder'])
     ->middleware('throttle:10,1')
     ->name('trademark-search-report.payment.order');
-Route::post('/trademark-search-report/{reportRequest}/payment/verify', [TrademarkSearchReportController::class, 'verify'])
+Route::get('/trademark-search-report/{reportRequest}/payment/confirm', [TrademarkSearchReportController::class, 'confirm'])
     ->middleware('throttle:10,1')
-    ->name('trademark-search-report.payment.verify');
+    ->name('trademark-search-report.payment.confirm');
 Route::get('/trademark-search-report/{reportRequest}/success', [TrademarkSearchReportController::class, 'success'])->name('trademark-search-report.success');
 Route::get('/trademark-search-report/{reportRequest}/documents/{document}/download', [TrademarkSearchReportController::class, 'download'])
     ->middleware('auth')
@@ -208,12 +212,13 @@ Route::middleware(['auth'])->group(function () {
     })->name('trademark.application-form');
     Route::post('/trademark/store', [TrademarkController::class, 'storeApplication'])->name('trademark.store');
 
-    // Payment Flow (Razorpay Integration)
+    // Payment Flow (Revolut Hosted Checkout)
     Route::get('/payment/{id}', [PaymentController::class, 'showPayment'])->name('payment.show');
     Route::post('/payment/{id}/create-order', [PaymentController::class, 'createOrder'])->middleware('throttle:10,1')->name('payment.create-order');
-    Route::post('/payment/{id}/verify-signature', [PaymentController::class, 'verifySignature'])->middleware('throttle:10,1')->name('payment.verify-signature');
+    Route::get('/payment/{id}/confirm', [PaymentController::class, 'confirm'])->middleware('throttle:10,1')->name('payment.confirm');
     Route::get('/payment/{id}/check-status', [PaymentController::class, 'checkPaymentStatus'])->name('payment.check-status');
     Route::get('/payments/history', [PaymentController::class, 'paymentHistory'])->name('payment.history');
+    Route::get('/payments/transactions/{transaction}/invoice', [PaymentController::class, 'viewTransactionInvoice'])->name('payment.transaction.invoice');
     Route::get('/payments/{payment}/invoice', [PaymentController::class, 'viewInvoice'])->name('payment.invoice');
 
     // Application Details (After Payment)
@@ -259,70 +264,70 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/api/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notification.mark-read');
 
     Route::middleware('legacy.services')->group(function () {
-    // Trademark Opposition Management - Flow A: Defend My Trademark
-    Route::get('/trademark-opposition/defend/create', [TrademarkOppositionController::class, 'create'])->name('trademark-opposition.create');
-    Route::post('/trademark-opposition/defend', [TrademarkOppositionController::class, 'storeBasic'])->name('trademark-opposition.store');
-    Route::get('/trademark-opposition/defend/{case}', [TrademarkOppositionController::class, 'show'])->name('trademark-opposition.show');
-    Route::get('/trademark-opposition/defend/{case}/action-center', [TrademarkOppositionController::class, 'actionCenter'])->name('trademark-opposition.action-center');
-    Route::post('/trademark-opposition/defend/{case}/documents', [TrademarkOppositionController::class, 'uploadDocuments'])->name('trademark-opposition.documents');
-    Route::post('/trademark-opposition/defend/{case}/evidence', [TrademarkOppositionController::class, 'uploadEvidence'])->name('trademark-opposition.evidence');
-    Route::post('/trademark-opposition/defend/{case}/stage-documents', [TrademarkOppositionController::class, 'uploadOpposeThirdPartyEvidence'])->name('trademark-opposition.stage-documents');
-    Route::post('/trademark-opposition/defend/{case}/payment', [TrademarkOppositionController::class, 'completePayment'])->name('trademark-opposition.payment');
-    Route::post('/trademark-opposition/defend/{case}/payment/create-order', [TrademarkOppositionController::class, 'createPaymentOrder'])->middleware('throttle:10,1')->name('trademark-opposition.payment.create-order');
-    Route::post('/trademark-opposition/defend/{case}/payment/verify-signature', [TrademarkOppositionController::class, 'verifyPaymentSignature'])->middleware('throttle:10,1')->name('trademark-opposition.payment.verify-signature');
-    Route::get('/trademark-opposition/defend/{case}/payment/invoice', [TrademarkOppositionController::class, 'viewPaymentInvoice'])->name('trademark-opposition.payment.invoice');
-    Route::post('/trademark-opposition/defend/{case}/draft/approve', [TrademarkOppositionController::class, 'approveDraft'])->name('trademark-opposition.draft.approve');
-    Route::post('/trademark-opposition/defend/{case}/draft/request-changes', [TrademarkOppositionController::class, 'requestDraftChanges'])->name('trademark-opposition.draft.request-changes');
-    Route::get('/trademark-opposition/defend/{case}/documents/{kind}/{id}', [TrademarkOppositionController::class, 'viewDocument'])->name('trademark-opposition.document.view');
-    Route::get('/trademark-opposition/defend/{case}/file/{file}', [TrademarkOppositionController::class, 'viewCaseFile'])->name('trademark-opposition.file.view');
-    Route::get('/trademark-opposition/oppose/create', [TrademarkOppositionController::class, 'createOppose'])->name('trademark-opposition.oppose.create');
-    Route::post('/trademark-opposition/oppose', [TrademarkOppositionController::class, 'storeOpposeBasic'])->name('trademark-opposition.oppose.store');
-    Route::get('/trademark-opposition/oppose/{case}', [TrademarkOppositionController::class, 'showOppose'])->name('trademark-opposition.oppose.show');
-    Route::post('/trademark-opposition/oppose/{case}/evidence', [TrademarkOppositionController::class, 'uploadOpposeEvidence'])->name('trademark-opposition.oppose.evidence');
-    Route::post('/trademark-opposition/oppose/{case}/payment', [TrademarkOppositionController::class, 'completeOpposePayment'])->name('trademark-opposition.oppose.payment');
-    Route::post('/trademark-opposition/oppose/{case}/payment/create-order', [TrademarkOppositionController::class, 'createOpposePaymentOrder'])->middleware('throttle:10,1')->name('trademark-opposition.oppose.payment.create-order');
-    Route::post('/trademark-opposition/oppose/{case}/payment/verify-signature', [TrademarkOppositionController::class, 'verifyOpposePaymentSignature'])->middleware('throttle:10,1')->name('trademark-opposition.oppose.payment.verify-signature');
-    Route::get('/trademark-opposition/oppose/{case}/payment/invoice', [TrademarkOppositionController::class, 'viewOpposePaymentInvoice'])->name('trademark-opposition.oppose.payment.invoice');
-    Route::post('/trademark-opposition/oppose/{case}/draft/approve', [TrademarkOppositionController::class, 'approveOpposeDraft'])->name('trademark-opposition.oppose.draft.approve');
-    Route::post('/trademark-opposition/oppose/{case}/draft/request-changes', [TrademarkOppositionController::class, 'requestOpposeDraftChanges'])->name('trademark-opposition.oppose.draft.request-changes');
-    Route::post('/trademark-opposition/oppose/{case}/third-party-evidence', [TrademarkOppositionController::class, 'uploadOpposeThirdPartyEvidence'])->name('trademark-opposition.oppose.third-party-evidence');
-    Route::get('/trademark-opposition/oppose/{case}/documents/{kind}/{id}', [TrademarkOppositionController::class, 'viewDocument'])->name('trademark-opposition.oppose.document.view');
-    Route::get('/trademark-opposition/oppose/{case}/file/{file}', [TrademarkOppositionController::class, 'viewCaseFile'])->name('trademark-opposition.oppose.file.view');
+        // Trademark Opposition Management - Flow A: Defend My Trademark
+        Route::get('/trademark-opposition/defend/create', [TrademarkOppositionController::class, 'create'])->name('trademark-opposition.create');
+        Route::post('/trademark-opposition/defend', [TrademarkOppositionController::class, 'storeBasic'])->name('trademark-opposition.store');
+        Route::get('/trademark-opposition/defend/{case}', [TrademarkOppositionController::class, 'show'])->name('trademark-opposition.show');
+        Route::get('/trademark-opposition/defend/{case}/action-center', [TrademarkOppositionController::class, 'actionCenter'])->name('trademark-opposition.action-center');
+        Route::post('/trademark-opposition/defend/{case}/documents', [TrademarkOppositionController::class, 'uploadDocuments'])->name('trademark-opposition.documents');
+        Route::post('/trademark-opposition/defend/{case}/evidence', [TrademarkOppositionController::class, 'uploadEvidence'])->name('trademark-opposition.evidence');
+        Route::post('/trademark-opposition/defend/{case}/stage-documents', [TrademarkOppositionController::class, 'uploadOpposeThirdPartyEvidence'])->name('trademark-opposition.stage-documents');
+        Route::post('/trademark-opposition/defend/{case}/payment', [TrademarkOppositionController::class, 'completePayment'])->name('trademark-opposition.payment');
+        Route::post('/trademark-opposition/defend/{case}/payment/create-order', [TrademarkOppositionController::class, 'createPaymentOrder'])->middleware('throttle:10,1')->name('trademark-opposition.payment.create-order');
+        Route::get('/trademark-opposition/defend/{case}/payment/confirm', [TrademarkOppositionController::class, 'confirmPayment'])->middleware('throttle:10,1')->name('trademark-opposition.payment.confirm');
+        Route::get('/trademark-opposition/defend/{case}/payment/invoice', [TrademarkOppositionController::class, 'viewPaymentInvoice'])->name('trademark-opposition.payment.invoice');
+        Route::post('/trademark-opposition/defend/{case}/draft/approve', [TrademarkOppositionController::class, 'approveDraft'])->name('trademark-opposition.draft.approve');
+        Route::post('/trademark-opposition/defend/{case}/draft/request-changes', [TrademarkOppositionController::class, 'requestDraftChanges'])->name('trademark-opposition.draft.request-changes');
+        Route::get('/trademark-opposition/defend/{case}/documents/{kind}/{id}', [TrademarkOppositionController::class, 'viewDocument'])->name('trademark-opposition.document.view');
+        Route::get('/trademark-opposition/defend/{case}/file/{file}', [TrademarkOppositionController::class, 'viewCaseFile'])->name('trademark-opposition.file.view');
+        Route::get('/trademark-opposition/oppose/create', [TrademarkOppositionController::class, 'createOppose'])->name('trademark-opposition.oppose.create');
+        Route::post('/trademark-opposition/oppose', [TrademarkOppositionController::class, 'storeOpposeBasic'])->name('trademark-opposition.oppose.store');
+        Route::get('/trademark-opposition/oppose/{case}', [TrademarkOppositionController::class, 'showOppose'])->name('trademark-opposition.oppose.show');
+        Route::post('/trademark-opposition/oppose/{case}/evidence', [TrademarkOppositionController::class, 'uploadOpposeEvidence'])->name('trademark-opposition.oppose.evidence');
+        Route::post('/trademark-opposition/oppose/{case}/payment', [TrademarkOppositionController::class, 'completeOpposePayment'])->name('trademark-opposition.oppose.payment');
+        Route::post('/trademark-opposition/oppose/{case}/payment/create-order', [TrademarkOppositionController::class, 'createOpposePaymentOrder'])->middleware('throttle:10,1')->name('trademark-opposition.oppose.payment.create-order');
+        Route::get('/trademark-opposition/oppose/{case}/payment/confirm', [TrademarkOppositionController::class, 'confirmOpposePayment'])->middleware('throttle:10,1')->name('trademark-opposition.oppose.payment.confirm');
+        Route::get('/trademark-opposition/oppose/{case}/payment/invoice', [TrademarkOppositionController::class, 'viewOpposePaymentInvoice'])->name('trademark-opposition.oppose.payment.invoice');
+        Route::post('/trademark-opposition/oppose/{case}/draft/approve', [TrademarkOppositionController::class, 'approveOpposeDraft'])->name('trademark-opposition.oppose.draft.approve');
+        Route::post('/trademark-opposition/oppose/{case}/draft/request-changes', [TrademarkOppositionController::class, 'requestOpposeDraftChanges'])->name('trademark-opposition.oppose.draft.request-changes');
+        Route::post('/trademark-opposition/oppose/{case}/third-party-evidence', [TrademarkOppositionController::class, 'uploadOpposeThirdPartyEvidence'])->name('trademark-opposition.oppose.third-party-evidence');
+        Route::get('/trademark-opposition/oppose/{case}/documents/{kind}/{id}', [TrademarkOppositionController::class, 'viewDocument'])->name('trademark-opposition.oppose.document.view');
+        Route::get('/trademark-opposition/oppose/{case}/file/{file}', [TrademarkOppositionController::class, 'viewCaseFile'])->name('trademark-opposition.oppose.file.view');
 
-    // Stuck / Delayed Trademark Recovery
-    Route::post('/services/trademark/filed-and-stuck', [StuckTrademarkController::class, 'store'])->name('stuck-trademark.store');
-    Route::get('/stuck-trademark/{case}/onboarding', [StuckTrademarkController::class, 'showOnboarding'])->name('stuck-trademark.onboarding');
-    Route::post('/stuck-trademark/{case}/onboarding', [StuckTrademarkController::class, 'submitOnboarding'])->name('stuck-trademark.onboarding.submit');
-    Route::get('/stuck-trademark/{case}/documents', [StuckTrademarkController::class, 'showDocuments'])->name('stuck-trademark.documents');
-    Route::get('/stuck-trademark/{case}', [StuckTrademarkController::class, 'show'])->name('stuck-trademark.show');
-    Route::post('/stuck-trademark/{case}/documents', [StuckTrademarkController::class, 'uploadDocuments'])->name('stuck-trademark.documents.store');
-    Route::get('/stuck-trademark/{case}/audit-package', [StuckTrademarkController::class, 'showAuditPackage'])->name('stuck-trademark.audit-package');
-    Route::post('/stuck-trademark/{case}/audit-payment/create-order', [StuckTrademarkController::class, 'createAuditOrder'])->middleware('throttle:10,1')->name('stuck-trademark.audit-payment.create-order');
-    Route::post('/stuck-trademark/{case}/audit-payment/verify-signature', [StuckTrademarkController::class, 'verifyAuditPaymentSignature'])->middleware('throttle:10,1')->name('stuck-trademark.audit-payment.verify-signature');
-    Route::post('/stuck-trademark/{case}/audit-payment', [StuckTrademarkController::class, 'markAuditPaid'])->name('stuck-trademark.audit-payment');
-    Route::get('/stuck-trademark/{case}/audit-payment/invoice', [StuckTrademarkController::class, 'viewAuditInvoice'])->name('stuck-trademark.audit-payment.invoice');
-    Route::post('/stuck-trademark/{case}/audit-report/approve', [StuckTrademarkController::class, 'approveAuditReport'])->name('stuck-trademark.audit-report.approve');
-    Route::post('/stuck-trademark/{case}/audit-report/request-reupload', [StuckTrademarkController::class, 'requestAuditReportReupload'])->name('stuck-trademark.audit-report.request-reupload');
-    Route::post('/stuck-trademark/{case}/approve-execution', [StuckTrademarkController::class, 'approveExecution'])->name('stuck-trademark.approve-execution');
-    Route::post('/stuck-trademark/{case}/execution-payment/create-order', [StuckTrademarkController::class, 'createExecutionOrder'])->middleware('throttle:10,1')->name('stuck-trademark.execution-payment.create-order');
-    Route::post('/stuck-trademark/{case}/execution-payment/verify-signature', [StuckTrademarkController::class, 'verifyExecutionPaymentSignature'])->middleware('throttle:10,1')->name('stuck-trademark.execution-payment.verify-signature');
-    Route::post('/stuck-trademark/{case}/skip-execution', [StuckTrademarkController::class, 'skipExecution'])->name('stuck-trademark.skip-execution');
-    Route::get('/stuck-trademark/documents/{document}/view', [StuckTrademarkController::class, 'viewDocument'])->name('stuck-trademark.document.view');
-    Route::get('/stuck-trademark/{case}/audit-report', [StuckTrademarkController::class, 'viewAuditReport'])->name('stuck-trademark.audit-report');
+        // Stuck / Delayed Trademark Recovery
+        Route::post('/services/trademark/filed-and-stuck', [StuckTrademarkController::class, 'store'])->name('stuck-trademark.store');
+        Route::get('/stuck-trademark/{case}/onboarding', [StuckTrademarkController::class, 'showOnboarding'])->name('stuck-trademark.onboarding');
+        Route::post('/stuck-trademark/{case}/onboarding', [StuckTrademarkController::class, 'submitOnboarding'])->name('stuck-trademark.onboarding.submit');
+        Route::get('/stuck-trademark/{case}/documents', [StuckTrademarkController::class, 'showDocuments'])->name('stuck-trademark.documents');
+        Route::get('/stuck-trademark/{case}', [StuckTrademarkController::class, 'show'])->name('stuck-trademark.show');
+        Route::post('/stuck-trademark/{case}/documents', [StuckTrademarkController::class, 'uploadDocuments'])->name('stuck-trademark.documents.store');
+        Route::get('/stuck-trademark/{case}/audit-package', [StuckTrademarkController::class, 'showAuditPackage'])->name('stuck-trademark.audit-package');
+        Route::post('/stuck-trademark/{case}/audit-payment/create-order', [StuckTrademarkController::class, 'createAuditOrder'])->middleware('throttle:10,1')->name('stuck-trademark.audit-payment.create-order');
+        Route::get('/stuck-trademark/{case}/audit-payment/confirm', [StuckTrademarkController::class, 'confirmAuditPayment'])->middleware('throttle:10,1')->name('stuck-trademark.audit-payment.confirm');
+        Route::post('/stuck-trademark/{case}/audit-payment', [StuckTrademarkController::class, 'markAuditPaid'])->name('stuck-trademark.audit-payment');
+        Route::get('/stuck-trademark/{case}/audit-payment/invoice', [StuckTrademarkController::class, 'viewAuditInvoice'])->name('stuck-trademark.audit-payment.invoice');
+        Route::post('/stuck-trademark/{case}/audit-report/approve', [StuckTrademarkController::class, 'approveAuditReport'])->name('stuck-trademark.audit-report.approve');
+        Route::post('/stuck-trademark/{case}/audit-report/request-reupload', [StuckTrademarkController::class, 'requestAuditReportReupload'])->name('stuck-trademark.audit-report.request-reupload');
+        Route::post('/stuck-trademark/{case}/approve-execution', [StuckTrademarkController::class, 'approveExecution'])->name('stuck-trademark.approve-execution');
+        Route::post('/stuck-trademark/{case}/execution-payment/create-order', [StuckTrademarkController::class, 'createExecutionOrder'])->middleware('throttle:10,1')->name('stuck-trademark.execution-payment.create-order');
+        Route::get('/stuck-trademark/{case}/execution-payment/confirm', [StuckTrademarkController::class, 'confirmExecutionPayment'])->middleware('throttle:10,1')->name('stuck-trademark.execution-payment.confirm');
+        Route::post('/stuck-trademark/{case}/skip-execution', [StuckTrademarkController::class, 'skipExecution'])->name('stuck-trademark.skip-execution');
+        Route::get('/stuck-trademark/documents/{document}/view', [StuckTrademarkController::class, 'viewDocument'])->name('stuck-trademark.document.view');
+        Route::get('/stuck-trademark/{case}/audit-report', [StuckTrademarkController::class, 'viewAuditReport'])->name('stuck-trademark.audit-report');
 
-    // Examination Report Reply / Trademark Objection Reply
-    Route::get('/trademark-objection-reply/create', [ExaminationReportReplyController::class, 'create'])->name('examination-reply.create');
-    Route::post('/trademark-objection-reply', [ExaminationReportReplyController::class, 'store'])->name('examination-reply.store');
-    Route::get('/trademark-objection-reply/{case}', [ExaminationReportReplyController::class, 'show'])->name('examination-reply.show');
-    Route::post('/trademark-objection-reply/{case}/requested-documents', [ExaminationReportReplyController::class, 'uploadRequestedDocuments'])->name('examination-reply.requested-documents');
-    Route::post('/trademark-objection-reply/{case}/evidence', [ExaminationReportReplyController::class, 'submitEvidence'])->name('examination-reply.evidence');
-    Route::post('/trademark-objection-reply/{case}/draft/approve', [ExaminationReportReplyController::class, 'approveDraft'])->name('examination-reply.draft.approve');
-    Route::post('/trademark-objection-reply/{case}/draft/request-changes', [ExaminationReportReplyController::class, 'requestDraftChanges'])->name('examination-reply.draft.request-changes');
-    Route::post('/trademark-objection-reply/{case}/payment/create-order', [ExaminationReportReplyController::class, 'createPaymentOrder'])->middleware('throttle:10,1')->name('examination-reply.payment.create-order');
-    Route::post('/trademark-objection-reply/{case}/payment/verify-signature', [ExaminationReportReplyController::class, 'verifyPaymentSignature'])->middleware('throttle:10,1')->name('examination-reply.payment.verify-signature');
-    Route::get('/trademark-objection-reply/{case}/payment/invoice', [ExaminationReportReplyController::class, 'viewPaymentInvoice'])->name('examination-reply.payment.invoice');
-    Route::get('/trademark-objection-reply/documents/{document}/view', [ExaminationReportReplyController::class, 'viewDocument'])->name('examination-reply.document.view');
-    Route::get('/trademark-objection-reply/documents/{document}/download', [ExaminationReportReplyController::class, 'downloadDocument'])->name('examination-reply.document.download');
+        // Examination Report Reply / Trademark Objection Reply
+        Route::get('/trademark-objection-reply/create', [ExaminationReportReplyController::class, 'create'])->name('examination-reply.create');
+        Route::post('/trademark-objection-reply', [ExaminationReportReplyController::class, 'store'])->name('examination-reply.store');
+        Route::get('/trademark-objection-reply/{case}', [ExaminationReportReplyController::class, 'show'])->name('examination-reply.show');
+        Route::post('/trademark-objection-reply/{case}/requested-documents', [ExaminationReportReplyController::class, 'uploadRequestedDocuments'])->name('examination-reply.requested-documents');
+        Route::post('/trademark-objection-reply/{case}/evidence', [ExaminationReportReplyController::class, 'submitEvidence'])->name('examination-reply.evidence');
+        Route::post('/trademark-objection-reply/{case}/draft/approve', [ExaminationReportReplyController::class, 'approveDraft'])->name('examination-reply.draft.approve');
+        Route::post('/trademark-objection-reply/{case}/draft/request-changes', [ExaminationReportReplyController::class, 'requestDraftChanges'])->name('examination-reply.draft.request-changes');
+        Route::post('/trademark-objection-reply/{case}/payment/create-order', [ExaminationReportReplyController::class, 'createPaymentOrder'])->middleware('throttle:10,1')->name('examination-reply.payment.create-order');
+        Route::get('/trademark-objection-reply/{case}/payment/confirm', [ExaminationReportReplyController::class, 'confirmPayment'])->middleware('throttle:10,1')->name('examination-reply.payment.confirm');
+        Route::get('/trademark-objection-reply/{case}/payment/invoice', [ExaminationReportReplyController::class, 'viewPaymentInvoice'])->name('examination-reply.payment.invoice');
+        Route::get('/trademark-objection-reply/documents/{document}/view', [ExaminationReportReplyController::class, 'viewDocument'])->name('examination-reply.document.view');
+        Route::get('/trademark-objection-reply/documents/{document}/download', [ExaminationReportReplyController::class, 'downloadDocument'])->name('examination-reply.document.download');
     });
 
 });
@@ -432,6 +437,8 @@ Route::middleware(['admin'])->prefix('admin')->group(function () {
 
     // Payment Approval/Rejection
     Route::get('/payment/{payment}/invoice', [PaymentController::class, 'viewAdminInvoice'])->name('admin.payment.invoice');
+    Route::get('/payments', [PaymentController::class, 'adminPaymentHistory'])->name('admin.payments.index');
+    Route::get('/payments/transactions/{transaction}/invoice', [PaymentController::class, 'viewAdminTransactionInvoice'])->name('admin.payment.transaction.invoice');
     Route::post('/payment/{id}/approve', [AdminController::class, 'approvePayment'])->name('admin.approve-payment');
     Route::post('/payment/{id}/reject', [AdminController::class, 'rejectPayment'])->name('admin.reject-payment');
     Route::get('/trademark/{id}/image/view', [TrademarkController::class, 'viewTrademarkImage'])->name('admin.trademark.image.view');
@@ -440,74 +447,74 @@ Route::middleware(['admin'])->prefix('admin')->group(function () {
     Route::get('/documents/{document}/download', [UserDocumentController::class, 'download'])->name('admin.document.download');
 
     Route::middleware('legacy.services')->group(function () {
-    // Stuck / Delayed Trademark Recovery
-    Route::get('/stuck-trademark-cases', [StuckTrademarkController::class, 'adminIndex'])->name('admin.stuck-trademark.index');
-    Route::get('/trademark-opposition-cases', [TrademarkOppositionController::class, 'adminIndex'])->name('admin.trademark-opposition.index');
-    Route::get('/trademark-opposition-cases/{case}', [TrademarkOppositionController::class, 'adminShow'])->name('admin.trademark-opposition.show');
-    Route::delete('/trademark-opposition-cases/{case}/additional-documents/{document}', [TrademarkOppositionController::class, 'destroyAdditionalDocument'])->name('admin.trademark-opposition.additional-document.destroy');
-    Route::post('/trademark-opposition-cases/{case}/documents/review', [TrademarkOppositionController::class, 'adminReviewDocuments'])->name('admin.trademark-opposition.documents.review');
-    Route::post('/trademark-opposition-cases/{case}/evidence/review', [TrademarkOppositionController::class, 'adminReviewEvidence'])->name('admin.trademark-opposition.evidence.review');
-    Route::post('/trademark-opposition-cases/{case}/analysis', [TrademarkOppositionController::class, 'adminAnalyze'])->name('admin.trademark-opposition.analysis');
-    Route::post('/trademark-opposition-cases/{case}/request-evidence', [TrademarkOppositionController::class, 'adminRequestEvidence'])->name('admin.trademark-opposition.request-evidence');
-    Route::post('/trademark-opposition-cases/{case}/risk', [TrademarkOppositionController::class, 'adminRisk'])->name('admin.trademark-opposition.risk');
-    Route::post('/trademark-opposition-cases/{case}/pricing', [TrademarkOppositionController::class, 'adminPricing'])->name('admin.trademark-opposition.pricing');
-    Route::post('/trademark-opposition-cases/{case}/draft', [TrademarkOppositionController::class, 'adminUploadDraft'])->name('admin.trademark-opposition.draft');
-    Route::post('/trademark-opposition-cases/{case}/file', [TrademarkOppositionController::class, 'adminFile'])->name('admin.trademark-opposition.file');
-    Route::post('/trademark-opposition-cases/{case}/tracking', [TrademarkOppositionController::class, 'adminTracking'])->name('admin.trademark-opposition.tracking');
-    Route::get('/trademark-opposition-cases/{case}/documents/{kind}/{id}', [TrademarkOppositionController::class, 'viewDocument'])->name('admin.trademark-opposition.document.view');
-    Route::get('/trademark-opposition-cases/{case}/file/{file}', [TrademarkOppositionController::class, 'viewCaseFile'])->name('admin.trademark-opposition.file.view');
-    Route::get('/trademark-opposition-oppose-cases', [TrademarkOppositionController::class, 'adminOpposeIndex'])->name('admin.trademark-opposition.oppose.index');
-    Route::get('/trademark-opposition-oppose-cases/{case}', [TrademarkOppositionController::class, 'adminOpposeShow'])->name('admin.trademark-opposition.oppose.show');
-    Route::post('/trademark-opposition-oppose-cases/{case}/review', [TrademarkOppositionController::class, 'adminOpposeReview'])->name('admin.trademark-opposition.oppose.review');
-    Route::post('/trademark-opposition-oppose-cases/{case}/evidence/review', [TrademarkOppositionController::class, 'adminOpposeReviewEvidence'])->name('admin.trademark-opposition.oppose.evidence.review');
-    Route::post('/trademark-opposition-oppose-cases/{case}/recommendation', [TrademarkOppositionController::class, 'adminOpposeRecommendation'])->name('admin.trademark-opposition.oppose.recommendation');
-    Route::post('/trademark-opposition-oppose-cases/{case}/request-evidence', [TrademarkOppositionController::class, 'adminOpposeRequestEvidence'])->name('admin.trademark-opposition.oppose.request-evidence');
-    Route::post('/trademark-opposition-oppose-cases/{case}/additional-documents', [TrademarkOppositionController::class, 'adminOpposeAdditionalDocuments'])->name('admin.trademark-opposition.oppose.additional-documents');
-    Route::post('/trademark-opposition-oppose-cases/{case}/pricing', [TrademarkOppositionController::class, 'adminOpposePricing'])->name('admin.trademark-opposition.oppose.pricing');
-    Route::post('/trademark-opposition-oppose-cases/{case}/draft-status', [TrademarkOppositionController::class, 'adminOpposeDraftStatus'])->name('admin.trademark-opposition.oppose.draft-status');
-    Route::post('/trademark-opposition-oppose-cases/{case}/draft', [TrademarkOppositionController::class, 'adminOpposeUploadDraft'])->name('admin.trademark-opposition.oppose.draft');
-    Route::post('/trademark-opposition-oppose-cases/{case}/file', [TrademarkOppositionController::class, 'adminOpposeFile'])->name('admin.trademark-opposition.oppose.file');
-    Route::post('/trademark-opposition-oppose-cases/{case}/tracking', [TrademarkOppositionController::class, 'adminOpposeTracking'])->name('admin.trademark-opposition.oppose.tracking');
-    Route::post('/trademark-opposition-oppose-cases/{case}/internal-note', [TrademarkOppositionController::class, 'adminOpposeInternalNote'])->name('admin.trademark-opposition.oppose.internal-note');
-    Route::post('/trademark-opposition-oppose-cases/{case}/third-party-action', [TrademarkOppositionController::class, 'adminOpposeThirdPartyAction'])->name('admin.trademark-opposition.oppose.third-party-action');
-    Route::post('/trademark-opposition-oppose-cases/{case}/third-party-evidence-request', [TrademarkOppositionController::class, 'adminOpposeThirdPartyEvidenceRequest'])->name('admin.trademark-opposition.oppose.third-party-evidence-request');
-    Route::post('/trademark-opposition-oppose-cases/{case}/evidence-filed', [TrademarkOppositionController::class, 'adminOpposeEvidenceFiled'])->name('admin.trademark-opposition.oppose.evidence-filed');
-    Route::post('/trademark-opposition-oppose-cases/{case}/registry-updates', [TrademarkOppositionController::class, 'adminOpposeRegistryUpdate'])->name('admin.trademark-opposition.oppose.registry-update');
-    Route::get('/examination-report-replies', [ExaminationReportReplyController::class, 'adminIndex'])->name('admin.examination-reply.index');
-    Route::get('/examination-report-replies/{case}', [ExaminationReportReplyController::class, 'adminShow'])->name('admin.examination-reply.show');
-    Route::post('/examination-report-replies/{case}/stage-draft', [ExaminationReportReplyController::class, 'adminSaveStageDraft'])->name('admin.examination-reply.stage-draft');
-    Route::post('/examination-report-replies/{case}/internal-note', [ExaminationReportReplyController::class, 'adminSaveInternalNote'])->name('admin.examination-reply.internal-note');
-    Route::post('/examination-report-replies/{case}/additional-documents', [ExaminationReportReplyController::class, 'adminStoreAdditionalDocuments'])->name('admin.examination-reply.additional-documents');
-    Route::post('/examination-report-replies/{case}/documents/review', [ExaminationReportReplyController::class, 'adminReviewDocuments'])->name('admin.examination-reply.documents.review');
-    Route::post('/examination-report-replies/{case}/start-review', [ExaminationReportReplyController::class, 'adminStartReview'])->name('admin.examination-reply.start-review');
-    Route::post('/examination-report-replies/{case}/objection', [ExaminationReportReplyController::class, 'adminSaveObjection'])->name('admin.examination-reply.objection');
-    Route::post('/examination-report-replies/{case}/evidence-review', [ExaminationReportReplyController::class, 'adminReviewEvidence'])->name('admin.examination-reply.evidence-review');
-    Route::post('/examination-report-replies/{case}/risk', [ExaminationReportReplyController::class, 'adminRisk'])->name('admin.examination-reply.risk');
-    Route::post('/examination-report-replies/{case}/pricing', [ExaminationReportReplyController::class, 'adminPricing'])->name('admin.examination-reply.pricing');
-    Route::post('/examination-report-replies/{case}/draft', [ExaminationReportReplyController::class, 'adminDraft'])->name('admin.examination-reply.draft');
-    Route::post('/examination-report-replies/{case}/filing', [ExaminationReportReplyController::class, 'adminFiling'])->name('admin.examination-reply.filing');
-    Route::post('/examination-report-replies/{case}/awaiting-registry', [ExaminationReportReplyController::class, 'adminAwaitingRegistry'])->name('admin.examination-reply.awaiting-registry');
-    Route::post('/examination-report-replies/{case}/registry-update', [ExaminationReportReplyController::class, 'adminRegistryUpdate'])->name('admin.examination-reply.registry-update');
-    Route::post('/examination-report-replies/{case}/hearing', [ExaminationReportReplyController::class, 'adminHearing'])->name('admin.examination-reply.hearing');
-    Route::post('/examination-report-replies/{case}/close', [ExaminationReportReplyController::class, 'adminClose'])->name('admin.examination-reply.close');
-    Route::get('/examination-report-reply-documents/{document}/view', [ExaminationReportReplyController::class, 'viewDocument'])->name('admin.examination-reply.document.view');
-    Route::get('/examination-report-reply-documents/{document}/download', [ExaminationReportReplyController::class, 'downloadDocument'])->name('admin.examination-reply.document.download');
-    Route::delete('/examination-report-reply-documents/{document}', [ExaminationReportReplyController::class, 'removeDocument'])->name('admin.examination-reply.document.destroy');
-    Route::get('/stuck-trademark-cases/{case}', [StuckTrademarkController::class, 'adminShow'])->name('admin.stuck-trademark.show');
-    Route::post('/stuck-trademark-cases/{case}', [StuckTrademarkController::class, 'adminUpdate'])->name('admin.stuck-trademark.update');
-    Route::post('/stuck-trademark-cases/{case}/audit-report', [StuckTrademarkController::class, 'adminUploadAuditReport'])->name('admin.stuck-trademark.audit-report');
-    Route::post('/stuck-trademark-cases/{case}/documents/bulk-verify', [StuckTrademarkController::class, 'adminBulkVerifyDocuments'])->name('admin.stuck-trademark.documents.bulk-verify');
-    Route::post('/stuck-trademark-documents/{document}/verify', [StuckTrademarkController::class, 'adminVerifyDocument'])->name('admin.stuck-trademark.document.verify');
-    Route::get('/stuck-trademark-documents/{document}/view', [StuckTrademarkController::class, 'viewDocument'])->name('admin.stuck-trademark.document.view');
-    Route::get('/stuck-trademark-cases/{case}/audit-report/view', [StuckTrademarkController::class, 'viewAuditReport'])->name('admin.stuck-trademark.audit-report.view');
-    Route::get('/stuck-trademark-cases/{case}/execution', [AdminTrademarkExecutionController::class, 'showExecution'])->name('admin.trademark-execution.show');
-    Route::post('/stuck-trademark-cases/{case}/execution/start', [AdminTrademarkExecutionController::class, 'startExecution'])->name('admin.trademark-execution.start');
-    Route::post('/stuck-trademark-cases/{case}/execution/required-actions', [AdminTrademarkExecutionController::class, 'saveActions'])->name('admin.trademark-execution.actions');
-    Route::post('/stuck-trademark-cases/{case}/execution/action-progress', [AdminTrademarkExecutionController::class, 'submitActionProgress'])->name('admin.trademark-execution.action-progress');
-    Route::post('/stuck-trademark-cases/{case}/execution/status-monitoring', [AdminTrademarkExecutionController::class, 'completeStatusMonitoring'])->name('admin.trademark-execution.status-monitoring');
-    Route::post('/stuck-trademark-cases/{case}/execution/additional-action', [AdminTrademarkExecutionController::class, 'resolveAdditionalAction'])->name('admin.trademark-execution.additional-action');
-    Route::post('/stuck-trademark-cases/{case}/monitoring-update', [AdminTrademarkExecutionController::class, 'submitMonitoringUpdate'])->name('admin.trademark-execution.monitoring-update');
-    Route::post('/stuck-trademark-cases/{case}/resolution-report', [AdminTrademarkExecutionController::class, 'submitResolutionReport'])->name('admin.trademark-execution.resolution-report');
+        // Stuck / Delayed Trademark Recovery
+        Route::get('/stuck-trademark-cases', [StuckTrademarkController::class, 'adminIndex'])->name('admin.stuck-trademark.index');
+        Route::get('/trademark-opposition-cases', [TrademarkOppositionController::class, 'adminIndex'])->name('admin.trademark-opposition.index');
+        Route::get('/trademark-opposition-cases/{case}', [TrademarkOppositionController::class, 'adminShow'])->name('admin.trademark-opposition.show');
+        Route::delete('/trademark-opposition-cases/{case}/additional-documents/{document}', [TrademarkOppositionController::class, 'destroyAdditionalDocument'])->name('admin.trademark-opposition.additional-document.destroy');
+        Route::post('/trademark-opposition-cases/{case}/documents/review', [TrademarkOppositionController::class, 'adminReviewDocuments'])->name('admin.trademark-opposition.documents.review');
+        Route::post('/trademark-opposition-cases/{case}/evidence/review', [TrademarkOppositionController::class, 'adminReviewEvidence'])->name('admin.trademark-opposition.evidence.review');
+        Route::post('/trademark-opposition-cases/{case}/analysis', [TrademarkOppositionController::class, 'adminAnalyze'])->name('admin.trademark-opposition.analysis');
+        Route::post('/trademark-opposition-cases/{case}/request-evidence', [TrademarkOppositionController::class, 'adminRequestEvidence'])->name('admin.trademark-opposition.request-evidence');
+        Route::post('/trademark-opposition-cases/{case}/risk', [TrademarkOppositionController::class, 'adminRisk'])->name('admin.trademark-opposition.risk');
+        Route::post('/trademark-opposition-cases/{case}/pricing', [TrademarkOppositionController::class, 'adminPricing'])->name('admin.trademark-opposition.pricing');
+        Route::post('/trademark-opposition-cases/{case}/draft', [TrademarkOppositionController::class, 'adminUploadDraft'])->name('admin.trademark-opposition.draft');
+        Route::post('/trademark-opposition-cases/{case}/file', [TrademarkOppositionController::class, 'adminFile'])->name('admin.trademark-opposition.file');
+        Route::post('/trademark-opposition-cases/{case}/tracking', [TrademarkOppositionController::class, 'adminTracking'])->name('admin.trademark-opposition.tracking');
+        Route::get('/trademark-opposition-cases/{case}/documents/{kind}/{id}', [TrademarkOppositionController::class, 'viewDocument'])->name('admin.trademark-opposition.document.view');
+        Route::get('/trademark-opposition-cases/{case}/file/{file}', [TrademarkOppositionController::class, 'viewCaseFile'])->name('admin.trademark-opposition.file.view');
+        Route::get('/trademark-opposition-oppose-cases', [TrademarkOppositionController::class, 'adminOpposeIndex'])->name('admin.trademark-opposition.oppose.index');
+        Route::get('/trademark-opposition-oppose-cases/{case}', [TrademarkOppositionController::class, 'adminOpposeShow'])->name('admin.trademark-opposition.oppose.show');
+        Route::post('/trademark-opposition-oppose-cases/{case}/review', [TrademarkOppositionController::class, 'adminOpposeReview'])->name('admin.trademark-opposition.oppose.review');
+        Route::post('/trademark-opposition-oppose-cases/{case}/evidence/review', [TrademarkOppositionController::class, 'adminOpposeReviewEvidence'])->name('admin.trademark-opposition.oppose.evidence.review');
+        Route::post('/trademark-opposition-oppose-cases/{case}/recommendation', [TrademarkOppositionController::class, 'adminOpposeRecommendation'])->name('admin.trademark-opposition.oppose.recommendation');
+        Route::post('/trademark-opposition-oppose-cases/{case}/request-evidence', [TrademarkOppositionController::class, 'adminOpposeRequestEvidence'])->name('admin.trademark-opposition.oppose.request-evidence');
+        Route::post('/trademark-opposition-oppose-cases/{case}/additional-documents', [TrademarkOppositionController::class, 'adminOpposeAdditionalDocuments'])->name('admin.trademark-opposition.oppose.additional-documents');
+        Route::post('/trademark-opposition-oppose-cases/{case}/pricing', [TrademarkOppositionController::class, 'adminOpposePricing'])->name('admin.trademark-opposition.oppose.pricing');
+        Route::post('/trademark-opposition-oppose-cases/{case}/draft-status', [TrademarkOppositionController::class, 'adminOpposeDraftStatus'])->name('admin.trademark-opposition.oppose.draft-status');
+        Route::post('/trademark-opposition-oppose-cases/{case}/draft', [TrademarkOppositionController::class, 'adminOpposeUploadDraft'])->name('admin.trademark-opposition.oppose.draft');
+        Route::post('/trademark-opposition-oppose-cases/{case}/file', [TrademarkOppositionController::class, 'adminOpposeFile'])->name('admin.trademark-opposition.oppose.file');
+        Route::post('/trademark-opposition-oppose-cases/{case}/tracking', [TrademarkOppositionController::class, 'adminOpposeTracking'])->name('admin.trademark-opposition.oppose.tracking');
+        Route::post('/trademark-opposition-oppose-cases/{case}/internal-note', [TrademarkOppositionController::class, 'adminOpposeInternalNote'])->name('admin.trademark-opposition.oppose.internal-note');
+        Route::post('/trademark-opposition-oppose-cases/{case}/third-party-action', [TrademarkOppositionController::class, 'adminOpposeThirdPartyAction'])->name('admin.trademark-opposition.oppose.third-party-action');
+        Route::post('/trademark-opposition-oppose-cases/{case}/third-party-evidence-request', [TrademarkOppositionController::class, 'adminOpposeThirdPartyEvidenceRequest'])->name('admin.trademark-opposition.oppose.third-party-evidence-request');
+        Route::post('/trademark-opposition-oppose-cases/{case}/evidence-filed', [TrademarkOppositionController::class, 'adminOpposeEvidenceFiled'])->name('admin.trademark-opposition.oppose.evidence-filed');
+        Route::post('/trademark-opposition-oppose-cases/{case}/registry-updates', [TrademarkOppositionController::class, 'adminOpposeRegistryUpdate'])->name('admin.trademark-opposition.oppose.registry-update');
+        Route::get('/examination-report-replies', [ExaminationReportReplyController::class, 'adminIndex'])->name('admin.examination-reply.index');
+        Route::get('/examination-report-replies/{case}', [ExaminationReportReplyController::class, 'adminShow'])->name('admin.examination-reply.show');
+        Route::post('/examination-report-replies/{case}/stage-draft', [ExaminationReportReplyController::class, 'adminSaveStageDraft'])->name('admin.examination-reply.stage-draft');
+        Route::post('/examination-report-replies/{case}/internal-note', [ExaminationReportReplyController::class, 'adminSaveInternalNote'])->name('admin.examination-reply.internal-note');
+        Route::post('/examination-report-replies/{case}/additional-documents', [ExaminationReportReplyController::class, 'adminStoreAdditionalDocuments'])->name('admin.examination-reply.additional-documents');
+        Route::post('/examination-report-replies/{case}/documents/review', [ExaminationReportReplyController::class, 'adminReviewDocuments'])->name('admin.examination-reply.documents.review');
+        Route::post('/examination-report-replies/{case}/start-review', [ExaminationReportReplyController::class, 'adminStartReview'])->name('admin.examination-reply.start-review');
+        Route::post('/examination-report-replies/{case}/objection', [ExaminationReportReplyController::class, 'adminSaveObjection'])->name('admin.examination-reply.objection');
+        Route::post('/examination-report-replies/{case}/evidence-review', [ExaminationReportReplyController::class, 'adminReviewEvidence'])->name('admin.examination-reply.evidence-review');
+        Route::post('/examination-report-replies/{case}/risk', [ExaminationReportReplyController::class, 'adminRisk'])->name('admin.examination-reply.risk');
+        Route::post('/examination-report-replies/{case}/pricing', [ExaminationReportReplyController::class, 'adminPricing'])->name('admin.examination-reply.pricing');
+        Route::post('/examination-report-replies/{case}/draft', [ExaminationReportReplyController::class, 'adminDraft'])->name('admin.examination-reply.draft');
+        Route::post('/examination-report-replies/{case}/filing', [ExaminationReportReplyController::class, 'adminFiling'])->name('admin.examination-reply.filing');
+        Route::post('/examination-report-replies/{case}/awaiting-registry', [ExaminationReportReplyController::class, 'adminAwaitingRegistry'])->name('admin.examination-reply.awaiting-registry');
+        Route::post('/examination-report-replies/{case}/registry-update', [ExaminationReportReplyController::class, 'adminRegistryUpdate'])->name('admin.examination-reply.registry-update');
+        Route::post('/examination-report-replies/{case}/hearing', [ExaminationReportReplyController::class, 'adminHearing'])->name('admin.examination-reply.hearing');
+        Route::post('/examination-report-replies/{case}/close', [ExaminationReportReplyController::class, 'adminClose'])->name('admin.examination-reply.close');
+        Route::get('/examination-report-reply-documents/{document}/view', [ExaminationReportReplyController::class, 'viewDocument'])->name('admin.examination-reply.document.view');
+        Route::get('/examination-report-reply-documents/{document}/download', [ExaminationReportReplyController::class, 'downloadDocument'])->name('admin.examination-reply.document.download');
+        Route::delete('/examination-report-reply-documents/{document}', [ExaminationReportReplyController::class, 'removeDocument'])->name('admin.examination-reply.document.destroy');
+        Route::get('/stuck-trademark-cases/{case}', [StuckTrademarkController::class, 'adminShow'])->name('admin.stuck-trademark.show');
+        Route::post('/stuck-trademark-cases/{case}', [StuckTrademarkController::class, 'adminUpdate'])->name('admin.stuck-trademark.update');
+        Route::post('/stuck-trademark-cases/{case}/audit-report', [StuckTrademarkController::class, 'adminUploadAuditReport'])->name('admin.stuck-trademark.audit-report');
+        Route::post('/stuck-trademark-cases/{case}/documents/bulk-verify', [StuckTrademarkController::class, 'adminBulkVerifyDocuments'])->name('admin.stuck-trademark.documents.bulk-verify');
+        Route::post('/stuck-trademark-documents/{document}/verify', [StuckTrademarkController::class, 'adminVerifyDocument'])->name('admin.stuck-trademark.document.verify');
+        Route::get('/stuck-trademark-documents/{document}/view', [StuckTrademarkController::class, 'viewDocument'])->name('admin.stuck-trademark.document.view');
+        Route::get('/stuck-trademark-cases/{case}/audit-report/view', [StuckTrademarkController::class, 'viewAuditReport'])->name('admin.stuck-trademark.audit-report.view');
+        Route::get('/stuck-trademark-cases/{case}/execution', [AdminTrademarkExecutionController::class, 'showExecution'])->name('admin.trademark-execution.show');
+        Route::post('/stuck-trademark-cases/{case}/execution/start', [AdminTrademarkExecutionController::class, 'startExecution'])->name('admin.trademark-execution.start');
+        Route::post('/stuck-trademark-cases/{case}/execution/required-actions', [AdminTrademarkExecutionController::class, 'saveActions'])->name('admin.trademark-execution.actions');
+        Route::post('/stuck-trademark-cases/{case}/execution/action-progress', [AdminTrademarkExecutionController::class, 'submitActionProgress'])->name('admin.trademark-execution.action-progress');
+        Route::post('/stuck-trademark-cases/{case}/execution/status-monitoring', [AdminTrademarkExecutionController::class, 'completeStatusMonitoring'])->name('admin.trademark-execution.status-monitoring');
+        Route::post('/stuck-trademark-cases/{case}/execution/additional-action', [AdminTrademarkExecutionController::class, 'resolveAdditionalAction'])->name('admin.trademark-execution.additional-action');
+        Route::post('/stuck-trademark-cases/{case}/monitoring-update', [AdminTrademarkExecutionController::class, 'submitMonitoringUpdate'])->name('admin.trademark-execution.monitoring-update');
+        Route::post('/stuck-trademark-cases/{case}/resolution-report', [AdminTrademarkExecutionController::class, 'submitResolutionReport'])->name('admin.trademark-execution.resolution-report');
     });
 
 });

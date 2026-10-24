@@ -6,6 +6,7 @@ return [
         'items' => [
             ['label' => 'Dashboard', 'description' => 'Admin workspace overview', 'icon' => 'bi-grid-1x2', 'route' => 'admin.dashboard', 'active' => ['admin.dashboard']],
             ['label' => 'Registered Users', 'description' => 'View registered website users', 'icon' => 'bi-people', 'route' => 'admin.users.index', 'active' => ['admin.users.*']],
+            ['label' => 'Payments & Invoices', 'description' => 'Review Revolut history and download invoices', 'icon' => 'bi-receipt', 'route' => 'admin.payments.index', 'active' => ['admin.payments.*', 'admin.payment.transaction.*']],
         ],
     ],
     [

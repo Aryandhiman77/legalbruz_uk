@@ -11,9 +11,13 @@ use Illuminate\Support\Facades\Schema;
 class TrademarkSearchReportRequest extends Model
 {
     public const AWAITING_PAYMENT = 'awaiting_payment';
+
     public const PAYMENT_RECEIVED = 'payment_received';
+
     public const IN_REVIEW = 'in_review';
+
     public const REPORT_READY = 'report_ready';
+
     public const COMPLETED = 'completed';
 
     protected $fillable = [
@@ -32,7 +36,7 @@ class TrademarkSearchReportRequest extends Model
         'report_file_path',
         'report_file_name',
         'report_uploaded_at',
-        'razorpay_order_id',
+        'payment_reference',
         'transaction_id',
         'paid_at',
     ];
@@ -63,6 +67,7 @@ class TrademarkSearchReportRequest extends Model
         return $query->where(function (Builder $query) use ($user): void {
             if (Schema::hasColumn('trademark_search_report_requests', 'user_id')) {
                 $query->where('user_id', $user->id)->orWhere('email', $user->email);
+
                 return;
             }
 

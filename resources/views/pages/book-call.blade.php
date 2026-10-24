@@ -47,7 +47,7 @@
                 <aside class="call-info-card">
                     <span>WHAT HAPPENS NEXT</span>
                     <h2>A focused first conversation</h2>
-                    <ol><li><b>1</b><div><strong>Submit your details</strong><p>Tell us about the issue and your preferred availability.</p></div></li><li><b>2</b><div><strong>Pay securely</strong><p>Complete the consultation payment through Razorpay.</p></div></li><li><b>3</b><div><strong>We confirm the slot</strong><p>Our team will contact you to confirm the exact call time.</p></div></li></ol>
+                    <ol><li><b>1</b><div><strong>Submit your details</strong><p>Tell us about the issue and your preferred availability.</p></div></li><li><b>2</b><div><strong>Pay securely</strong><p>Complete the consultation payment through Revolut.</p></div></li><li><b>3</b><div><strong>We confirm the slot</strong><p>Our team will contact you to confirm the exact call time.</p></div></li></ol>
                     <div class="call-note"><i class="bi bi-info-circle"></i><p>Your preferred date and window are a request, not a guaranteed appointment. We will agree the final slot with you.</p></div>
                 </aside>
             </div>

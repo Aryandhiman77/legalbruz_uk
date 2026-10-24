@@ -24,7 +24,7 @@ class ConsultationBooking extends Model
         'amount',
         'currency',
         'payment_status',
-        'razorpay_order_id',
+        'payment_reference',
         'transaction_id',
         'paid_at',
     ];
@@ -55,6 +55,7 @@ class ConsultationBooking extends Model
         return $query->where(function (Builder $query) use ($user): void {
             if (Schema::hasColumn('consultation_bookings', 'user_id')) {
                 $query->where('user_id', $user->id)->orWhere('email', $user->email);
+
                 return;
             }
 

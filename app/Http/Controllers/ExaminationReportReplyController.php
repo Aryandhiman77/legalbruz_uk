@@ -10,14 +10,14 @@ use App\Models\ExaminationReplyDocument;
 use App\Models\ExaminationReplyDraft;
 use App\Models\ExaminationReplyNotificationLog;
 use App\Models\ExaminationReplyRequestedDocument;
-use App\Models\ExaminationReplyStageRequest;
 use App\Models\ExaminationReplyStageDraft;
+use App\Models\ExaminationReplyStageRequest;
 use App\Models\ExaminationReplyStatusHistory;
 use App\Models\ExaminationReportReplyCase;
 use App\Models\Notification;
-use App\Services\RazorpayPaymentVerifier;
+use App\Models\PaymentTransaction;
+use App\Services\RevolutMerchantService;
 use App\Support\ExaminationReportReplyWorkflow as Workflow;
-use App\Support\UkMobileNumber;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -27,13 +27,16 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Throwable;
 
 class ExaminationReportReplyController extends Controller
 {
     private const ALLOWED_UPLOADS = 'pdf,jpg,jpeg,png,doc,docx';
+
     private const CLIENT_UPLOAD_MAX_KB = 10240;
+
     private const ADMIN_UPLOAD_MAX_KB = 15360;
 
     public function landing(): View
@@ -56,9 +59,9 @@ class ExaminationReportReplyController extends Controller
             'application_filing_date' => ['required', 'date', 'before_or_equal:today'],
             'current_status' => ['required', 'in:Objected,Awaiting reply to examination report,Hearing required,Not sure'],
             'filed_through_legalbruz' => ['required', 'boolean'],
-            'exam_report' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:' . self::CLIENT_UPLOAD_MAX_KB],
-            'tma_acknowledgment' => ['nullable', 'file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:' . self::CLIENT_UPLOAD_MAX_KB],
-            'logo_device_mark' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:' . self::CLIENT_UPLOAD_MAX_KB],
+            'exam_report' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:'.self::CLIENT_UPLOAD_MAX_KB],
+            'tma_acknowledgment' => ['nullable', 'file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:'.self::CLIENT_UPLOAD_MAX_KB],
+            'logo_device_mark' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:'.self::CLIENT_UPLOAD_MAX_KB],
             'exam_report_receipt_date' => ['required', 'date', 'after_or_equal:application_filing_date', 'before_or_equal:today'],
         ]);
 
@@ -72,7 +75,7 @@ class ExaminationReportReplyController extends Controller
         $case = ExaminationReportReplyCase::create([
             ...$caseData,
             'user_id' => Auth::id(),
-            'case_number' => 'ERR-' . now()->format('Ymd') . '-' . str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT),
+            'case_number' => 'ERR-'.now()->format('Ymd').'-'.str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT),
             'reply_deadline' => $deadline,
             'deadline_status' => Workflow::deadlineStatus($deadline),
             'current_admin_status' => Workflow::ADMIN_APPLICATION_RECEIVED,
@@ -107,7 +110,6 @@ class ExaminationReportReplyController extends Controller
             'case' => $case,
             'timeline' => Workflow::clientTimeline($case),
             'evidenceTypes' => Workflow::evidenceDocumentTypes(),
-            'razorpayKeyId' => config('razorpay.key_id'),
             'paymentCoupons' => DiscountCoupon::availableForPayment('objection_reply', Auth::id()),
             'autoApplyCoupon' => DiscountCoupon::autoApplyForPayment('objection_reply', Auth::id()),
         ]);
@@ -128,7 +130,7 @@ class ExaminationReportReplyController extends Controller
             'similar_brands_known' => [$hasEvidenceIntake ? 'nullable' : 'required', 'in:yes,no'],
             'message_to_admin' => ['nullable', 'string', 'max:2000'],
             'requested_documents' => ['nullable', 'array'],
-            'requested_documents.*' => ['file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:' . self::CLIENT_UPLOAD_MAX_KB],
+            'requested_documents.*' => ['file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:'.self::CLIENT_UPLOAD_MAX_KB],
         ];
 
         $data = $request->validate($rules);
@@ -136,7 +138,7 @@ class ExaminationReportReplyController extends Controller
 
         foreach ($request->file('requested_documents', []) as $requestedId => $file) {
             $requested = $case->requestedDocuments()->find($requestedId);
-            if (!$requested) {
+            if (! $requested) {
                 continue;
             }
 
@@ -181,9 +183,9 @@ class ExaminationReportReplyController extends Controller
         }
 
         $clientAdminMessage = trim((string) ($data['message_to_admin'] ?? ''));
-        $statusNote = 'Client submitted requested evidence.' . ($clientAdminMessage !== '' ? "\n\nMessage to admin: " . $clientAdminMessage : '');
+        $statusNote = 'Client submitted requested evidence.'.($clientAdminMessage !== '' ? "\n\nMessage to admin: ".$clientAdminMessage : '');
         $this->transition($case, Workflow::ADMIN_EVIDENCE_SUBMITTED, $statusNote, 'client');
-        $this->notifyAdmins($case, 'Evidence submitted for Trademark Objection Reply case ' . $case->case_number . ($clientAdminMessage !== '' ? "\n\nClient message:\n" . $clientAdminMessage : ''));
+        $this->notifyAdmins($case, 'Evidence submitted for Trademark Objection Reply case '.$case->case_number.($clientAdminMessage !== '' ? "\n\nClient message:\n".$clientAdminMessage : ''));
 
         return back()->with('success', 'Your documents have been submitted. Our legal team will review them.');
     }
@@ -194,7 +196,7 @@ class ExaminationReportReplyController extends Controller
 
         $request->validate([
             'requested_documents' => ['required', 'array', 'min:1'],
-            'requested_documents.*' => ['file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:' . self::CLIENT_UPLOAD_MAX_KB],
+            'requested_documents.*' => ['file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:'.self::CLIENT_UPLOAD_MAX_KB],
             'message_to_admin' => ['nullable', 'string', 'max:2000'],
         ]);
         $clientAdminMessage = trim((string) $request->input('message_to_admin', ''));
@@ -203,7 +205,7 @@ class ExaminationReportReplyController extends Controller
         $isRegistryClarificationUpload = false;
         foreach ($request->file('requested_documents', []) as $requestedId => $file) {
             $requested = $case->requestedDocuments()->find($requestedId);
-            if (!$requested) {
+            if (! $requested) {
                 continue;
             }
 
@@ -244,9 +246,9 @@ class ExaminationReportReplyController extends Controller
             $case->current_admin_status === Workflow::ADMIN_DOCUMENTS_PENDING => Workflow::ADMIN_APPLICATION_RECEIVED,
             default => Workflow::ADMIN_EVIDENCE_SUBMITTED,
         };
-        $statusNote = 'Client uploaded requested documents.' . ($clientAdminMessage !== '' ? "\n\nMessage to admin: " . $clientAdminMessage : '');
+        $statusNote = 'Client uploaded requested documents.'.($clientAdminMessage !== '' ? "\n\nMessage to admin: ".$clientAdminMessage : '');
         $this->transition($case, $nextStatus, $statusNote, 'client');
-        $this->notifyAdmins($case, 'Requested documents uploaded for Trademark Objection Reply case ' . $case->case_number . ($clientAdminMessage !== '' ? "\n\nClient message:\n" . $clientAdminMessage : ''));
+        $this->notifyAdmins($case, 'Requested documents uploaded for Trademark Objection Reply case '.$case->case_number.($clientAdminMessage !== '' ? "\n\nClient message:\n".$clientAdminMessage : ''));
 
         return back()->with('success', 'Requested documents uploaded successfully.');
     }
@@ -255,14 +257,14 @@ class ExaminationReportReplyController extends Controller
     {
         $this->authorizeClient($case);
 
-        if (!$case->drafts()->where('status', 'client_approval_pending')->exists()) {
+        if (! $case->drafts()->where('status', 'client_approval_pending')->exists()) {
             return back()->with('error', 'A draft is not currently pending approval.');
         }
 
         $case->drafts()->latest('id')->first()?->update(['status' => 'approved']);
         $case->update(['client_approval_status' => 'approved']);
         $this->transition($case, Workflow::ADMIN_READY_FOR_FILING, 'Client approved the objection reply draft.', 'client');
-        $this->notifyAdmins($case, 'Client approved objection reply draft for case ' . $case->case_number . '.');
+        $this->notifyAdmins($case, 'Client approved objection reply draft for case '.$case->case_number.'.');
 
         return back()->with('success', 'Draft approved. Our team can now proceed with filing.');
     }
@@ -271,7 +273,7 @@ class ExaminationReportReplyController extends Controller
     {
         $this->authorizeClient($case);
 
-        if (!$case->drafts()->where('status', 'client_approval_pending')->exists()) {
+        if (! $case->drafts()->where('status', 'client_approval_pending')->exists()) {
             return back()->with('error', 'A draft is not currently pending review.');
         }
 
@@ -283,12 +285,12 @@ class ExaminationReportReplyController extends Controller
         ]);
         $case->update(['client_approval_status' => 'changes_requested']);
         $this->transition($case, Workflow::ADMIN_CHANGES_REQUESTED, $data['change_request'], 'client');
-        $this->notifyAdmins($case, 'Client requested draft changes for objection reply case ' . $case->case_number . '.');
+        $this->notifyAdmins($case, 'Client requested draft changes for objection reply case '.$case->case_number.'.');
 
         return back()->with('success', 'Your change request has been sent to the drafting team.');
     }
 
-    public function createPaymentOrder(Request $request, ExaminationReportReplyCase $case): JsonResponse
+    public function createPaymentOrder(Request $request, ExaminationReportReplyCase $case, RevolutMerchantService $revolut): JsonResponse
     {
         $this->authorizeClient($case);
 
@@ -314,123 +316,73 @@ class ExaminationReportReplyController extends Controller
         }
 
         try {
-            $razorpayKeyId = config('razorpay.key_id');
-            $razorpaySecret = config('razorpay.key_secret');
-            if (!$razorpayKeyId || !$razorpaySecret) {
-                throw new \RuntimeException('Razorpay credentials are not configured.');
-            }
-
-            $amountInPaise = (int) round($amount * 100);
-            $receipt = 'exam_reply_' . $case->id . '_' . time();
-            $ch = curl_init('https://api.razorpay.com/v1/orders');
-            curl_setopt($ch, CURLOPT_USERPWD, "$razorpayKeyId:$razorpaySecret");
-            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
-                'amount' => $amountInPaise,
-                'currency' => config('razorpay.currency', 'GBP'),
-                'receipt' => $receipt,
-                'description' => 'Examination Report Reply - ' . $case->case_number,
-                'notes' => [
-                    'case_id' => (string) $case->id,
-                    'case_number' => (string) $case->case_number,
-                    'payment_type' => 'objection_reply',
-                    'original_amount' => (string) $pricing['original_amount'],
-                    'discount_amount' => (string) $pricing['discount_amount'],
-                    'coupon' => (string) ($pricing['coupon_label'] ?? ''),
-                ],
-            ]));
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $curlError = curl_error($ch);
-            curl_close($ch);
-
-            if ($response === false || $curlError || !in_array($httpCode, [200, 201], true)) {
-                throw new \RuntimeException($curlError ?: 'Failed to create Razorpay order.');
-            }
-
-            $order = json_decode($response, true);
-            if (!is_array($order) || empty($order['id'])) {
-                throw new \RuntimeException('Razorpay returned an invalid order response.');
-            }
-            $orders = $request->session()->get('examination_reply_payment_orders', []);
-            $orders[$order['id']] = [
-                'case_id' => $case->id,
-                'amount' => $amountInPaise,
-                'original_amount' => $pricing['original_amount'],
-                'payable_amount' => $pricing['payable_amount'],
-                'discount_amount' => $pricing['discount_amount'],
-                'coupon_label' => $pricing['coupon_label'],
-            ];
-            $request->session()->put('examination_reply_payment_orders', $orders);
+            $transaction = $revolut->createHostedOrder(
+                $case,
+                'examination_reply',
+                $amount,
+                (string) config('revolut.currency', 'GBP'),
+                'Examination Report Reply - '.$case->case_number,
+                route('examination-reply.payment.confirm', $case),
+                Auth::id(),
+                Auth::user()->email,
+                array_merge($pricing, ['case_number' => $case->case_number]),
+            );
 
             return response()->json([
                 'status' => 'success',
-                'order_id' => $order['id'],
-                'amount' => $amountInPaise,
-                'currency' => config('razorpay.currency', 'GBP'),
-                'key' => $razorpayKeyId,
-                'user_name' => Auth::user()->name,
-                'user_email' => Auth::user()->email,
-                'user_phone' => UkMobileNumber::normalizeOrNull(Auth::user()->mobile),
+                'order_id' => $transaction->provider_order_id,
+                'checkout_url' => $transaction->checkout_url,
+                'amount' => (int) round($amount * 100),
+                'currency' => $transaction->currency,
             ]);
-        } catch (\Throwable $exception) {
+        } catch (PaymentVerificationException $exception) {
+            return response()->json(['status' => 'error', 'message' => $exception->getMessage()], $exception->httpStatus());
+        } catch (Throwable $exception) {
             return response()->json(['status' => 'error', 'message' => $exception->getMessage()], 500);
         }
     }
 
-    public function verifyPaymentSignature(Request $request, ExaminationReportReplyCase $case, RazorpayPaymentVerifier $verifier): JsonResponse
+    public function confirmPayment(ExaminationReportReplyCase $case, RevolutMerchantService $revolut): RedirectResponse
     {
         $this->authorizeClient($case);
-        $data = $request->validate([
-            'razorpay_payment_id' => ['required', 'string'],
-            'razorpay_order_id' => ['required', 'string'],
-            'razorpay_signature' => ['required', 'string'],
-        ]);
+        if ($case->payment_status === 'paid') {
+            return redirect()->route('examination-reply.show', $case)->with('success', 'Payment is already complete.');
+        }
 
-        $orders = $request->session()->get('examination_reply_payment_orders', []);
-        $order = $orders[$data['razorpay_order_id']] ?? null;
-        if (!$order || (int) ($order['case_id'] ?? 0) !== (int) $case->id) {
-            return response()->json(['status' => 'error', 'message' => 'This Razorpay order does not belong to the current objection reply case.'], 422);
+        $transaction = PaymentTransaction::query()->whereMorphedTo('payable', $case)->where('service', 'examination_reply')->latest('id')->first();
+        if (! $transaction) {
+            return redirect()->route('examination-reply.show', $case)->with('error', 'No payment order was found.');
         }
 
         try {
-            $verifier->verifyCaptured(
-                $data['razorpay_payment_id'],
-                $data['razorpay_order_id'],
-                $data['razorpay_signature'],
-                $data['razorpay_order_id'],
-                (int) ($order['amount'] ?? 0),
-                (string) config('razorpay.currency', 'GBP'),
-            );
+            $transaction = $revolut->verifyCompleted($case, $transaction->provider_order_id);
         } catch (PaymentVerificationException $exception) {
-            return response()->json(['status' => 'error', 'message' => $exception->getMessage()], $exception->httpStatus());
+            return redirect()->route('examination-reply.show', $case)->with('error', $exception->getMessage());
         }
+        $order = $transaction->metadata ?? [];
 
         $case->update([
             'payment_status' => 'paid',
-            'payment_reference' => $data['razorpay_order_id'],
-            'transaction_id' => $data['razorpay_payment_id'],
-            'paid_at' => now(),
+            'payment_reference' => $transaction->provider_order_id,
+            'transaction_id' => $transaction->provider_payment_id,
+            'paid_at' => $transaction->paid_at ?? now(),
             'original_package_price' => $order['original_amount'] ?? $case->package_price,
             'paid_amount' => $order['payable_amount'] ?? $case->package_price,
             'discount_amount' => $order['discount_amount'] ?? 0,
             'coupon_label' => $order['coupon_label'] ?? null,
         ]);
         $this->transition($case, Workflow::ADMIN_PAYMENT_COMPLETED, 'Client completed objection reply payment.', 'client');
-        $this->notifyAdmins($case, 'Payment completed for Trademark Objection Reply case ' . $case->case_number . '.');
+        $this->notifyAdmins($case, 'Payment completed for Trademark Objection Reply case '.$case->case_number.'.');
         $this->notifyClient($case, null, 'Your payment has been completed successfully. The payment invoice has been emailed to you and is also available in your case dashboard.');
 
         try {
             $case->refresh()->loadMissing('user');
             $issuedAt = $case->paid_at;
-            $invoiceName = 'objection-reply-invoice-' . $case->case_number . '.pdf';
+            $invoiceName = 'objection-reply-invoice-'.$case->case_number.'.pdf';
             $invoicePdf = \PDF::loadView('examination-reply.payment-invoice', [
                 'case' => $case,
                 'user' => $case->user,
-                'invoiceNumber' => 'ERR-INV-' . $issuedAt->format('Y') . '-' . $case->id,
+                'invoiceNumber' => 'ERR-INV-'.$issuedAt->format('Y').'-'.$case->id,
                 'issuedAt' => $issuedAt,
                 'firmName' => config('app.name', 'Legal Bruz'),
                 'firmEmail' => config('mail.from.address'),
@@ -438,7 +390,7 @@ class ExaminationReportReplyController extends Controller
             $this->emailClient(
                 $case,
                 'Payment Successful – Trademark Objection Reply',
-                'Your payment for Trademark Objection Reply case ' . $case->case_number . ' was completed successfully. Your invoice is attached.',
+                'Your payment for Trademark Objection Reply case '.$case->case_number.' was completed successfully. Your invoice is attached.',
                 'Open Case',
                 [[
                     'data' => $invoicePdf->output(),
@@ -461,13 +413,7 @@ class ExaminationReportReplyController extends Controller
             ]);
         }
 
-        unset($orders[$data['razorpay_order_id']]);
-        $request->session()->put('examination_reply_payment_orders', $orders);
-
-        return response()->json([
-            'status' => 'success',
-            'redirect_url' => route('examination-reply.show', $case),
-        ]);
+        return redirect()->route('examination-reply.show', $case)->with('success', 'Payment verified successfully.');
     }
 
     public function viewPaymentInvoice(ExaminationReportReplyCase $case)
@@ -488,13 +434,13 @@ class ExaminationReportReplyController extends Controller
         $pdf = \PDF::loadView('examination-reply.payment-invoice', [
             'case' => $case,
             'user' => $case->user,
-            'invoiceNumber' => 'ERR-INV-' . $issuedAt->format('Y') . '-' . $case->id,
+            'invoiceNumber' => 'ERR-INV-'.$issuedAt->format('Y').'-'.$case->id,
             'issuedAt' => $issuedAt,
             'firmName' => config('app.name', 'Legal Bruz'),
             'firmEmail' => config('mail.from.address'),
         ])->setPaper('a4');
 
-        return $pdf->stream('objection-reply-invoice-' . $case->case_number . '.pdf');
+        return $pdf->stream('objection-reply-invoice-'.$case->case_number.'.pdf');
     }
 
     public function adminIndex(Request $request): View
@@ -548,7 +494,7 @@ class ExaminationReportReplyController extends Controller
         $stageKey = $this->stageKey($request, $case);
 
         foreach (['draft_file', 'filing_acknowledgment'] as $replaceableInput) {
-            if (!$request->hasFile($replaceableInput)) {
+            if (! $request->hasFile($replaceableInput)) {
                 continue;
             }
 
@@ -597,11 +543,11 @@ class ExaminationReportReplyController extends Controller
     {
         $data = $request->validate([
             'additional_documents' => ['nullable', 'array', 'max:10'],
-            'additional_documents.*' => ['nullable', 'file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:' . self::ADMIN_UPLOAD_MAX_KB],
+            'additional_documents.*' => ['nullable', 'file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:'.self::ADMIN_UPLOAD_MAX_KB],
             'visibility' => ['nullable', 'in:client,admin'],
             'document_type' => ['nullable', 'string', 'max:120'],
             'optional_documents' => ['nullable', 'array', 'max:10'],
-            'optional_documents.*' => ['nullable', 'file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:' . self::ADMIN_UPLOAD_MAX_KB],
+            'optional_documents.*' => ['nullable', 'file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:'.self::ADMIN_UPLOAD_MAX_KB],
             'optional_document_names' => ['nullable', 'array'],
             'optional_document_names.*' => ['nullable', 'string', 'max:120'],
             'optional_document_types' => ['nullable', 'array'],
@@ -690,15 +636,15 @@ class ExaminationReportReplyController extends Controller
 
         if ($data['action'] === 'reupload_requested') {
             $message = 'The following '
-                . ($isEvidenceReview ? 'evidence document(s)' : 'Examination Report Reply document(s)')
-                . " need to be reuploaded:\n\n- "
-                . implode("\n- ", $documentLabels)
-                . "\n\nIssues to fix:\n" . $reviewNote;
+                .($isEvidenceReview ? 'evidence document(s)' : 'Examination Report Reply document(s)')
+                ." need to be reuploaded:\n\n- "
+                .implode("\n- ", $documentLabels)
+                ."\n\nIssues to fix:\n".$reviewNote;
 
             $this->transition(
                 $case,
                 $isEvidenceReview ? Workflow::ADMIN_EVIDENCE_REQUESTED : Workflow::ADMIN_DOCUMENTS_PENDING,
-                ($isEvidenceReview ? 'Evidence rejected for reupload: ' : 'Documents rejected for reupload: ') . implode(', ', $documentLabels),
+                ($isEvidenceReview ? 'Evidence rejected for reupload: ' : 'Documents rejected for reupload: ').implode(', ', $documentLabels),
                 'admin'
             );
             $this->notifyClient($case, $isEvidenceReview ? 'evidence_requested' : 'documents_pending', $message);
@@ -714,9 +660,9 @@ class ExaminationReportReplyController extends Controller
                 : 'Selected documents were sent back to the client for reupload.');
         }
 
-        $message = "The following Examination Report Reply document(s) have been reviewed and accepted:\n\n- " . implode("\n- ", $documentLabels);
+        $message = "The following Examination Report Reply document(s) have been reviewed and accepted:\n\n- ".implode("\n- ", $documentLabels);
         if ($reviewNote !== '') {
-            $message .= "\n\nReview note:\n" . $reviewNote;
+            $message .= "\n\nReview note:\n".$reviewNote;
         }
 
         $this->notifyClient($case, null, $message);
@@ -753,7 +699,7 @@ class ExaminationReportReplyController extends Controller
             $case,
             $case->current_admin_status,
             $case->current_admin_status,
-            'Documents reviewed and accepted: ' . implode(', ', $documentLabels),
+            'Documents reviewed and accepted: '.implode(', ', $documentLabels),
             'admin'
         );
 
@@ -773,8 +719,7 @@ class ExaminationReportReplyController extends Controller
 
         if (($data['document_action'] ?? null) === 'documents_pending') {
             $missingDocuments = collect($data['missing_documents'] ?? [])
-                ->push($data['missing_document_name'] ?? null)
-(fn ($documentName) => trim((string) $documentName))
+                ->push($data['missing_document_name'] ?? null)(fn ($documentName) => trim((string) $documentName))
                 ->filter()
                 ->unique()
                 ->values();
@@ -807,7 +752,7 @@ class ExaminationReportReplyController extends Controller
             return back()->with('success', 'Missing document request sent to client.');
         }
 
-        if (!$case->documents()->where('document_type', 'examination_report')->exists()) {
+        if (! $case->documents()->where('document_type', 'examination_report')->exists()) {
             $this->transition($case, Workflow::ADMIN_DOCUMENTS_PENDING, 'Examination Report is missing.', 'admin');
             $this->notifyClient($case, 'documents_pending');
 
@@ -1066,11 +1011,11 @@ class ExaminationReportReplyController extends Controller
             ->merge($request->input('optional_existing_document_ids', []));
 
         $data = $request->validate([
-            'draft_file' => [$savedDraftReplyDocument ? 'nullable' : 'required', 'file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:' . self::ADMIN_UPLOAD_MAX_KB],
+            'draft_file' => [$savedDraftReplyDocument ? 'nullable' : 'required', 'file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:'.self::ADMIN_UPLOAD_MAX_KB],
             'message_to_client' => ['nullable', 'string', 'max:5000'],
             'tracking_note' => ['nullable', 'string', 'max:5000'],
             'optional_documents' => ['nullable', 'array', 'max:10'],
-            'optional_documents.*' => ['nullable', 'file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:' . self::ADMIN_UPLOAD_MAX_KB],
+            'optional_documents.*' => ['nullable', 'file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:'.self::ADMIN_UPLOAD_MAX_KB],
             'optional_existing_document_ids' => ['nullable', 'array', 'max:10'],
             'optional_existing_document_ids.*' => ['nullable', 'integer'],
             'optional_document_names' => ['nullable', 'array', 'max:10'],
@@ -1098,7 +1043,7 @@ class ExaminationReportReplyController extends Controller
         $this->saveNotesAndDocuments($request, $case);
         if ($request->hasFile('draft_file')) {
             $file = $request->file('draft_file');
-            $path = $file->store('examination-replies/' . $case->id . '/drafts', 'public');
+            $path = $file->store('examination-replies/'.$case->id.'/drafts', 'public');
             $originalName = $file->getClientOriginalName();
             $fileType = strtolower((string) $file->getClientOriginalExtension());
             $fileSize = (int) $file->getSize();
@@ -1170,7 +1115,7 @@ class ExaminationReportReplyController extends Controller
             ->map(fn (ExaminationReplyDocument $document) => [
                 'path' => Storage::disk('public')->path($document->file_path),
                 'name' => $document->document_title
-                    ? $document->document_title . ($document->file_type ? '.' . $document->file_type : '')
+                    ? $document->document_title.($document->file_type ? '.'.$document->file_type : '')
                     : $document->original_name,
             ])
             ->values()
@@ -1201,11 +1146,11 @@ class ExaminationReportReplyController extends Controller
 
         $data = $request->validate([
             'reply_filing_date' => ['required', 'date'],
-            'filing_acknowledgment' => [$savedFilingAcknowledgmentDocument ? 'nullable' : 'required', 'file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:' . self::ADMIN_UPLOAD_MAX_KB],
+            'filing_acknowledgment' => [$savedFilingAcknowledgmentDocument ? 'nullable' : 'required', 'file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:'.self::ADMIN_UPLOAD_MAX_KB],
             'registry_filing_note' => ['nullable', 'string', 'max:5000'],
             'tracking_note' => ['nullable', 'string', 'max:5000'],
             'optional_documents' => ['nullable', 'array', 'max:10'],
-            'optional_documents.*' => ['nullable', 'file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:' . self::ADMIN_UPLOAD_MAX_KB],
+            'optional_documents.*' => ['nullable', 'file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:'.self::ADMIN_UPLOAD_MAX_KB],
             'optional_existing_document_ids' => ['nullable', 'array', 'max:10'],
             'optional_existing_document_ids.*' => ['nullable', 'integer'],
             'optional_document_names' => ['nullable', 'array', 'max:10'],
@@ -1274,17 +1219,17 @@ class ExaminationReportReplyController extends Controller
     {
         $data = $request->validate([
             'registry_update_type' => ['required', 'in:Accepted,Accepted & Advertised,Hearing Issued,Further Clarification Required,Application Abandoned,Still Waiting'],
-            'registry_document' => ['nullable', 'file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:' . self::ADMIN_UPLOAD_MAX_KB],
+            'registry_document' => ['nullable', 'file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:'.self::ADMIN_UPLOAD_MAX_KB],
             'hearing_notice' => [
-                \Illuminate\Validation\Rule::requiredIf(fn () => $request->input('registry_update_type') === 'Hearing Issued'),
+                Rule::requiredIf(fn () => $request->input('registry_update_type') === 'Hearing Issued'),
                 'nullable',
                 'file',
-                'mimes:' . self::ALLOWED_UPLOADS,
-                'max:' . self::ADMIN_UPLOAD_MAX_KB,
+                'mimes:'.self::ALLOWED_UPLOADS,
+                'max:'.self::ADMIN_UPLOAD_MAX_KB,
             ],
             'hearing_datetime' => ['nullable', 'date_format:Y-m-d\TH:i'],
             'message_to_client' => [
-                \Illuminate\Validation\Rule::requiredIf(fn () => in_array($request->input('registry_update_type'), [
+                Rule::requiredIf(fn () => in_array($request->input('registry_update_type'), [
                     'Further Clarification Required',
                     'Application Abandoned',
                 ], true)),
@@ -1297,7 +1242,7 @@ class ExaminationReportReplyController extends Controller
             'clarification_documents.*.name' => ['nullable', 'string', 'max:120'],
             'clarification_documents.*.required' => ['nullable', 'boolean'],
             'optional_documents' => ['nullable', 'array', 'max:10'],
-            'optional_documents.*' => ['nullable', 'file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:' . self::ADMIN_UPLOAD_MAX_KB],
+            'optional_documents.*' => ['nullable', 'file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:'.self::ADMIN_UPLOAD_MAX_KB],
             'optional_existing_document_ids' => ['nullable', 'array', 'max:10'],
             'optional_existing_document_ids.*' => ['nullable', 'integer'],
             'optional_document_names' => ['nullable', 'array', 'max:10'],
@@ -1434,11 +1379,11 @@ class ExaminationReportReplyController extends Controller
         }
 
         $transitionNote = trim((string) ($data['tracking_note'] ?? ''))
-            ?: 'Registry update recorded: ' . $data['registry_update_type'] . '.';
+            ?: 'Registry update recorded: '.$data['registry_update_type'].'.';
         $isSilentStillWaiting = $data['registry_update_type'] === 'Still Waiting'
             && $clientMessage === ''
             && trim((string) ($data['tracking_note'] ?? '')) === '';
-        if (!$isSilentStillWaiting) {
+        if (! $isSilentStillWaiting) {
             $this->transition($case, $nextStatus, $transitionNote, 'admin');
         }
 
@@ -1472,7 +1417,7 @@ class ExaminationReportReplyController extends Controller
     public function adminHearing(Request $request, ExaminationReportReplyCase $case): RedirectResponse
     {
         $data = $request->validate([
-            'hearing_notice' => ['nullable', 'file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:' . self::ADMIN_UPLOAD_MAX_KB],
+            'hearing_notice' => ['nullable', 'file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:'.self::ADMIN_UPLOAD_MAX_KB],
             'hearing_datetime' => ['nullable', 'date_format:Y-m-d\TH:i'],
             'hearing_package_price' => ['nullable', 'numeric', 'min:1', 'max:100000'],
             'message_to_client' => ['nullable', 'string', 'max:5000'],
@@ -1503,7 +1448,7 @@ class ExaminationReportReplyController extends Controller
     {
         $data = $request->validate([
             'final_outcome' => ['required', 'in:Accepted,Accepted & Advertised,Hearing Required,Further Clarification Required,Application Abandoned,Other'],
-            'final_registry_document' => ['nullable', 'file', 'mimes:' . self::ALLOWED_UPLOADS, 'max:' . self::ADMIN_UPLOAD_MAX_KB],
+            'final_registry_document' => ['nullable', 'file', 'mimes:'.self::ALLOWED_UPLOADS, 'max:'.self::ADMIN_UPLOAD_MAX_KB],
             'final_note_to_client' => ['required', 'string', 'max:5000'],
             'internal_closing_note' => ['nullable', 'string', 'max:5000'],
         ]);
@@ -1556,7 +1501,7 @@ class ExaminationReportReplyController extends Controller
         $availableCoupons = DiscountCoupon::availableForPayment($service, Auth::id());
         $coupon = $couponId ? $availableCoupons->firstWhere('id', $couponId) : null;
 
-        if (!$coupon) {
+        if (! $coupon) {
             $coupon = DiscountCoupon::autoApplyForPayment($service, Auth::id());
         }
 
@@ -1698,7 +1643,7 @@ class ExaminationReportReplyController extends Controller
 
     private function storeDocument(ExaminationReportReplyCase $case, $file, string $documentType, string $uploadedBy, string $visibility, ?string $reviewStatus = null, array $attributes = []): ExaminationReplyDocument
     {
-        $path = $file->store('examination-replies/' . $case->id . '/documents', 'public');
+        $path = $file->store('examination-replies/'.$case->id.'/documents', 'public');
 
         return ExaminationReplyDocument::create([
             'case_id' => $case->id,
@@ -1795,15 +1740,15 @@ class ExaminationReportReplyController extends Controller
         $lines = [$intro];
 
         if (filled($case->portal_label)) {
-            $lines[] = 'Portal label: ' . $case->portal_label;
+            $lines[] = 'Portal label: '.$case->portal_label;
         }
 
-        if (!empty($case->objection_types)) {
-            $lines[] = 'Objection type(s): ' . implode(', ', $case->objection_types);
+        if (! empty($case->objection_types)) {
+            $lines[] = 'Objection type(s): '.implode(', ', $case->objection_types);
         }
 
-        if (!empty($case->section_9_reasons)) {
-            $lines[] = 'Section 9 reason(s): ' . implode(', ', $case->section_9_reasons);
+        if (! empty($case->section_9_reasons)) {
+            $lines[] = 'Section 9 reason(s): '.implode(', ', $case->section_9_reasons);
         }
 
         $section11Details = $case->section_11_details ?? [];
@@ -1816,12 +1761,12 @@ class ExaminationReportReplyController extends Controller
         if ($section11Lines->isNotEmpty()) {
             $lines[] = 'Section 11 details:';
             foreach ($section11Lines as $label => $value) {
-                $lines[] = '- ' . $label . ': ' . $value;
+                $lines[] = '- '.$label.': '.$value;
             }
         }
 
-        if (!empty($case->formal_objection_reasons)) {
-            $lines[] = 'Formal objection reason(s): ' . implode(', ', $case->formal_objection_reasons);
+        if (! empty($case->formal_objection_reasons)) {
+            $lines[] = 'Formal objection reason(s): '.implode(', ', $case->formal_objection_reasons);
         }
 
         $requestedDocuments = $case->requestedDocuments
@@ -1831,11 +1776,11 @@ class ExaminationReportReplyController extends Controller
             ->values();
 
         if ($requestedDocuments->isNotEmpty()) {
-            $lines[] = 'Evidence/document(s) requested: ' . $requestedDocuments->implode(', ');
+            $lines[] = 'Evidence/document(s) requested: '.$requestedDocuments->implode(', ');
         }
 
         if (filled($case->client_visible_note)) {
-            $lines[] = "\nAdmin note: " . $case->client_visible_note;
+            $lines[] = "\nAdmin note: ".$case->client_visible_note;
         }
 
         return implode("\n", $lines);
@@ -1869,7 +1814,7 @@ class ExaminationReportReplyController extends Controller
         $storedCount += $this->updateExistingAdditionalDocuments($request, $case, $stageKey);
 
         foreach ($request->file('additional_documents', []) as $file) {
-            if (!$file) {
+            if (! $file) {
                 continue;
             }
 
@@ -1897,7 +1842,7 @@ class ExaminationReportReplyController extends Controller
         $newDocumentOffset = count($request->input('optional_existing_document_ids', []));
 
         foreach ($request->file('optional_documents', []) as $index => $file) {
-            if (!$file) {
+            if (! $file) {
                 continue;
             }
 
@@ -1941,7 +1886,7 @@ class ExaminationReportReplyController extends Controller
 
         foreach ($existingIds as $index => $documentId) {
             $document = $case->documents()->whereKey($documentId)->first();
-            if (!$document) {
+            if (! $document) {
                 continue;
             }
 
@@ -1991,7 +1936,7 @@ class ExaminationReportReplyController extends Controller
 
         foreach ($request->allFiles() as $inputName => $files) {
             foreach ($this->flattenFiles($files) as $index => $file) {
-                if (!$file) {
+                if (! $file) {
                     continue;
                 }
 
@@ -2110,7 +2055,7 @@ class ExaminationReportReplyController extends Controller
         $message = $message ?: Workflow::notificationMessage((string) $type);
         Notification::create([
             'user_id' => $case->user_id,
-            'type' => 'examination_reply_' . ($type ?: 'updated'),
+            'type' => 'examination_reply_'.($type ?: 'updated'),
             'title' => 'Trademark Objection Reply Update',
             'message' => $message,
             'data' => ['case_id' => $case->id, 'case_number' => $case->case_number],
@@ -2144,7 +2089,7 @@ class ExaminationReportReplyController extends Controller
     {
         $user = $case->user;
 
-        if (!$user?->email) {
+        if (! $user?->email) {
             ExaminationReplyNotificationLog::create([
                 'case_id' => $case->id,
                 'notification_type' => $title,

@@ -1154,7 +1154,7 @@
                     </div>
                 @elseif($actionType==='payment')
                     <h3>Pricing & Payment</h3><p class="flowb-muted">Includes legal analysis, Notice of Opposition drafting, filing, and case monitoring.</p>@if($case->included_services)<ul>@foreach($case->included_services as $service)<li>{{ $service }}</li>@endforeach</ul>@endif
-                    <form method="POST" action="{{ route('trademark-opposition.oppose.payment',$case) }}" class="js-flowb-payment-form" data-create-order-url="{{ route('trademark-opposition.oppose.payment.create-order', $case) }}" data-verify-url="{{ route('trademark-opposition.oppose.payment.verify-signature', $case) }}" data-amount="{{ number_format($oppositionFilingPayableAmount,2,'.','') }}">@csrf
+                    <form method="POST" action="{{ route('trademark-opposition.oppose.payment',$case) }}" class="js-flowb-payment-form" data-create-order-url="{{ route('trademark-opposition.oppose.payment.create-order', $case) }}" data-amount="{{ number_format($oppositionFilingPayableAmount,2,'.','') }}">@csrf
                         @include('partials.payment-coupons', ['paymentCoupons' => $oppositionFilingPaymentCoupons, 'paymentAmount' => $oppositionFilingOriginalAmount, 'couponInputName' => 'opposition_filing_discount_coupon_id', 'selectedCouponId' => $oppositionFilingAutoCoupon?->id])
                         @include('partials.government-fee-notice')
                         <label class="flowb-disclaimer"><input type="checkbox" name="success_disclaimer" value="1" required>  &nbsp;I understand that Legal Bruz cannot guarantee success. The final decision rests with the Trademark Registry.</label><div class="flowb-actions"><button class="flowb-btn green" type="submit"><i class="bi bi-credit-card"></i> Pay £<span data-flowb-pay-amount>{{ number_format($oppositionFilingPayableAmount,2) }}</span> & Continue</button></div></form>
@@ -1461,9 +1461,6 @@
         <div class="flowb-modal" data-flowb-dialog="approve"><div class="flowb-dialog"><header><h3>Approve Notice Draft</h3><button type="button" data-flowb-close>&times;</button></header><form method="POST" action="{{ route('trademark-opposition.oppose.draft.approve',$case) }}">@csrf<label>Approval Note</label><textarea class="flowb-input" name="client_approval_note" rows="4" placeholder="Optional approval note"></textarea><div class="flowb-actions"><button class="flowb-btn gray" type="button" data-flowb-close>Cancel</button><button class="flowb-btn green" type="submit">Approve Draft</button></div></form></div></div>
         <div class="flowb-modal" data-flowb-dialog="changes"><div class="flowb-dialog"><header><h3>Request Draft Reupload</h3><button type="button" data-flowb-close>&times;</button></header><form method="POST" action="{{ route('trademark-opposition.oppose.draft.request-changes',$case) }}">@csrf<label>Changes Required</label><textarea class="flowb-input" name="client_change_request" rows="5" required placeholder="Describe every correction required"></textarea><div class="flowb-actions"><button class="flowb-btn gray" type="button" data-flowb-close>Cancel</button><button class="flowb-btn" type="submit">Request Reupload</button></div></form></div></div>
     @endif
-    @if($actionType === 'payment')
-        <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-    @endif
     <script>
         document.querySelectorAll('.flowb-evidence-form').forEach((form) => {
             const maxFileBytes = Number(form.dataset.maxFileBytes || 10485760);
@@ -1497,5 +1494,39 @@
             });
         });
     </script>
-    <script>document.querySelectorAll('[data-open-flowb-stage-documents]').forEach(b=>b.addEventListener('click',()=>document.querySelector(`[data-flowb-stage-documents-modal="${b.dataset.openFlowbStageDocuments}"]`)?.classList.add('is-visible')));document.querySelectorAll('[data-flowb-stage-documents-modal]').forEach(m=>{m.querySelectorAll('[data-close-flowb-stage-documents]').forEach(b=>b.addEventListener('click',()=>m.classList.remove('is-visible')));m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('is-visible')})});document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('[data-flowb-stage-documents-modal].is-visible').forEach(m=>m.classList.remove('is-visible'))});document.querySelectorAll('[data-flowb-modal]').forEach(b=>b.addEventListener('click',()=>document.querySelector(`[data-flowb-dialog="${b.dataset.flowbModal}"]`)?.classList.add('open')));document.querySelectorAll('[data-flowb-dialog]').forEach(m=>{m.querySelectorAll('[data-flowb-close]').forEach(b=>b.addEventListener('click',()=>m.classList.remove('open')));m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open')})});document.querySelectorAll('.flowb-file-native').forEach(input=>{input.addEventListener('change',()=>{const card=input.closest('.flowb-upload-card');const label=card?.querySelector('[data-flowb-file-name]');const state=card?.querySelector('.flowb-upload-state');const count=input.files?.length||0;if(!label||!count)return;label.textContent=count===1?input.files[0].name:`${count} files selected`;card?.classList.add('has-file');if(state){state.classList.add('is-uploaded');state.innerHTML='<i class="bi bi-check-circle-fill"></i> Ready to upload.';}})});document.querySelectorAll('.js-flowb-payment-form').forEach(form=>{const button=form.querySelector('button[type="submit"]');const couponInputs=Array.from(form.querySelectorAll('input[name="opposition_filing_discount_coupon_id"]'));const amountText=form.querySelector('[data-flowb-pay-amount]');const selectedCoupon=()=>couponInputs.find(input=>input.checked);const updateAmount=()=>{const amount=selectedCoupon()?.dataset.payableAmount||form.dataset.amount||'0.00';if(amountText)amountText.textContent=Number(amount).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});};couponInputs.forEach(input=>input.addEventListener('change',updateAmount));updateAmount();form.addEventListener('submit',async event=>{event.preventDefault();if(!form.checkValidity()){form.reportValidity();return;}if(!window.Razorpay){alert('Razorpay checkout could not be loaded. Please refresh and try again.');return;}button.disabled=true;const oldHtml=button.innerHTML;button.innerHTML='Creating order...';try{const response=await fetch(form.dataset.createOrderUrl,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':form.querySelector('input[name="_token"]')?.value||'','X-Requested-With':'XMLHttpRequest'},body:JSON.stringify({success_disclaimer:form.querySelector('input[name="success_disclaimer"]')?.checked?'1':'',discount_coupon_id:selectedCoupon()?.value||null})});const orderData=await response.json();if(!response.ok||orderData.status!=='success')throw new Error(orderData.message||'Unable to create payment order.');const razorpay=new Razorpay({key:orderData.key,amount:orderData.amount,currency:orderData.currency,name:'{{ config('app.name') }}',description:orderData.description,order_id:orderData.order_id,prefill:{name:orderData.user_name,email:orderData.user_email,contact:orderData.user_phone},theme:{color:'#2A9D8F'},handler:async paymentResponse=>{button.innerHTML='Verifying payment...';const verifyResponse=await fetch(form.dataset.verifyUrl,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':form.querySelector('input[name="_token"]')?.value||'','X-Requested-With':'XMLHttpRequest'},body:JSON.stringify(paymentResponse)});const verifyData=await verifyResponse.json();if(!verifyResponse.ok||verifyData.status!=='success')throw new Error(verifyData.message||'Payment verification failed.');window.location.href=verifyData.redirect_url;},modal:{ondismiss:()=>{button.disabled=false;button.innerHTML=oldHtml;}}});razorpay.open();button.disabled=false;button.innerHTML=oldHtml;}catch(error){alert(error.message||'Unable to process payment.');button.disabled=false;button.innerHTML=oldHtml;}})});</script>
+    <script>document.querySelectorAll('[data-open-flowb-stage-documents]').forEach(b=>b.addEventListener('click',()=>document.querySelector(`[data-flowb-stage-documents-modal="${b.dataset.openFlowbStageDocuments}"]`)?.classList.add('is-visible')));document.querySelectorAll('[data-flowb-stage-documents-modal]').forEach(m=>{m.querySelectorAll('[data-close-flowb-stage-documents]').forEach(b=>b.addEventListener('click',()=>m.classList.remove('is-visible')));m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('is-visible')})});document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('[data-flowb-stage-documents-modal].is-visible').forEach(m=>m.classList.remove('is-visible'))});document.querySelectorAll('[data-flowb-modal]').forEach(b=>b.addEventListener('click',()=>document.querySelector(`[data-flowb-dialog="${b.dataset.flowbModal}"]`)?.classList.add('open')));document.querySelectorAll('[data-flowb-dialog]').forEach(m=>{m.querySelectorAll('[data-flowb-close]').forEach(b=>b.addEventListener('click',()=>m.classList.remove('open')));m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open')})});document.querySelectorAll('.flowb-file-native').forEach(input=>{input.addEventListener('change',()=>{const card=input.closest('.flowb-upload-card');const label=card?.querySelector('[data-flowb-file-name]');const state=card?.querySelector('.flowb-upload-state');const count=input.files?.length||0;if(!label||!count)return;label.textContent=count===1?input.files[0].name:`${count} files selected`;card?.classList.add('has-file');if(state){state.classList.add('is-uploaded');state.innerHTML='<i class="bi bi-check-circle-fill"></i> Ready to upload.';}})});document.querySelectorAll('.js-flowb-payment-form').forEach(form => {
+    const button = form.querySelector('button[type="submit"]');
+    const couponInputs = Array.from(form.querySelectorAll('input[name="opposition_filing_discount_coupon_id"]'));
+    const amountText = form.querySelector('[data-flowb-pay-amount]');
+    const selectedCoupon = () => couponInputs.find(input => input.checked);
+    const updateAmount = () => {
+        const amount = selectedCoupon()?.dataset.payableAmount || form.dataset.amount || '0.00';
+        if (amountText) amountText.textContent = Number(amount).toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    };
+    couponInputs.forEach(input => input.addEventListener('change', updateAmount));
+    updateAmount();
+    form.addEventListener('submit', async event => {
+        event.preventDefault();
+        if (!form.checkValidity()) { form.reportValidity(); return; }
+        button.disabled = true;
+        const oldHtml = button.innerHTML;
+        button.innerHTML = 'Creating order...';
+        try {
+            const response = await fetch(form.dataset.createOrderUrl, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': form.querySelector('input[name="_token"]')?.value || '', 'X-Requested-With': 'XMLHttpRequest'},
+                body: JSON.stringify({success_disclaimer: form.querySelector('input[name="success_disclaimer"]')?.checked ? '1' : '', discount_coupon_id: selectedCoupon()?.value || null})
+            });
+            const order = await response.json();
+            if (!response.ok || order.status !== 'success') throw new Error(order.message || 'Unable to create payment order.');
+            if (!order.checkout_url) throw new Error('Secure checkout URL was not returned.');
+            window.location.assign(order.checkout_url);
+        } catch (error) {
+            alert(error.message || 'Unable to process payment.');
+            button.disabled = false;
+            button.innerHTML = oldHtml;
+        }
+    });
+});
+</script>
 @endsection

@@ -44,23 +44,25 @@ class TrademarkSearchReportPaymentTest extends TestCase
         $this->assertDatabaseCount('contact_messages', 0);
     }
 
-    public function test_report_payment_order_and_signature_are_recorded(): void
+    public function test_report_revolut_order_and_return_are_recorded(): void
     {
         config([
-            'razorpay.key_id' => 'rzp_test_key',
-            'razorpay.key_secret' => 'test_secret',
-            'razorpay.currency' => 'GBP',
+            'revolut.secret_key' => 'sk_test_secret',
+            'revolut.environment' => 'sandbox',
+            'revolut.api_version' => '2026-08-17',
         ]);
         Http::fake([
-            'api.razorpay.com/v1/orders' => Http::response(['id' => 'order_search_report_1'], 200),
-            'api.razorpay.com/v1/payments/pay_search_report_1' => Http::response([
-                'id' => 'pay_search_report_1',
-                'order_id' => 'order_search_report_1',
+            'sandbox-merchant.revolut.com/api/orders' => Http::response([
+                'id' => 'order_search_report_1',
+                'state' => 'pending',
+                'checkout_url' => 'https://checkout.revolut.test/search-report',
+            ], 201),
+            'sandbox-merchant.revolut.com/api/orders/order_search_report_1' => Http::response([
+                'id' => 'order_search_report_1',
                 'amount' => 14900,
                 'currency' => 'GBP',
-                'status' => 'captured',
-                'captured' => true,
-                'amount_refunded' => 0,
+                'state' => 'completed',
+                'payments' => [['id' => 'pay_search_report_1', 'state' => 'completed']],
             ], 200),
         ]);
 
@@ -73,26 +75,16 @@ class TrademarkSearchReportPaymentTest extends TestCase
                 'status' => 'success',
                 'order_id' => 'order_search_report_1',
                 'amount' => 14900,
-                'currency' => 'GBP',
+                'checkout_url' => 'https://checkout.revolut.test/search-report',
             ]);
 
-        $paymentId = 'pay_search_report_1';
-        $signature = hash_hmac('sha256', 'order_search_report_1|'.$paymentId, 'test_secret');
-
-        $this->postJson(route('trademark-search-report.payment.verify', $reportRequest), [
-            'razorpay_payment_id' => $paymentId,
-            'razorpay_order_id' => 'order_search_report_1',
-            'razorpay_signature' => $signature,
-        ])->assertOk()
-            ->assertJson([
-                'status' => 'success',
-                'redirect_url' => route('trademark-search-report.success', $reportRequest),
-            ]);
+        $this->get(route('trademark-search-report.payment.confirm', $reportRequest))
+            ->assertRedirect(route('trademark-search-report.success', $reportRequest));
 
         $reportRequest->refresh();
         $this->assertSame('paid', $reportRequest->payment_status);
         $this->assertSame(TrademarkSearchReportRequest::PAYMENT_RECEIVED, $reportRequest->report_status);
-        $this->assertSame($paymentId, $reportRequest->transaction_id);
+        $this->assertSame('pay_search_report_1', $reportRequest->transaction_id);
         $this->assertNotNull($reportRequest->paid_at);
         $this->get(route('trademark-search-report.success', $reportRequest))
             ->assertOk()

@@ -115,23 +115,25 @@ class ConsultationBookingTest extends TestCase
         ]);
     }
 
-    public function test_consultation_payment_order_and_signature_are_verified(): void
+    public function test_consultation_revolut_order_and_return_are_verified(): void
     {
         config([
-            'razorpay.key_id' => 'rzp_test_key',
-            'razorpay.key_secret' => 'test_secret',
-            'razorpay.currency' => 'GBP',
+            'revolut.secret_key' => 'sk_test_secret',
+            'revolut.environment' => 'sandbox',
+            'revolut.api_version' => '2026-08-17',
         ]);
         Http::fake([
-            'api.razorpay.com/v1/orders' => Http::response(['id' => 'order_consultation_1'], 200),
-            'api.razorpay.com/v1/payments/pay_consultation_1' => Http::response([
-                'id' => 'pay_consultation_1',
-                'order_id' => 'order_consultation_1',
+            'sandbox-merchant.revolut.com/api/orders' => Http::response([
+                'id' => 'order_consultation_1',
+                'state' => 'pending',
+                'checkout_url' => 'https://checkout.revolut.test/consultation',
+            ], 201),
+            'sandbox-merchant.revolut.com/api/orders/order_consultation_1' => Http::response([
+                'id' => 'order_consultation_1',
                 'amount' => 2500,
                 'currency' => 'GBP',
-                'status' => 'captured',
-                'captured' => true,
-                'amount_refunded' => 0,
+                'state' => 'completed',
+                'payments' => [['id' => 'pay_consultation_1', 'state' => 'completed']],
             ], 200),
         ]);
 
@@ -144,28 +146,19 @@ class ConsultationBookingTest extends TestCase
                 'status' => 'success',
                 'order_id' => 'order_consultation_1',
                 'amount' => 2500,
-                'currency' => 'GBP',
+                'checkout_url' => 'https://checkout.revolut.test/consultation',
             ]);
 
-        Http::assertSent(fn ($request) => $request->url() === 'https://api.razorpay.com/v1/orders'
+        Http::assertSent(fn ($request) => $request->url() === 'https://sandbox-merchant.revolut.com/api/orders'
             && $request['amount'] === 2500
             && $request['currency'] === 'GBP');
 
-        $paymentId = 'pay_consultation_1';
-        $signature = hash_hmac('sha256', 'order_consultation_1|'.$paymentId, 'test_secret');
-        $this->postJson(route('book-call.payment.verify', $booking), [
-            'razorpay_payment_id' => $paymentId,
-            'razorpay_order_id' => 'order_consultation_1',
-            'razorpay_signature' => $signature,
-        ])->assertOk()
-            ->assertJson([
-                'status' => 'success',
-                'redirect_url' => route('book-call.success', $booking),
-            ]);
+        $this->get(route('book-call.payment.confirm', $booking))
+            ->assertRedirect(route('book-call.success', $booking));
 
         $booking->refresh();
         $this->assertSame('paid', $booking->payment_status);
-        $this->assertSame($paymentId, $booking->transaction_id);
+        $this->assertSame('pay_consultation_1', $booking->transaction_id);
         $this->assertNotNull($booking->paid_at);
         $this->assertSame('Book a Call — Paid', $booking->contactMessage->subject);
         $this->assertStringContainsString('Payment status: Paid', $booking->contactMessage->message);

@@ -870,9 +870,9 @@
 
         <!-- Dashboard Header -->
         <div class="row mb-4">
-            <div class="col-md-12">
-                <h2>Welcome, {{ $dashboardUser->name }}!</h2>
-                <p class="text-muted">Your Trademark Applications Dashboard</p>
+            <div class="col-md-12 d-flex justify-content-between align-items-start gap-3">
+                <div><h2>Welcome, {{ $dashboardUser->name }}!</h2><p class="text-muted">Your Trademark Applications Dashboard</p></div>
+                @unless($isAdminPreview)<a href="{{ route('payment.history') }}" class="btn btn-outline-primary"><i class="bi bi-receipt me-1"></i> Payment history & invoices</a>@endunless
             </div>
         </div>
 

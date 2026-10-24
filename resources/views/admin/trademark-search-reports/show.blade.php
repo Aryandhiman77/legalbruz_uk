@@ -32,7 +32,7 @@
                     <dl class="row mb-0">
                         <dt class="col-5">Status</dt><dd class="col-7"><x-admin-status :status="$reportRequest->payment_status" /></dd>
                         <dt class="col-5">Amount</dt><dd class="col-7">£{{ number_format((float) $reportRequest->amount, 2) }} {{ $reportRequest->currency }}</dd>
-                        <dt class="col-5">Order ID</dt><dd class="col-7 text-break">{{ $reportRequest->razorpay_order_id ?: 'Not created' }}</dd>
+                        <dt class="col-5">Order ID</dt><dd class="col-7 text-break">{{ $reportRequest->payment_reference ?: 'Not created' }}</dd>
                         <dt class="col-5">Transaction</dt><dd class="col-7 text-break">{{ $reportRequest->transaction_id ?: 'Not available' }}</dd>
                         <dt class="col-5">Paid at</dt><dd class="col-7">{{ $reportRequest->paid_at?->timezone(config('app.timezone', 'Europe/London'))->format('d M Y, h:i A T') ?: 'Not paid yet' }}</dd>
                     </dl>

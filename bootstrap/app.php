@@ -16,6 +16,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // asset(), route(), and Vite generate public HTTPS URLs instead of
         // mixed-content http://localhost URLs.
         $middleware->trustProxies(at: env('TRUSTED_PROXIES', '*'));
+        $middleware->validateCsrfTokens(except: [
+            'webhooks/revolut',
+        ]);
 
         $middleware->web(append: [
             \App\Http\Middleware\TrackWebsiteVisitor::class,

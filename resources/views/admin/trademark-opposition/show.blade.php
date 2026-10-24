@@ -579,7 +579,7 @@
                             <div class="admin-actions"><button class="admin-btn" type="submit">Save Risk Assessment & Notify Client</button></div>
                         </form>
                     @elseif ($activeAction === 'await-payment')
-                        <div class="stage-note">Waiting for the client to complete the opposition defence package payment. Draft attachment controls will appear after a verified Razorpay payment.</div>
+                        <div class="stage-note">Waiting for the client to complete the opposition defence package payment. Draft attachment controls will appear after a verified Revolut payment.</div>
                     @elseif ($activeAction === 'draft')
                         <div class="stage-note">Send the counter statement draft and any additional supporting documents to the client for approval.</div>
                         <form method="POST" action="{{ route('admin.trademark-opposition.draft', $case) }}" enctype="multipart/form-data" data-draft-notification-form data-has-current-draft="{{ $case->draft_path ? '1' : '0' }}" data-swal-confirm data-swal-title="Send draft to client?" data-swal-text="Upload Draft & Notify Client will send the counter statement draft and supporting documents to the client for approval." data-swal-icon="question" data-swal-confirm-text="Yes, notify client" data-loading-text="Submitting...">

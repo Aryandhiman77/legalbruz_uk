@@ -2,20 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\PaymentVerificationException;
 use App\Models\ConsultationBooking;
 use App\Models\ContactMessage;
+use App\Models\PaymentTransaction;
 use App\Models\TrademarkPricing;
-use App\Exceptions\PaymentVerificationException;
-use App\Services\RazorpayPaymentVerifier;
+use App\Services\RevolutMerchantService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
-use Throwable;
 
 class ConsultationBookingController extends Controller
 {
@@ -82,96 +81,63 @@ class ConsultationBookingController extends Controller
             'booking' => $booking,
             'topic' => $booking->topic_label,
             'timeSlot' => $booking->time_slot_label,
-            'razorpayKeyId' => config('razorpay.key_id'),
         ]);
     }
 
-    public function createOrder(ConsultationBooking $booking): JsonResponse
+    public function createOrder(ConsultationBooking $booking, RevolutMerchantService $revolut): JsonResponse
     {
         if ($booking->payment_status === 'paid') {
             return response()->json(['status' => 'error', 'message' => 'This consultation has already been paid.'], 422);
         }
 
-        $keyId = (string) config('razorpay.key_id');
-        $secret = (string) config('razorpay.key_secret');
-
-        if ($keyId === '' || $secret === '') {
-            return response()->json(['status' => 'error', 'message' => 'Online payment is temporarily unavailable. Please contact us for assistance.'], 503);
-        }
-
         try {
-            $response = Http::withBasicAuth($keyId, $secret)
-                ->acceptJson()
-                ->timeout((int) config('razorpay.timeout', 30))
-                ->post('https://api.razorpay.com/v1/orders', [
-                    'amount' => (int) round((float) $booking->amount * 100),
-                    'currency' => $booking->currency,
-                    'receipt' => 'call_'.$booking->id.'_'.now()->timestamp,
-                    'notes' => [
-                        'booking_id' => $booking->public_id,
-                        'service' => 'Consultation Call',
-                    ],
-                ]);
-        } catch (Throwable) {
-            return response()->json(['status' => 'error', 'message' => 'The payment service is temporarily unavailable. Please try again.'], 502);
-        }
-
-        if (! $response->successful() || blank($response->json('id'))) {
-            return response()->json(['status' => 'error', 'message' => 'The payment order could not be created. Please try again.'], 502);
-        }
-
-        $booking->update(['razorpay_order_id' => $response->json('id')]);
-
-        return response()->json([
-            'status' => 'success',
-            'order_id' => $response->json('id'),
-            'amount' => (int) round((float) $booking->amount * 100),
-            'currency' => $booking->currency,
-            'key' => $keyId,
-            'description' => 'Legal Bruz consultation call',
-            'name' => $booking->name,
-            'email' => $booking->email,
-            'phone' => $booking->phone,
-        ]);
-    }
-
-    public function verify(Request $request, ConsultationBooking $booking, RazorpayPaymentVerifier $verifier): JsonResponse
-    {
-        $validated = $request->validate([
-            'razorpay_payment_id' => ['required', 'string', 'max:255'],
-            'razorpay_order_id' => ['required', 'string', 'max:255'],
-            'razorpay_signature' => ['required', 'string', 'max:255'],
-        ]);
-
-        if ($booking->payment_status === 'paid') {
-            if (! hash_equals((string) $booking->razorpay_order_id, $validated['razorpay_order_id'])
-                || ! hash_equals((string) $booking->transaction_id, $validated['razorpay_payment_id'])) {
-                return response()->json(['status' => 'error', 'message' => 'This booking is already linked to a different payment.'], 422);
-            }
-
-            return response()->json([
-                'status' => 'success',
-                'redirect_url' => route('book-call.success', $booking),
-            ]);
-        }
-
-        try {
-            $verifier->verifyCaptured(
-                $validated['razorpay_payment_id'],
-                $validated['razorpay_order_id'],
-                $validated['razorpay_signature'],
-                (string) $booking->razorpay_order_id,
-                (int) round((float) $booking->amount * 100),
+            $transaction = $revolut->createHostedOrder(
+                $booking,
+                'consultation',
+                (float) $booking->amount,
                 $booking->currency,
+                'Legal Bruz consultation call',
+                route('book-call.payment.confirm', $booking),
+                $booking->user_id,
+                $booking->email,
+                ['booking_id' => $booking->public_id],
             );
         } catch (PaymentVerificationException $exception) {
             return response()->json(['status' => 'error', 'message' => $exception->getMessage()], $exception->httpStatus());
         }
 
+        $booking->update(['payment_reference' => $transaction->provider_order_id]);
+
+        return response()->json([
+            'status' => 'success',
+            'order_id' => $transaction->provider_order_id,
+            'checkout_url' => $transaction->checkout_url,
+            'amount' => (int) round((float) $booking->amount * 100),
+            'currency' => $booking->currency,
+        ]);
+    }
+
+    public function confirm(ConsultationBooking $booking, RevolutMerchantService $revolut): RedirectResponse
+    {
+        if ($booking->payment_status === 'paid') {
+            return redirect()->route('book-call.success', $booking);
+        }
+
+        $transaction = PaymentTransaction::query()->whereMorphedTo('payable', $booking)->latest('id')->first();
+        if (! $transaction) {
+            return redirect()->route('book-call.payment', $booking)->with('error', 'No payment order was found.');
+        }
+        try {
+            $transaction = $revolut->verifyCompleted($booking, $transaction->provider_order_id);
+        } catch (PaymentVerificationException $exception) {
+            return redirect()->route('book-call.payment', $booking)->with('error', $exception->getMessage());
+        }
+
         $booking->update([
             'payment_status' => 'paid',
-            'transaction_id' => $validated['razorpay_payment_id'],
-            'paid_at' => now(),
+            'payment_reference' => $transaction->provider_order_id,
+            'transaction_id' => $transaction->provider_payment_id,
+            'paid_at' => $transaction->paid_at ?? now(),
         ]);
 
         $booking->contactMessage?->update([
@@ -181,15 +147,12 @@ class ConsultationBookingController extends Controller
                 $booking->preferred_date->toDateString(),
                 $booking->time_slot_label,
                 (float) $booking->amount,
-                'Paid — '.$validated['razorpay_payment_id'],
+                'Paid — '.$transaction->provider_payment_id,
                 $booking->message,
             ),
         ]);
 
-        return response()->json([
-            'status' => 'success',
-            'redirect_url' => route('book-call.success', $booking),
-        ]);
+        return redirect()->route('book-call.success', $booking)->with('success', 'Payment confirmed successfully.');
     }
 
     public function success(ConsultationBooking $booking): View|RedirectResponse

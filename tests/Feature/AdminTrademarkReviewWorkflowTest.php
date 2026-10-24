@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Mail\EventNotification;
 use App\Mail\AdminWorkflowNotification;
+use App\Mail\EventNotification;
 use App\Models\Admin;
 use App\Models\Application;
 use App\Models\Document;
@@ -380,7 +380,7 @@ class AdminTrademarkReviewWorkflowTest extends TestCase
             'total_amount' => 399,
             'payment_type' => 'final',
             'percentage' => '50%',
-            'payment_method' => 'razorpay',
+            'payment_method' => 'revolut',
             'status' => 'completed',
             'reference_number' => 'order_verified_final_test',
             'transaction_id' => 'pay_verified_final_test',
@@ -581,7 +581,7 @@ class AdminTrademarkReviewWorkflowTest extends TestCase
             'payment_type' => 'advance',
             'percentage' => '50%',
             'transaction_id' => 'pay_admin_proof_123',
-            'payment_method' => 'razorpay',
+            'payment_method' => 'revolut',
             'status' => 'completed',
             'paid_at' => now(),
             'reference_number' => 'order_admin_proof_123',

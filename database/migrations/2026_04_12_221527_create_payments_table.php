@@ -15,11 +15,11 @@ return new class extends Migration
             $table->id();
             $table->foreignId('application_id')->constrained()->onDelete('cascade');
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->decimal('amount', 8, 2); // ₹2500 for 50% advance
+            $table->decimal('amount', 8, 2);
             $table->decimal('total_amount', 8, 2);
             $table->string('percentage')->default('50%');
             $table->string('transaction_id')->nullable()->unique();
-            $table->string('payment_method')->nullable(); // razorpay, stripe, etc
+            $table->string('payment_method')->nullable();
             $table->string('status')->default('pending'); // pending, completed, failed
             $table->timestamp('paid_at')->nullable();
             $table->string('reference_number')->nullable();

@@ -6,10 +6,11 @@ use App\Exceptions\PaymentVerificationException;
 use App\Mail\EventNotification;
 use App\Models\DiscountCoupon;
 use App\Models\Notification;
+use App\Models\PaymentTransaction;
 use App\Models\StuckTrademarkCase;
 use App\Models\StuckTrademarkDocument;
 use App\Models\StuckTrademarkStatusLog;
-use App\Services\RazorpayPaymentVerifier;
+use App\Services\RevolutMerchantService;
 use App\Support\StuckTrademarkWorkflow;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -85,13 +86,13 @@ class StuckTrademarkController extends Controller
                 return response()->json([
                     'status' => 'success',
                     'message' => 'Step 1 intake is already saved. Continue with client onboarding.',
-                'case_id' => $existingCase->id,
-                'next_step' => 2,
-                'onboarding_url' => route('stuck-trademark.onboarding.submit', $existingCase),
-                'documents_page_url' => route('stuck-trademark.documents', $existingCase),
-                'documents_url' => route('stuck-trademark.documents.store', $existingCase),
-                'show_url' => route('stuck-trademark.show', $existingCase),
-            ]);
+                    'case_id' => $existingCase->id,
+                    'next_step' => 2,
+                    'onboarding_url' => route('stuck-trademark.onboarding.submit', $existingCase),
+                    'documents_page_url' => route('stuck-trademark.documents', $existingCase),
+                    'documents_url' => route('stuck-trademark.documents.store', $existingCase),
+                    'show_url' => route('stuck-trademark.show', $existingCase),
+                ]);
             }
 
             return redirect()->route('stuck-trademark.onboarding', $existingCase)
@@ -103,7 +104,7 @@ class StuckTrademarkController extends Controller
         $case = StuckTrademarkCase::create([
             ...$validated,
             'user_id' => Auth::id(),
-            'case_number' => 'STR-' . now()->format('Ymd') . '-' . str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT),
+            'case_number' => 'STR-'.now()->format('Ymd').'-'.str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT),
             'status' => StuckTrademarkWorkflow::CLIENT_ONBOARDING,
             'audit_fee' => $validated['urgency'] === 'urgent' ? 2499 : ($validated['urgency'] === 'critical' ? 3999 : 1499),
         ]);
@@ -118,7 +119,7 @@ class StuckTrademarkController extends Controller
             $case,
             'stuck_trademark_intake_submitted',
             'Step 1 completed',
-            'Your stuck trademark recovery case ' . $case->case_number . ' has been created. Please complete client onboarding to continue.'
+            'Your stuck trademark recovery case '.$case->case_number.' has been created. Please complete client onboarding to continue.'
         );
 
         if ($request->expectsJson()) {
@@ -268,7 +269,7 @@ class StuckTrademarkController extends Controller
         $isReupload = $case->status === StuckTrademarkWorkflow::REUPLOAD_REQUIRED
             || $requestedTypes->intersect(array_keys($uploads))->isNotEmpty();
 
-        if (!$isReupload) {
+        if (! $isReupload) {
             $existingCurrentTypes = $case->documents()
                 ->whereIn('document_type', $this->mandatoryCaseDocumentTypes())
                 ->pluck('document_type')
@@ -283,10 +284,10 @@ class StuckTrademarkController extends Controller
 
             if ($missingMandatoryTypes !== []) {
                 $message = 'Please attach all mandatory core documents before submitting: '
-                    . collect($missingMandatoryTypes)
+                    .collect($missingMandatoryTypes)
                         ->map(fn (string $type) => $this->caseDocumentTypeLabels()[$type] ?? ucwords(str_replace('_', ' ', $type)))
                         ->implode(', ')
-                    . '.';
+                    .'.';
 
                 if ($request->expectsJson()) {
                     return response()->json([
@@ -323,7 +324,7 @@ class StuckTrademarkController extends Controller
         );
         $this->notifyAdmins(
             $isReupload ? 'Applicant reuploaded recovery documents' : 'Applicant uploaded recovery documents',
-            ($case->case_number ?: 'Recovery case #' . $case->id) . ' is ready for document verification.'
+            ($case->case_number ?: 'Recovery case #'.$case->id).' is ready for document verification.'
         );
         $this->notifyApplicant(
             $case,
@@ -350,7 +351,7 @@ class StuckTrademarkController extends Controller
         $this->authorizeApplicant($case);
 
         return redirect()->route('stuck-trademark.show', $case)
-            ->with('error', 'Please complete the Razorpay checkout to activate the audit package.');
+            ->with('error', 'Please complete the Revolut checkout to activate the audit package.');
     }
 
     private function discountedPackagePricing(string $service, float $amount, ?int $couponId = null): array
@@ -390,11 +391,11 @@ class StuckTrademarkController extends Controller
         ]);
     }
 
-    public function createAuditOrder(Request $request, StuckTrademarkCase $case)
+    public function createAuditOrder(Request $request, StuckTrademarkCase $case, RevolutMerchantService $revolut)
     {
         $this->authorizeApplicant($case);
 
-        if (!$this->documentsReadyForAudit($case)) {
+        if (! $this->documentsReadyForAudit($case)) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Please complete document verification before purchasing the audit package.',
@@ -423,141 +424,63 @@ class StuckTrademarkController extends Controller
         }
 
         try {
-            $razorpayKeyId = config('razorpay.key_id');
-            $razorpaySecret = config('razorpay.key_secret');
-
-            if (!$razorpayKeyId || !$razorpaySecret) {
-                throw new \Exception('Razorpay credentials are not configured.');
-            }
-
-            $amountInPaise = (int) round($amount * 100);
-            $receipt = 'str_audit_' . $case->id . '_' . time();
-
-            $ch = curl_init('https://api.razorpay.com/v1/orders');
-            curl_setopt($ch, CURLOPT_USERPWD, "$razorpayKeyId:$razorpaySecret");
-            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
-                'amount' => $amountInPaise,
-                'currency' => config('razorpay.currency', 'INR'),
-                'receipt' => $receipt,
-                'description' => 'Stuck Trademark Audit Package - ' . $case->case_number,
-                'notes' => [
-                    'case_id' => (string) $case->id,
-                    'case_number' => $case->case_number,
-                    'payment_type' => 'stuck_trademark_audit',
-                    'original_amount' => (string) $pricing['original_amount'],
-                    'discount_amount' => (string) $pricing['discount_amount'],
-                    'coupon' => (string) ($pricing['coupon_label'] ?? ''),
-                ],
-            ]));
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $curlError = curl_error($ch);
-            curl_close($ch);
-
-            if ($response === false || $curlError) {
-                throw new \Exception($curlError ?: 'Unable to contact Razorpay.');
-            }
-
-            if (!in_array($httpCode, [200, 201], true)) {
-                throw new \Exception('Failed to create Razorpay order.');
-            }
-
-            $order = json_decode($response, true);
-
-            if (!is_array($order) || empty($order['id'])) {
-                throw new \Exception('Razorpay returned an invalid order response.');
-            }
-
-            $orders = $request->session()->get('stuck_trademark_audit_orders', []);
-            $orders[$order['id']] = [
-                'case_id' => $case->id,
-                'amount' => $amountInPaise,
-                'original_amount' => $pricing['original_amount'],
-                'payable_amount' => $pricing['payable_amount'],
-                'discount_amount' => $pricing['discount_amount'],
-                'coupon_label' => $pricing['coupon_label'],
-            ];
-            $request->session()->put('stuck_trademark_audit_orders', $orders);
+            $transaction = $revolut->createHostedOrder(
+                $case,
+                'stuck_trademark_audit',
+                $amount,
+                (string) config('revolut.currency', 'GBP'),
+                'Stuck Trade Mark Audit Package - '.$case->case_number,
+                route('stuck-trademark.audit-payment.confirm', $case),
+                Auth::id(),
+                Auth::user()->email,
+                array_merge($pricing, ['case_number' => $case->case_number]),
+            );
 
             return response()->json([
                 'status' => 'success',
-                'order_id' => $order['id'],
-                'amount' => $amountInPaise,
-                'currency' => $order['currency'] ?? config('razorpay.currency', 'INR'),
-                'key' => $razorpayKeyId,
-                'user_email' => Auth::user()->email,
-                'user_phone' => Auth::user()->phone ?? $case->phone,
-                'user_name' => Auth::user()->name ?? $case->applicant_name,
-                'description' => 'Audit Package - ' . $case->case_number,
+                'order_id' => $transaction->provider_order_id,
+                'checkout_url' => $transaction->checkout_url,
+                'amount' => (int) round($amount * 100),
+                'currency' => $transaction->currency,
+                'description' => 'Audit Package - '.$case->case_number,
             ]);
+        } catch (PaymentVerificationException $e) {
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], $e->httpStatus());
         } catch (\Throwable $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Failed to create audit payment order: ' . $e->getMessage(),
+                'message' => 'Failed to create audit payment order: '.$e->getMessage(),
             ], 500);
         }
     }
 
-    public function verifyAuditPaymentSignature(Request $request, StuckTrademarkCase $case, RazorpayPaymentVerifier $verifier)
+    public function confirmAuditPayment(StuckTrademarkCase $case, RevolutMerchantService $revolut)
     {
         $this->authorizeApplicant($case);
 
         if ($case->audit_payment_status === 'paid') {
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Audit package payment is already complete.',
-                'redirect_url' => route('stuck-trademark.show', $case),
-            ]);
+            return redirect()->route('stuck-trademark.show', $case)->with('success', 'Audit package payment is already complete.');
         }
 
-        $validated = $request->validate([
-            'razorpay_payment_id' => 'required|string',
-            'razorpay_order_id' => 'required|string',
-            'razorpay_signature' => 'required|string',
-        ]);
-
-        $orders = $request->session()->get('stuck_trademark_audit_orders', []);
-        $order = $orders[$validated['razorpay_order_id']] ?? null;
-
-        if (!$order || (int) ($order['case_id'] ?? 0) !== (int) $case->id) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'This Razorpay order does not belong to the current recovery case.',
-            ], 422);
+        $transaction = PaymentTransaction::query()->whereMorphedTo('payable', $case)->where('service', 'stuck_trademark_audit')->latest('id')->first();
+        if (! $transaction) {
+            return redirect()->route('stuck-trademark.show', $case)->with('error', 'No payment order was found.');
         }
 
         try {
-            $verifier->verifyCaptured(
-                $validated['razorpay_payment_id'],
-                $validated['razorpay_order_id'],
-                $validated['razorpay_signature'],
-                $validated['razorpay_order_id'],
-                (int) ($order['amount'] ?? 0),
-                (string) config('razorpay.currency', 'GBP'),
-            );
+            $transaction = $revolut->verifyCompleted($case, $transaction->provider_order_id);
         } catch (PaymentVerificationException $exception) {
-            return response()->json(['status' => 'error', 'message' => $exception->getMessage()], $exception->httpStatus());
+            return redirect()->route('stuck-trademark.show', $case)->with('error', $exception->getMessage());
         }
 
         $this->activateAuditPackage(
             $case,
-            $validated['razorpay_order_id'],
-            $validated['razorpay_payment_id'],
-            $order
+            $transaction->provider_order_id,
+            $transaction->provider_payment_id,
+            $transaction->metadata ?? [],
         );
 
-        unset($orders[$validated['razorpay_order_id']]);
-        $request->session()->put('stuck_trademark_audit_orders', $orders);
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Audit payment verified successfully.',
-            'redirect_url' => route('stuck-trademark.show', $case),
-        ]);
+        return redirect()->route('stuck-trademark.show', $case)->with('success', 'Audit payment verified successfully.');
     }
 
     private function activateAuditPackage(
@@ -565,8 +488,7 @@ class StuckTrademarkController extends Controller
         ?string $orderId = null,
         ?string $paymentId = null,
         ?array $paymentDetails = null
-    ): void
-    {
+    ): void {
         $from = $case->status;
         $updates = [
             'audit_payment_status' => 'paid',
@@ -590,11 +512,11 @@ class StuckTrademarkController extends Controller
             $updates['audit_coupon_label'] = $paymentDetails['coupon_label'] ?? null;
         }
 
-        if (\Illuminate\Support\Facades\Schema::hasColumn('stuck_trademark_cases', 'audit_payment_reference')) {
+        if (Schema::hasColumn('stuck_trademark_cases', 'audit_payment_reference')) {
             $updates['audit_payment_reference'] = $orderId;
         }
 
-        if (\Illuminate\Support\Facades\Schema::hasColumn('stuck_trademark_cases', 'audit_transaction_id')) {
+        if (Schema::hasColumn('stuck_trademark_cases', 'audit_transaction_id')) {
             $updates['audit_transaction_id'] = $paymentId;
         }
 
@@ -668,13 +590,13 @@ class StuckTrademarkController extends Controller
         $pdf = \PDF::loadView('stuck-trademark.audit-invoice', [
             'case' => $case,
             'user' => $case->user,
-            'invoiceNumber' => 'STR-INV-' . $issuedAt->format('Y') . '-' . $case->id,
+            'invoiceNumber' => 'STR-INV-'.$issuedAt->format('Y').'-'.$case->id,
             'issuedAt' => $issuedAt,
             'firmName' => config('app.name', 'Legal Bruz'),
             'firmEmail' => config('mail.from.address'),
         ])->setPaper('a4');
 
-        return $pdf->stream('audit-invoice-' . $case->case_number . '.pdf');
+        return $pdf->stream('audit-invoice-'.$case->case_number.'.pdf');
     }
 
     public function approveExecution(StuckTrademarkCase $case)
@@ -700,7 +622,7 @@ class StuckTrademarkController extends Controller
         return redirect()->route('stuck-trademark.show', $case)->with('success', 'Execution package approval recorded. Payment instructions are now pending.');
     }
 
-    public function createExecutionOrder(Request $request, StuckTrademarkCase $case)
+    public function createExecutionOrder(Request $request, StuckTrademarkCase $case, RevolutMerchantService $revolut)
     {
         $this->authorizeApplicant($case);
 
@@ -726,130 +648,60 @@ class StuckTrademarkController extends Controller
         }
 
         try {
-            $razorpayKeyId = config('razorpay.key_id');
-            $razorpaySecret = config('razorpay.key_secret');
-
-            if (!$razorpayKeyId || !$razorpaySecret) {
-                throw new \Exception('Razorpay credentials are not configured.');
-            }
-
-            $amountInPaise = (int) round($amount * 100);
-            $receipt = 'str_exec_' . $case->id . '_' . time();
-
-            $ch = curl_init('https://api.razorpay.com/v1/orders');
-            curl_setopt($ch, CURLOPT_USERPWD, "$razorpayKeyId:$razorpaySecret");
-            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
-                'amount' => $amountInPaise,
-                'currency' => config('razorpay.currency', 'INR'),
-                'receipt' => $receipt,
-                'description' => 'Stuck Trademark Execution Package - ' . $case->case_number,
-                'notes' => [
-                    'case_id' => (string) $case->id,
-                    'case_number' => $case->case_number,
-                    'payment_type' => 'stuck_trademark_execution',
-                    'original_amount' => (string) $pricing['original_amount'],
-                    'discount_amount' => (string) $pricing['discount_amount'],
-                    'coupon' => (string) ($pricing['coupon_label'] ?? ''),
-                ],
-            ]));
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $curlError = curl_error($ch);
-            curl_close($ch);
-
-            if ($response === false || $curlError) {
-                throw new \Exception($curlError ?: 'Unable to contact Razorpay.');
-            }
-
-            if (!in_array($httpCode, [200, 201], true)) {
-                throw new \Exception('Failed to create Razorpay order.');
-            }
-
-            $order = json_decode($response, true);
-
-            if (!is_array($order) || empty($order['id'])) {
-                throw new \Exception('Razorpay returned an invalid order response.');
-            }
-
-            $orders = $request->session()->get('stuck_trademark_execution_orders', []);
-            $orders[$order['id']] = [
-                'case_id' => $case->id,
-                'amount' => $amountInPaise,
-                'original_amount' => $pricing['original_amount'],
-                'payable_amount' => $pricing['payable_amount'],
-                'discount_amount' => $pricing['discount_amount'],
-                'coupon_label' => $pricing['coupon_label'],
-            ];
-            $request->session()->put('stuck_trademark_execution_orders', $orders);
+            $transaction = $revolut->createHostedOrder(
+                $case,
+                'stuck_trademark_execution',
+                $amount,
+                (string) config('revolut.currency', 'GBP'),
+                'Stuck Trade Mark Execution Package - '.$case->case_number,
+                route('stuck-trademark.execution-payment.confirm', $case),
+                Auth::id(),
+                Auth::user()->email,
+                array_merge($pricing, ['case_number' => $case->case_number]),
+            );
 
             return response()->json([
                 'status' => 'success',
-                'order_id' => $order['id'],
-                'amount' => $amountInPaise,
-                'currency' => $order['currency'] ?? config('razorpay.currency', 'INR'),
-                'key' => $razorpayKeyId,
-                'user_email' => Auth::user()->email,
-                'user_phone' => Auth::user()->phone ?? $case->phone,
-                'user_name' => Auth::user()->name ?? $case->applicant_name,
-                'description' => 'Execution Package - ' . $case->case_number,
+                'order_id' => $transaction->provider_order_id,
+                'checkout_url' => $transaction->checkout_url,
+                'amount' => (int) round($amount * 100),
+                'currency' => $transaction->currency,
+                'description' => 'Execution Package - '.$case->case_number,
             ]);
+        } catch (PaymentVerificationException $e) {
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], $e->httpStatus());
         } catch (\Throwable $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Failed to create execution payment order: ' . $e->getMessage(),
+                'message' => 'Failed to create execution payment order: '.$e->getMessage(),
             ], 500);
         }
     }
 
-    public function verifyExecutionPaymentSignature(Request $request, StuckTrademarkCase $case, RazorpayPaymentVerifier $verifier)
+    public function confirmExecutionPayment(StuckTrademarkCase $case, RevolutMerchantService $revolut)
     {
         $this->authorizeApplicant($case);
 
         if ($case->execution_payment_status === 'paid') {
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Execution payment is already complete.',
-                'redirect_url' => route('stuck-trademark.show', $case),
-            ]);
+            return redirect()->route('stuck-trademark.show', $case)->with('success', 'Execution payment is already complete.');
         }
 
-        $validated = $request->validate([
-            'razorpay_payment_id' => 'required|string',
-            'razorpay_order_id' => 'required|string',
-            'razorpay_signature' => 'required|string',
-        ]);
-
-        $orders = $request->session()->get('stuck_trademark_execution_orders', []);
-        $order = $orders[$validated['razorpay_order_id']] ?? null;
-
-        if (!$order || (int) ($order['case_id'] ?? 0) !== (int) $case->id) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'This Razorpay order does not belong to the current recovery case.',
-            ], 422);
+        $transaction = PaymentTransaction::query()->whereMorphedTo('payable', $case)->where('service', 'stuck_trademark_execution')->latest('id')->first();
+        if (! $transaction) {
+            return redirect()->route('stuck-trademark.show', $case)->with('error', 'No payment order was found.');
         }
 
         try {
-            $verifier->verifyCaptured(
-                $validated['razorpay_payment_id'],
-                $validated['razorpay_order_id'],
-                $validated['razorpay_signature'],
-                $validated['razorpay_order_id'],
-                (int) ($order['amount'] ?? 0),
-                (string) config('razorpay.currency', 'GBP'),
-            );
+            $transaction = $revolut->verifyCompleted($case, $transaction->provider_order_id);
         } catch (PaymentVerificationException $exception) {
-            return response()->json(['status' => 'error', 'message' => $exception->getMessage()], $exception->httpStatus());
+            return redirect()->route('stuck-trademark.show', $case)->with('error', $exception->getMessage());
         }
+        $order = $transaction->metadata ?? [];
 
         $from = $case->status;
         $updates = [
             'execution_payment_status' => 'paid',
-            'execution_paid_at' => now(),
+            'execution_paid_at' => $transaction->paid_at ?? now(),
             'status' => StuckTrademarkWorkflow::EXECUTION_ACTIVE,
         ];
 
@@ -874,14 +726,7 @@ class StuckTrademarkController extends Controller
         $this->logStatus($case, $from, $case->status, 'Execution package payment completed', 'Applicant paid the approved execution package fee.');
         $this->notifyApplicant($case, 'stuck_trademark_execution_payment_paid', 'Execution payment received', 'Your execution package payment has been received. Recovery work is now active.');
 
-        unset($orders[$validated['razorpay_order_id']]);
-        $request->session()->put('stuck_trademark_execution_orders', $orders);
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Execution payment verified successfully.',
-            'redirect_url' => route('stuck-trademark.show', $case),
-        ]);
+        return redirect()->route('stuck-trademark.show', $case)->with('success', 'Execution payment verified successfully.');
     }
 
     public function approveAuditReport(Request $request, StuckTrademarkCase $case)
@@ -932,7 +777,7 @@ class StuckTrademarkController extends Controller
         );
         $this->notifyAdmins(
             'Applicant approved audit report',
-            ($case->case_number ?: 'Recovery case #' . $case->id) . ' is ready for execution package approval.'
+            ($case->case_number ?: 'Recovery case #'.$case->id).' is ready for execution package approval.'
         );
 
         return redirect()->route('stuck-trademark.show', $case)->with('success', 'Audit report approved. Please review the execution package recommendation.');
@@ -986,7 +831,7 @@ class StuckTrademarkController extends Controller
         );
         $this->notifyAdmins(
             'Applicant requested audit report changes',
-            ($case->case_number ?: 'Recovery case #' . $case->id) . " needs an updated audit report.\n\nRequest:\n" . ($validated['audit_report_client_note'] ?? 'No note provided.')
+            ($case->case_number ?: 'Recovery case #'.$case->id)." needs an updated audit report.\n\nRequest:\n".($validated['audit_report_client_note'] ?? 'No note provided.')
         );
 
         return redirect()->route('stuck-trademark.show', $case)->with('success', 'Audit report change request sent to the legal team.');
@@ -1065,11 +910,11 @@ class StuckTrademarkController extends Controller
             $updates['next_follow_up_at'] = Carbon::parse($validated['next_follow_up_at'], config('app.timezone', 'Europe/London'))->utc();
         }
 
-        if ($validated['status'] === StuckTrademarkWorkflow::RESOLVED && !$case->resolved_at) {
+        if ($validated['status'] === StuckTrademarkWorkflow::RESOLVED && ! $case->resolved_at) {
             $updates['resolved_at'] = now();
         }
 
-        if ($validated['status'] === StuckTrademarkWorkflow::CLOSED && !$case->closed_at) {
+        if ($validated['status'] === StuckTrademarkWorkflow::CLOSED && ! $case->closed_at) {
             $updates['closed_at'] = now();
         }
 
@@ -1090,7 +935,7 @@ class StuckTrademarkController extends Controller
             && $case->audit_payment_status !== 'paid') {
             return redirect()
                 ->route('admin.stuck-trademark.show', $case)
-                ->with('error', 'This workflow stage cannot be activated until Razorpay confirms the audit payment as captured.');
+                ->with('error', 'This workflow stage cannot be activated until Revolut confirms the audit payment as completed.');
         }
 
         $executionProtectedStatuses = [
@@ -1104,19 +949,19 @@ class StuckTrademarkController extends Controller
             && $case->execution_payment_status !== 'paid') {
             return redirect()
                 ->route('admin.stuck-trademark.show', $case)
-                ->with('error', 'Execution cannot be activated until Razorpay confirms the payment as captured.');
+                ->with('error', 'Execution cannot be activated until Revolut confirms the payment as completed.');
         }
 
         $case->update($updates);
         $this->logStatus($case, $from, $case->status, 'Admin updated recovery case', $validated['note'] ?: 'Recovery case workflow was updated by admin.', 'admin', Auth::guard('admin')->id());
-        $this->notifyApplicant($case, 'stuck_trademark_status_updated', 'Recovery case updated', $validated['note'] ?: 'Your recovery case status is now: ' . $case->status_label . '.');
+        $this->notifyApplicant($case, 'stuck_trademark_status_updated', 'Recovery case updated', $validated['note'] ?: 'Your recovery case status is now: '.$case->status_label.'.');
 
         return redirect()->route('admin.stuck-trademark.show', $case)->with('success', 'Recovery case updated.');
     }
 
     public function adminVerifyDocument(Request $request, StuckTrademarkDocument $document)
     {
-        if (!$this->isVerifiableDocumentType($document->document_type)) {
+        if (! $this->isVerifiableDocumentType($document->document_type)) {
             return redirect()
                 ->back()
                 ->with('error', 'This document type is not available for admin verification.');
@@ -1160,7 +1005,7 @@ class StuckTrademarkController extends Controller
         );
         $this->notifyApplicant(
             $case,
-            'stuck_trademark_document_' . $validated['status'],
+            'stuck_trademark_document_'.$validated['status'],
             $validated['status'] === 'verified' ? 'Document verified' : 'Document changes requested',
             $verificationNotes ?: ($validated['status'] === 'verified' ? 'A recovery case document has been verified.' : 'A recovery case document needs changes. Please reupload the corrected file from your dashboard.')
         );
@@ -1199,7 +1044,8 @@ class StuckTrademarkController extends Controller
             ->filter(fn (StuckTrademarkDocument $document) => in_array((int) $document->id, $latestDocumentIdsByType, true))
             ->filter(function (StuckTrademarkDocument $document) {
                 $status = $document->status === 'rejected' ? 'reupload_requested' : $document->status;
-                return !in_array($status, ['verified', 'reupload_requested'], true);
+
+                return ! in_array($status, ['verified', 'reupload_requested'], true);
             })
             ->values();
 
@@ -1235,24 +1081,24 @@ class StuckTrademarkController extends Controller
             ->map(function (StuckTrademarkDocument $document) {
                 $documentType = $this->caseDocumentTypeLabels()[$document->document_type] ?? ucwords(str_replace('_', ' ', $document->document_type));
 
-                return '- ' . $documentType . ': ' . $document->file_name;
+                return '- '.$documentType.': '.$document->file_name;
             })
             ->implode("\n");
         $title = $validated['status'] === 'verified'
             ? ($toStatus === StuckTrademarkWorkflow::AUDIT_PENDING ? 'Audit package available' : 'Documents verified')
             : 'Document changes requested';
         $message = $validated['status'] === 'verified'
-            ? $count . ' recovery document' . ($count === 1 ? ' was' : 's were') . " verified by admin.\n\nVerified documents:\n" . $documentList
-            : "Selected recovery documents need changes. Please reupload the corrected files from your dashboard.\n\nDocuments requiring reupload:\n" . $documentList;
+            ? $count.' recovery document'.($count === 1 ? ' was' : 's were')." verified by admin.\n\nVerified documents:\n".$documentList
+            : "Selected recovery documents need changes. Please reupload the corrected files from your dashboard.\n\nDocuments requiring reupload:\n".$documentList;
 
         if ($verificationNotes) {
-            $message .= "\n\nAdmin note: " . $verificationNotes;
+            $message .= "\n\nAdmin note: ".$verificationNotes;
         }
 
         $this->logStatus($case, $from, $case->status, $title, $message, 'admin', Auth::guard('admin')->id());
         $this->notifyApplicant(
             $case,
-            'stuck_trademark_documents_bulk_' . $validated['status'],
+            'stuck_trademark_documents_bulk_'.$validated['status'],
             $validated['status'] === 'verified' ? 'Documents verified' : 'Document changes requested',
             $message,
             route('stuck-trademark.show', $case),
@@ -1260,13 +1106,13 @@ class StuckTrademarkController extends Controller
         );
 
         return redirect()->back()->with('success', $validated['status'] === 'verified'
-            ? $count . ' document' . ($count === 1 ? '' : 's') . ' verified.'
-            : 'Reupload request sent for ' . $count . ' document' . ($count === 1 ? '' : 's') . '.');
+            ? $count.' document'.($count === 1 ? '' : 's').' verified.'
+            : 'Reupload request sent for '.$count.' document'.($count === 1 ? '' : 's').'.');
     }
 
     public function adminUploadAuditReport(Request $request, StuckTrademarkCase $case)
     {
-        if (!$this->canUploadAuditReport($case)) {
+        if (! $this->canUploadAuditReport($case)) {
             return redirect()
                 ->route('admin.stuck-trademark.show', $case)
                 ->with('error', 'Audit report can be uploaded only after all current documents are verified and the audit package is paid.');
@@ -1285,7 +1131,7 @@ class StuckTrademarkController extends Controller
         ]);
 
         $file = $request->file('audit_report');
-        $path = $file->store('stuck-trademark/audit-reports/' . $case->id, 'public');
+        $path = $file->store('stuck-trademark/audit-reports/'.$case->id, 'public');
         $from = $case->status;
         $optionalDocuments = $this->storeAuditOptionalDocuments($request, $case, $validated['optional_document_names'] ?? []);
 
@@ -1313,9 +1159,9 @@ class StuckTrademarkController extends Controller
 
         $case->update($updates);
         $supportingDocumentMessage = $optionalDocuments->isNotEmpty()
-            ? ' Supporting documents attached: ' . $optionalDocuments->pluck('file_name')->implode(', ') . '.'
+            ? ' Supporting documents attached: '.$optionalDocuments->pluck('file_name')->implode(', ').'.'
             : '';
-        $this->logStatus($case, $from, $case->status, 'Audit report created', ($validated['audit_note'] ?? 'Finalized audit report was uploaded for client download.') . $supportingDocumentMessage, 'admin', Auth::guard('admin')->id());
+        $this->logStatus($case, $from, $case->status, 'Audit report created', ($validated['audit_note'] ?? 'Finalized audit report was uploaded for client download.').$supportingDocumentMessage, 'admin', Auth::guard('admin')->id());
 
         $from = $case->status;
         $case->update([
@@ -1334,7 +1180,7 @@ class StuckTrademarkController extends Controller
     public function viewDocument(StuckTrademarkDocument $document)
     {
         $case = $document->case;
-        if (!Auth::guard('admin')->check()) {
+        if (! Auth::guard('admin')->check()) {
             $this->authorizeApplicant($case);
         }
 
@@ -1343,7 +1189,7 @@ class StuckTrademarkController extends Controller
 
     public function viewAuditReport(StuckTrademarkCase $case)
     {
-        if (!Auth::guard('admin')->check()) {
+        if (! Auth::guard('admin')->check()) {
             $this->authorizeApplicant($case);
         }
 
@@ -1386,12 +1232,12 @@ class StuckTrademarkController extends Controller
 
     private function storeUploadedDocuments(Request $request, StuckTrademarkCase $case, ?string $fallbackType = null, string $status = 'pending'): void
     {
-        if (!$request->hasFile('documents')) {
+        if (! $request->hasFile('documents')) {
             return;
         }
 
         foreach ($request->file('documents') as $file) {
-            $path = $file->store('stuck-trademark/documents/' . $case->id, 'public');
+            $path = $file->store('stuck-trademark/documents/'.$case->id, 'public');
             StuckTrademarkDocument::create([
                 'case_id' => $case->id,
                 'user_id' => $case->user_id,
@@ -1411,7 +1257,7 @@ class StuckTrademarkController extends Controller
 
         if ($request->hasFile('document_uploads')) {
             foreach ($request->file('document_uploads') as $documentType => $file) {
-                if (!$file) {
+                if (! $file) {
                     continue;
                 }
 
@@ -1421,7 +1267,7 @@ class StuckTrademarkController extends Controller
 
         if ($request->hasFile('documents')) {
             foreach ($request->file('documents') as $file) {
-                if (!$file) {
+                if (! $file) {
                     continue;
                 }
 
@@ -1436,7 +1282,7 @@ class StuckTrademarkController extends Controller
     {
         foreach ($uploads as $documentType => $files) {
             foreach ($files as $file) {
-                $path = $file->store('stuck-trademark/documents/' . $case->id, 'public');
+                $path = $file->store('stuck-trademark/documents/'.$case->id, 'public');
 
                 StuckTrademarkDocument::create([
                     'case_id' => $case->id,
@@ -1458,7 +1304,7 @@ class StuckTrademarkController extends Controller
             ->filter()
             ->values()
             ->map(function ($file, int $index) use ($case, $documentNames) {
-                $path = $file->store('stuck-trademark/audit-optional-documents/' . $case->id, 'public');
+                $path = $file->store('stuck-trademark/audit-optional-documents/'.$case->id, 'public');
                 $displayName = trim((string) ($documentNames[$index] ?? ''));
 
                 return StuckTrademarkDocument::create([
@@ -1562,10 +1408,10 @@ class StuckTrademarkController extends Controller
     private function documentsReadyForAudit(StuckTrademarkCase $case): bool
     {
         return in_array($case->status, [
-                StuckTrademarkWorkflow::AUDIT_PENDING,
-                StuckTrademarkWorkflow::DOCUMENTS_VERIFIED,
-                StuckTrademarkWorkflow::DOCUMENTS_UNDER_VERIFICATION,
-            ], true)
+            StuckTrademarkWorkflow::AUDIT_PENDING,
+            StuckTrademarkWorkflow::DOCUMENTS_VERIFIED,
+            StuckTrademarkWorkflow::DOCUMENTS_UNDER_VERIFICATION,
+        ], true)
             && $this->allCurrentDocumentsVerified($case);
     }
 
@@ -1604,8 +1450,7 @@ class StuckTrademarkController extends Controller
         string $message,
         ?string $actionUrl = null,
         string $actionText = 'Open Application Status'
-    ): void
-    {
+    ): void {
         Notification::create([
             'user_id' => $case->user_id,
             'type' => $type,
@@ -1638,23 +1483,23 @@ class StuckTrademarkController extends Controller
         $caseUrl = route('stuck-trademark.show', $case);
         $title = 'Audit report delivered';
         $message = "Your finalized stuck trademark audit report is ready and attached to this email.\n\n"
-            . 'Please review it here: ' . $caseUrl . "\n\n"
-            . 'You can approve the report or request a corrected upload from the recovery case page.';
+            .'Please review it here: '.$caseUrl."\n\n"
+            .'You can approve the report or request a corrected upload from the recovery case page.';
 
         if (filled($auditNote)) {
-            $message .= "\n\nAdmin note: " . $auditNote;
+            $message .= "\n\nAdmin note: ".$auditNote;
         }
 
         if (filled($case->risk_level)) {
-            $message .= "\n\nRisk: " . ucfirst($case->risk_level);
+            $message .= "\n\nRisk: ".ucfirst($case->risk_level);
         }
 
         if (filled($case->execution_recommendation)) {
-            $message .= "\n\nProfessional recommendation: " . $case->execution_recommendation;
+            $message .= "\n\nProfessional recommendation: ".$case->execution_recommendation;
         }
 
         if ((float) $case->execution_fee > 0) {
-            $message .= "\n\nExecution package fee: ₹" . number_format((float) $case->execution_fee, 2);
+            $message .= "\n\nExecution package fee: ₹".number_format((float) $case->execution_fee, 2);
         }
 
         Notification::create([
@@ -1674,12 +1519,12 @@ class StuckTrademarkController extends Controller
             $attachmentPath = Storage::disk('public')->path($case->audit_report_path);
             $mailAttachments = [[
                 'path' => $attachmentPath,
-                'name' => $case->audit_report_name ?: 'stuck-trademark-audit-report-' . $case->case_number . '.pdf',
+                'name' => $case->audit_report_name ?: 'stuck-trademark-audit-report-'.$case->case_number.'.pdf',
                 'mime' => 'application/pdf',
             ]];
 
             foreach ($supportingDocuments as $document) {
-                if (!Storage::disk('public')->exists($document->file_path)) {
+                if (! Storage::disk('public')->exists($document->file_path)) {
                     continue;
                 }
 
@@ -1702,8 +1547,5 @@ class StuckTrademarkController extends Controller
         }
     }
 
-    private function notifyAdmins(string $title, string $message): void
-    {
-        return;
-    }
+    private function notifyAdmins(string $title, string $message): void {}
 }

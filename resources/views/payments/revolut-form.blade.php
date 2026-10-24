@@ -54,7 +54,7 @@
                     <div class="card-body p-5" style="background: linear-gradient(135deg, #1D3557 0%, #2A9D8F 100%);">
                         <h1 class="text-white mb-2">Payment Required</h1>
                         <p class="text-white-50 mb-0">
-                            {{ ($paymentType ?? 'advance') === 'final' ? 'Final 50% balance payment' : '50% Advance Payment for Trademark Application' }}
+                            {{ ($paymentType ?? 'advance') === 'final' ? 'Final 50% balance payment' : 'Choose a 50% advance or one-time full payment' }}
                         </p>
                     </div>
                 </div>
@@ -78,7 +78,7 @@
                                 @endif
                             </div>
                             <div class="col-6">
-                                <p class="text-muted small">{{ ($paymentType ?? 'advance') === 'final' ? 'Payable Now' : 'Advance (50%)' }}</p>
+                                <p class="text-muted small" data-payable-label>{{ ($paymentType ?? 'advance') === 'final' ? 'Payable Now' : 'Advance (50%)' }}</p>
                                 <h6 style="color: #2A9D8F;"><strong data-payable-now>{{ $formatPounds($advanceAmount) }}</strong></h6>
                             </div>
                         </div>
@@ -87,12 +87,12 @@
 
                         <div class="row">
                             <div class="col-6">
-                                <p class="text-muted small">{{ ($paymentType ?? 'advance') === 'final' ? 'Remaining After This Payment' : 'Remaining Payment (50%)' }}</p>
+                                <p class="text-muted small" data-remaining-label>{{ ($paymentType ?? 'advance') === 'final' ? 'Remaining After This Payment' : 'Remaining Payment (50%)' }}</p>
                                 <h6 style="color: #4A4A4A;"><strong data-remaining-balance>{{ $formatPounds(max($totalAmount - $paidServiceAmount - $advanceAmount, 0)) }}</strong></h6>
                             </div>
                             <div class="col-6">
-                                <p class="text-muted small">{{ ($paymentType ?? 'advance') === 'final' ? 'Payment Stage' : 'Final Balance' }}</p>
-                                <small class="text-muted">{{ ($paymentType ?? 'advance') === 'final' ? 'Due now before filing' : 'Due after client approval' }}</small>
+                                <p class="text-muted small" data-payment-stage-title>{{ ($paymentType ?? 'advance') === 'final' ? 'Payment Stage' : 'Final Balance' }}</p>
+                                <small class="text-muted" data-payment-stage-copy>{{ ($paymentType ?? 'advance') === 'final' ? 'Due now before filing' : 'Due after client approval' }}</small>
                             </div>
                         </div>
                     </div>
@@ -158,6 +158,23 @@
                                 </div>
                             </div>
 
+                            @if (($paymentType ?? 'advance') === 'advance')
+                                <div class="payment-option mb-3" onclick="selectPaymentOption('full', this)">
+                                    <div class="p-3 border rounded-lg cursor-pointer"
+                                        style="border: 2px solid #e9ecef !important; background: #fff;">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="mb-1" style="color: #1D3557;">Full Payment</h6>
+                                                <small class="text-muted">Pay the complete professional fee now; no final balance after draft approval</small>
+                                            </div>
+                                            <div>
+                                                <h5 class="{{ !empty($autoApplyCoupon) ? 'coupon-price-new' : '' }}" style="{{ empty($autoApplyCoupon) ? 'color: #2A9D8F;' : '' }}" data-full-option-amount>{{ $formatPounds($totalAmount) }}</h5>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
+
                             <!-- Custom Amount
                             <div class="payment-option" onclick="selectPaymentOption('custom', 0)">
                                 <div class="p-3 border rounded-lg cursor-pointer"
@@ -166,8 +183,8 @@
                                         <div>
                                             <h6 class="mb-1" style="color: #1D3557;">Custom Amount</h6>
                                             <small class="text-muted">Pay any amount between
-                                                £{{ config('razorpay.custom_payments.min_amount') }} -
-                                                £{{ number_format(config('razorpay.custom_payments.max_amount'), 0) }}</small>
+                                                £{{ config('revolut.custom_payments.min_amount') }} -
+                                                £{{ number_format(config('revolut.custom_payments.max_amount'), 0) }}</small>
                                         </div>
                                         <div>
                                             <button class="btn btn-sm btn-outline-secondary">Enter Amount</button>
@@ -181,26 +198,25 @@
                         <div id="custom-amount-div" style="display: none; margin-top: 15px;">
                             <label for="custom_amount" class="form-label">Enter Custom Amount (£)</label>
                             <input type="number" id="custom_amount" class="form-control"
-                                placeholder="Enter amount between {{ config('razorpay.custom_payments.min_amount') }} - {{ config('razorpay.custom_payments.max_amount') }}"
-                                min="{{ config('razorpay.custom_payments.min_amount') }}"
-                                max="{{ config('razorpay.custom_payments.max_amount') }}">
+                                placeholder="Enter amount between {{ config('revolut.custom_payments.min_amount') }} - {{ config('revolut.custom_payments.max_amount') }}"
+                                min="{{ config('revolut.custom_payments.min_amount') }}"
+                                max="{{ config('revolut.custom_payments.max_amount') }}">
                         </div>
                     </div>
                 </div>
 
-                <!-- Payment Method: Razorpay -->
-                <div class="card border-0 shadow-sm mb-4" id="razorpay-section">
+                <!-- Payment Method: Revolut -->
+                <div class="card border-0 shadow-sm mb-4" id="revolut-section">
                     <div class="card-body p-4">
                         <h5 class="card-title mb-4" style="color: #1D3557;">🔐 Secure Payment</h5>
 
                         <div class="alert alert-info d-flex align-items-center" role="alert">
                             <i class="bi bi-shield-check me-2"></i>
-                            <small>Your payment is secured with Razorpay's encryption. We accept all major credit/debit
-                                cards.</small>
+                            <small>You will continue to Revolut's secure hosted checkout. Major cards, Revolut Pay and
+                                other enabled payment methods are supported.</small>
                         </div>
 
-                        <img src="https://razorpay.com/favicon.ico" alt="Razorpay" style="height: 20px;">
-                        <span class="ms-2 text-muted small">Powered by Razorpay</span>
+                        <span class="ms-2 text-muted small">Secure payment powered by Revolut</span>
                     </div>
                 </div>
 
@@ -228,9 +244,6 @@
         </div>
     </div>
 
-    <!-- Razorpay Checkout Script -->
-    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-
     <script>
         // Initialize payment option
         let selectedPaymentType = '{{ $paymentType ?? 'advance' }}';
@@ -241,6 +254,7 @@
 
         function calculateSelectedAmount(type) {
             if (type === 'final') return Math.max(discountedServiceTotal - previouslyPaidAmount, 0);
+            if (type === 'full') return Math.max(discountedServiceTotal - previouslyPaidAmount, 0);
             return Math.round(discountedServiceTotal * 50) / 100;
         }
 
@@ -262,6 +276,14 @@
             document.querySelectorAll('[data-payable-now]').forEach(el => el.textContent = formatPounds(selectedAmount));
             document.querySelectorAll('[data-remaining-balance]').forEach(el => el.textContent = formatPounds(Math.max(discountedServiceTotal - previouslyPaidAmount - selectedAmount, 0)));
             document.querySelectorAll('[data-primary-option-amount]').forEach(el => el.textContent = formatPounds(primaryAmount));
+            document.querySelectorAll('[data-full-option-amount]').forEach(el => el.textContent = formatPounds(Math.max(discountedServiceTotal - previouslyPaidAmount, 0)));
+
+            const isFull = selectedPaymentType === 'full';
+            const isFinal = selectedPaymentType === 'final';
+            document.querySelectorAll('[data-payable-label]').forEach(el => el.textContent = isFull ? 'Full Payment (100%)' : (isFinal ? 'Payable Now' : 'Advance (50%)'));
+            document.querySelectorAll('[data-remaining-label]').forEach(el => el.textContent = isFull ? 'Remaining After This Payment' : (isFinal ? 'Remaining After This Payment' : 'Remaining Payment (50%)'));
+            document.querySelectorAll('[data-payment-stage-title]').forEach(el => el.textContent = isFull ? 'Payment Plan' : (isFinal ? 'Payment Stage' : 'Final Balance'));
+            document.querySelectorAll('[data-payment-stage-copy]').forEach(el => el.textContent = isFull ? 'Paid completely upfront' : (isFinal ? 'Due now before filing' : 'Due after client approval'));
         }
 
         function selectPaymentOption(type, element = null) {
@@ -271,7 +293,7 @@
 
             // Update UI
             document.querySelectorAll('.payment-option > div').forEach(el => {
-                el.style.borderColor = '#e9ecef';
+                el.style.setProperty('border-color', '#e9ecef', 'important');
                 el.style.background = '#fff';
             });
 
@@ -279,7 +301,7 @@
                 const selectedCard = element.querySelector(':scope > div') ?? element.firstElementChild;
 
                 if (selectedCard) {
-                    selectedCard.style.borderColor = '#2A9D8F';
+                    selectedCard.style.setProperty('border-color', '#2A9D8F', 'important');
                     selectedCard.style.background = '#f0f9f8';
                 }
             }
@@ -288,15 +310,14 @@
         // Pay button click
         document.getElementById('pay-button').addEventListener('click', function() {
             let amount = selectedAmount;
-            const minAmount = {{ config('razorpay.custom_payments.min_amount') }};
-            const maxAmount = {{ config('razorpay.custom_payments.max_amount') }};
+            const minAmount = {{ config('revolut.custom_payments.min_amount') }};
+            const maxAmount = {{ config('revolut.custom_payments.max_amount') }};
 
             // If custom amount selected, get value from input
-            // Create Razorpay order
-            createRazorpayOrder(amount);
+            createRevolutOrder(amount);
         });
 
-        function createRazorpayOrder(amount) {
+        function createRevolutOrder(amount) {
             const button = document.getElementById('pay-button');
             window.LegalBruzButtonLoading?.set(button, 'Creating Order...');
 
@@ -314,8 +335,8 @@
                 })
                 .then(response => response.json())
                 .then(data => {
-                    if (data.status === 'success') {
-                        initiateRazorpayCheckout(data);
+                    if (data.status === 'success' && data.checkout_url) {
+                        window.location.assign(data.checkout_url);
                     } else {
                         alert('Error: ' + data.message);
                         window.LegalBruzButtonLoading?.reset(button);
@@ -323,81 +344,6 @@
                 })
                 .catch(error => {
                     alert('Error creating order: ' + error.message);
-                    window.LegalBruzButtonLoading?.reset(button);
-                });
-        }
-
-        function initiateRazorpayCheckout(orderData) {
-            const options = {
-                key: orderData.key,
-                amount: orderData.amount,
-                currency: orderData.currency,
-                name: '{{ config('app.name') }}',
-                description: 'UK Trade Mark Application - {{ $application->brand_name }}',
-                order_id: orderData.order_id,
-                handler: function(response) {
-                    verifyPaymentSignature(response);
-                },
-                prefill: {
-                    name: orderData.user_name,
-                    email: orderData.user_email,
-                    contact: orderData.user_phone
-                },
-                theme: {
-                    color: '#2A9D8F'
-                }
-            };
-
-            const rzp1 = new Razorpay(options);
-            rzp1.open();
-
-            document.getElementById('pay-button').disabled = false;
-            window.LegalBruzButtonLoading?.reset(document.getElementById('pay-button'));
-        }
-
-        function verifyPaymentSignature(response) {
-            const button = document.getElementById('pay-button');
-            window.LegalBruzButtonLoading?.set(button, 'Verifying Payment...');
-
-            fetch('{{ route('payment.verify-signature', $application->id) }}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    body: JSON.stringify({
-                        razorpay_payment_id: response.razorpay_payment_id,
-                        razorpay_order_id: response.razorpay_order_id,
-                        razorpay_signature: response.razorpay_signature
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        // Show success message
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Payment Successful!',
-                            text: 'Your payment has been verified. Redirecting...',
-                            allowOutsideClick: false
-                        }).then(() => {
-                            window.location.href = data.redirect_url;
-                        });
-                    } else {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Verification Failed',
-                            text: data.message
-                        });
-                        window.LegalBruzButtonLoading?.reset(button);
-                    }
-                })
-                .catch(error => {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error',
-                        text: 'Payment verification failed: ' + error.message
-                    });
                     window.LegalBruzButtonLoading?.reset(button);
                 });
         }
