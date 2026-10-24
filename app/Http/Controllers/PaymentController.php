@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\PaymentVerificationException;
 use App\Models\Application;
+use App\Models\ConsultationBooking;
 use App\Models\DiscountCoupon;
 use App\Models\Payment;
 use App\Models\PaymentTransaction;
@@ -429,6 +430,10 @@ class PaymentController extends Controller
             return $this->renderInvoice($transaction->payable);
         }
 
+        if ($transaction->payable instanceof ConsultationBooking) {
+            return $this->renderConsultationInvoice($transaction, $transaction->payable);
+        }
+
         abort_unless($transaction->status === 'completed' && $transaction->paid_at, 404);
 
         $pdf = \PDF::loadView('payments.transaction-invoice', [
@@ -440,6 +445,23 @@ class PaymentController extends Controller
         ])->setPaper('a4');
 
         return $pdf->stream('payment-invoice-'.$transaction->id.'.pdf');
+    }
+
+    private function renderConsultationInvoice(PaymentTransaction $transaction, ConsultationBooking $booking)
+    {
+        abort_unless($transaction->status === 'completed', 404);
+
+        $issuedAt = $transaction->paid_at ?? $booking->paid_at ?? $transaction->created_at;
+        $pdf = \PDF::loadView('consultations.payment-invoice', [
+            'booking' => $booking,
+            'transaction' => $transaction,
+            'invoiceNumber' => 'CON-INV-'.$issuedAt->format('Y').'-'.$booking->id,
+            'issuedAt' => $issuedAt,
+            'firmName' => config('app.name', 'Legal Bruz'),
+            'firmEmail' => config('mail.from.address'),
+        ])->setPaper('a4');
+
+        return $pdf->stream('consultation-invoice-'.$booking->id.'.pdf');
     }
 
     private function hasPaymentsColumn(string $column): bool

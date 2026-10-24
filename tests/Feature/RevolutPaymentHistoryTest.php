@@ -53,6 +53,66 @@ class RevolutPaymentHistoryTest extends TestCase
             ->assertSee('payment_history_1');
     }
 
+    public function test_admin_transaction_invoice_uses_the_original_consultation_booking_details(): void
+    {
+        config([
+            'company.registered_office' => 'Registered Office: 10 Example Street, London, SW1A 1AA',
+            'company.number' => '12345678',
+        ]);
+        $booking = ConsultationBooking::create([
+            'public_id' => (string) Str::uuid(),
+            'name' => 'Alex Morgan',
+            'email' => 'alex@example.test',
+            'phone' => '+447123456789',
+            'business_name' => 'Morgan Studio Ltd',
+            'service_topic' => 'trademark_application',
+            'preferred_date' => now()->addDay()->toDateString(),
+            'preferred_time' => '10_12',
+            'message' => 'I would like advice about a UK trade mark application.',
+            'amount' => 25,
+            'currency' => 'GBP',
+            'payment_status' => 'paid',
+            'payment_reference' => 'consultation_order_original',
+            'transaction_id' => 'consultation_payment_original',
+            'paid_at' => now(),
+        ]);
+        $transaction = PaymentTransaction::create([
+            'payable_type' => ConsultationBooking::class,
+            'payable_id' => $booking->id,
+            'service' => 'consultation',
+            'provider' => 'revolut',
+            'provider_order_id' => 'consultation_order_original',
+            'provider_payment_id' => 'consultation_payment_original',
+            'amount' => 25,
+            'currency' => 'GBP',
+            'status' => 'completed',
+            'paid_at' => now(),
+        ]);
+
+        $invoice = view('consultations.payment-invoice', [
+            'booking' => $booking,
+            'transaction' => $transaction,
+            'invoiceNumber' => 'CON-INV-TEST-1',
+            'issuedAt' => $transaction->paid_at,
+            'firmName' => 'Legal Bruz Ltd.',
+            'firmEmail' => 'test@example.com',
+        ])->render();
+
+        $this->assertStringContainsString('Alex Morgan', $invoice);
+        $this->assertStringContainsString('alex@example.test', $invoice);
+        $this->assertStringContainsString('Morgan Studio Ltd', $invoice);
+        $this->assertStringContainsString('UK trade mark application', $invoice);
+        $this->assertStringContainsString('Registered office:</strong> 10 Example Street', $invoice);
+        $this->assertStringNotContainsString('Registered Office: Registered Office:', $invoice);
+
+        $admin = Admin::create(['name' => 'Admin', 'email' => 'invoice-admin@example.test', 'password' => bcrypt('password')]);
+        $this->actingAs($admin, 'admin')
+            ->get(route('admin.payment.transaction.invoice', $transaction))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf')
+            ->assertHeader('content-disposition', 'inline; filename=consultation-invoice-'.$booking->id.'.pdf');
+    }
+
     public function test_customer_history_includes_legacy_paid_services_and_uses_the_original_application_invoice(): void
     {
         $user = User::factory()->create();

@@ -17,7 +17,7 @@
             <td><small>Order</small> <code class="d-block">{{ $transaction->provider_order_id }}</code>@if($transaction->provider_payment_id)<small>Payment</small> <code class="d-block">{{ $transaction->provider_payment_id }}</code>@endif</td>
             <td>{{ $transaction->currency }} {{ number_format((float) $transaction->amount, 2) }}</td>
             <td><x-admin-status :status="$transaction->status" /></td>
-            <td class="text-end">@if($transaction->status === 'completed')<a class="btn btn-sm btn-outline-primary" target="_blank" href="{{ route('admin.payment.transaction.invoice', $transaction) }}">Invoice</a>@endif</td>
+            <td class="text-end">@if($transaction->status === 'completed')<a class="btn btn-sm btn-outline-primary" target="_blank" href="{{ route('admin.payment.transaction.invoice', $transaction) }}">Original invoice</a>@endif</td>
         </tr>@empty<tr><td colspan="7" class="text-center text-muted py-5">No payment transactions found.</td></tr>@endforelse</tbody>
     </table></div></div>
     <div class="mt-3">{{ $transactions->links() }}</div>

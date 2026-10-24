@@ -1,5 +1,9 @@
 @php
-    $registeredOffice = trim((string) config('company.registered_office'));
+    $registeredOffice = preg_replace(
+        '/^registered\s+office(?:\s+address)?\s*:\s*/i',
+        '',
+        trim((string) config('company.registered_office')),
+    );
     $companyNumber = trim((string) config('company.number'));
 @endphp
 
