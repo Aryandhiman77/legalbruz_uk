@@ -32,6 +32,7 @@
             <td>
                 <div class="title">{{ $firmName }}</div>
                 <div class="muted">{{ $firmEmail }}</div>
+                @include('invoices.partials.company-registration')
             </td>
             <td class="text-right">
                 <div><strong>Invoice No:</strong> {{ $invoiceNumber }}</div>

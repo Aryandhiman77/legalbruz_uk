@@ -275,6 +275,32 @@ class PaymentSplitTest extends TestCase
         $this->assertStringNotContainsString('Individual / Proprietor / Trader', $invoice);
     }
 
+    public function test_invoice_shows_company_registration_details_from_configuration(): void
+    {
+        config([
+            'company.registered_office' => '10 Example Street, London, SW1A 1AA',
+            'company.number' => '12345678',
+        ]);
+        [$user, $application] = $this->application(TrademarkWorkflow::UNDER_REVIEW);
+        $payment = $this->completedPayment($user, $application, 'advance', 199.50, '50%');
+
+        $invoice = view('emails.attachments.invoice', [
+            'application' => $application,
+            'user' => $user,
+            'payment' => $payment,
+            'invoiceNumber' => 'INV-TEST-COMPANY',
+            'paymentLabel' => 'Advance Payment (50%)',
+            'issuedAt' => $payment->paid_at,
+            'firmName' => 'Legal Bruz Ltd.',
+            'firmEmail' => 'test@example.com',
+        ])->render();
+
+        $this->assertStringContainsString('Registered office:', $invoice);
+        $this->assertStringContainsString('10 Example Street, London, SW1A 1AA', $invoice);
+        $this->assertStringContainsString('Company number:', $invoice);
+        $this->assertStringContainsString('12345678', $invoice);
+    }
+
     private function application(string $status): array
     {
         $user = User::factory()->create();
