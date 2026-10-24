@@ -2,12 +2,11 @@
 
 namespace App\Models;
 
+use App\Support\PostFilingJourney;
+use App\Support\TrademarkWorkflow;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use App\Models\TrademarkOppositionCase;
-use App\Support\PostFilingJourney;
-use App\Support\TrademarkWorkflow;
 
 class Application extends Model
 {
@@ -153,5 +152,18 @@ class Application extends Model
         return $this->registry_status === TrademarkWorkflow::REGISTRY_REGISTERED
             || filled($this->registered_at)
             || $this->current_status === TrademarkWorkflow::REGISTERED;
+    }
+
+    public function getApplicantTypeLabelAttribute(): string
+    {
+        $applicantType = data_get($this->members_details, 'applicant_details.applicant_type')
+            ?: $this->entity_type;
+
+        if (blank($applicantType)) {
+            return 'Not provided';
+        }
+
+        return config("uk_site.applicant_types.{$applicantType}")
+            ?? str((string) $applicantType)->replace('_', ' ')->title()->toString();
     }
 }

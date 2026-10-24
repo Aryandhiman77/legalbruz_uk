@@ -93,7 +93,7 @@
             <td width="50%" class="text-right">
                 <strong>Brand</strong><br>
                 {{ $application->brand_name ?? 'Trademark Application' }}<br>
-                <span class="muted">{{ $application->entity_type === 'individual' ? 'Individual / Proprietor / Trader' : ucfirst($application->entity_type) }} applicant</span>
+                <span class="muted">{{ $application->applicant_type_label }}</span>
             </td>
         </tr>
     </table>
