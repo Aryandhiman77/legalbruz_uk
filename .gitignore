@@ -26,3 +26,5 @@ Thumbs.db
 *.md
 !REVOLUT_INTEGRATION.md
 *.txt
+
+admin.php
