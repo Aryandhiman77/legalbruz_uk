@@ -1623,6 +1623,7 @@ class AdminController extends Controller
             } else {
                 Mail::to($application->user->email)->send($notification);
             }
+            request()->attributes->set('workflow_client_email_sent', true);
         } catch (\Throwable $exception) {
             Log::warning('Client stage-action email could not be dispatched.', [
                 'application_id' => $application->id,

@@ -126,6 +126,93 @@ class PaymentSplitTest extends TestCase
             ->assertJsonValidationErrors('payment_type');
     }
 
+    public function test_status_dashboard_prefers_a_completed_full_payment_over_failed_attempts(): void
+    {
+        [$user, $application] = $this->application(TrademarkWorkflow::UNDER_REVIEW);
+
+        Payment::query()->create([
+            'application_id' => $application->id,
+            'user_id' => $user->id,
+            'amount' => 199.50,
+            'total_amount' => 399,
+            'payment_type' => 'advance',
+            'percentage' => '50%',
+            'payment_method' => 'revolut',
+            'status' => 'failed',
+        ]);
+        $completedPayment = $this->completedPayment($user, $application, 'full', 399, '100%');
+
+        $this->actingAs($user)
+            ->get(route('trademark.status', $application->id))
+            ->assertOk()
+            ->assertSee('Application Payment')
+            ->assertSee('Paid in Full')
+            ->assertSee(route('payment.invoice', $completedPayment->id), false)
+            ->assertDontSee('>Failed<', false);
+    }
+
+    public function test_status_and_client_dashboards_keep_a_completed_half_payment_after_a_failed_retry(): void
+    {
+        [$user, $application] = $this->application(TrademarkWorkflow::UNDER_REVIEW);
+        $completedPayment = $this->completedPayment($user, $application, 'advance', 199.50, '50%');
+
+        Payment::query()->create([
+            'application_id' => $application->id,
+            'user_id' => $user->id,
+            'amount' => 199.50,
+            'total_amount' => 399,
+            'payment_type' => 'advance',
+            'percentage' => '50%',
+            'payment_method' => 'revolut',
+            'status' => 'failed',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('trademark.status', $application->id))
+            ->assertOk()
+            ->assertSee('Half Payment Done')
+            ->assertSee(route('payment.invoice', $completedPayment->id), false)
+            ->assertDontSee('>Failed<', false);
+
+        $this->actingAs($user)
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('Half Payment Done')
+            ->assertDontSee('>Failed<', false);
+    }
+
+    public function test_status_dashboard_keeps_a_completed_final_payment_after_a_failed_retry(): void
+    {
+        [$user, $application] = $this->application(TrademarkWorkflow::PAYMENT_COMPLETED);
+        $this->completedPayment($user, $application, 'advance', 199.50, '50%');
+        $completedFinalPayment = $this->completedPayment($user, $application, 'final', 199.50, '50%');
+
+        Payment::query()->create([
+            'application_id' => $application->id,
+            'user_id' => $user->id,
+            'amount' => 199.50,
+            'total_amount' => 399,
+            'payment_type' => 'final',
+            'percentage' => '50%',
+            'payment_method' => 'revolut',
+            'status' => 'failed',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('trademark.status', $application->id))
+            ->assertOk()
+            ->assertSee('Half Payment Done')
+            ->assertSee('Final Payment Done')
+            ->assertSee(route('payment.invoice', $completedFinalPayment->id), false)
+            ->assertDontSee('>Failed<', false);
+
+        $this->actingAs($user)
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('Full Payment Done')
+            ->assertDontSee('>Failed<', false);
+    }
+
     public function test_final_payment_cannot_be_created_before_client_approval(): void
     {
         [$user, $application] = $this->application(TrademarkWorkflow::UNDER_REVIEW);

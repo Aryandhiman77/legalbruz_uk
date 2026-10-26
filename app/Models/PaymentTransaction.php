@@ -47,6 +47,7 @@ class PaymentTransaction extends Model
         return match ($this->service) {
             'trademark_application_advance' => 'Trade mark application — advance',
             'trademark_application_final' => 'Trade mark application — final balance',
+            'trademark_application_full' => 'Trade mark application — full payment',
             'consultation' => 'Consultation call',
             'trademark_search_report' => 'Trade mark search report',
             'opposition_defence' => 'Opposition defence',

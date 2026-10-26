@@ -8,6 +8,7 @@ use App\Models\TrademarkPricing;
 use App\Models\TrademarkSearchReportDocument;
 use App\Models\TrademarkSearchReportRequest;
 use App\Services\RevolutMerchantService;
+use App\Services\PaymentInvoiceEmailService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -92,7 +93,11 @@ class TrademarkSearchReportController extends Controller
         ]);
     }
 
-    public function confirm(TrademarkSearchReportRequest $reportRequest, RevolutMerchantService $revolut): RedirectResponse
+    public function confirm(
+        TrademarkSearchReportRequest $reportRequest,
+        RevolutMerchantService $revolut,
+        PaymentInvoiceEmailService $invoiceEmails,
+    ): RedirectResponse
     {
         if ($reportRequest->payment_status === 'paid') {
             return redirect()->route('trademark-search-report.success', $reportRequest);
@@ -115,6 +120,8 @@ class TrademarkSearchReportController extends Controller
             'transaction_id' => $transaction->provider_payment_id,
             'paid_at' => $transaction->paid_at ?? now(),
         ]);
+
+        $invoiceEmails->sendToClientAndAdmins($transaction);
 
         return redirect()->route('trademark-search-report.success', $reportRequest)->with('success', 'Payment confirmed successfully.');
     }

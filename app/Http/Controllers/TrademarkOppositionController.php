@@ -20,6 +20,7 @@ use App\Models\OppositionRegistryUpdate;
 use App\Models\PaymentTransaction;
 use App\Models\TrademarkOppositionCase;
 use App\Services\RevolutMerchantService;
+use App\Services\PaymentInvoiceEmailService;
 use App\Support\PostFilingJourney;
 use App\Support\TrademarkOppositionWorkflow;
 use App\Support\TrademarkWorkflow;
@@ -286,7 +287,11 @@ class TrademarkOppositionController extends Controller
         }
     }
 
-    public function confirmOpposePayment(TrademarkOppositionCase $case, RevolutMerchantService $revolut): RedirectResponse
+    public function confirmOpposePayment(
+        TrademarkOppositionCase $case,
+        RevolutMerchantService $revolut,
+        PaymentInvoiceEmailService $invoiceEmails,
+    ): RedirectResponse
     {
         $this->authorizeClient($case);
         abort_unless($case->flow_type === TrademarkOppositionWorkflow::FLOW_OPPOSE, 404);
@@ -319,6 +324,7 @@ class TrademarkOppositionController extends Controller
         ]);
 
         $this->transition($case, 'Payment Completed', 'Client completed Notice of Opposition filing package payment.', 'client');
+        $invoiceEmails->sendToClientAndAdmins($transaction);
 
         return redirect()->route('trademark-opposition.oppose.show', $case)->with('success', 'Payment verified successfully.');
     }
@@ -781,7 +787,11 @@ class TrademarkOppositionController extends Controller
         }
     }
 
-    public function confirmPayment(TrademarkOppositionCase $case, RevolutMerchantService $revolut): RedirectResponse
+    public function confirmPayment(
+        TrademarkOppositionCase $case,
+        RevolutMerchantService $revolut,
+        PaymentInvoiceEmailService $invoiceEmails,
+    ): RedirectResponse
     {
         $this->authorizeClient($case);
 
@@ -833,6 +843,7 @@ class TrademarkOppositionController extends Controller
 
         $case->update($updates);
         $this->transition($case, 'Payment Completed', 'Client completed opposition defence package payment.', 'client');
+        $invoiceEmails->sendToClientAndAdmins($transaction);
 
         return redirect()->route('trademark-opposition.show', $case)->with('success', 'Payment verified successfully.');
     }
@@ -3261,6 +3272,7 @@ class TrademarkOppositionController extends Controller
                 $actionUrl,
                 $actionText
             ));
+            request()->attributes->set('workflow_client_email_sent', true);
 
             NotificationLog::create([
                 'case_id' => $case->id,

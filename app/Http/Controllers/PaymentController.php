@@ -4,12 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\PaymentVerificationException;
 use App\Models\Application;
-use App\Models\ConsultationBooking;
 use App\Models\DiscountCoupon;
 use App\Models\Payment;
 use App\Models\PaymentTransaction;
 use App\Models\TrademarkPricing;
 use App\Services\ClientPaymentHistoryService;
+use App\Services\PaymentInvoiceEmailService;
+use App\Services\PaymentInvoiceService;
 use App\Services\RevolutMerchantService;
 use App\Services\TrademarkWorkflowService;
 use App\Support\TrademarkWorkflow;
@@ -250,6 +251,7 @@ class PaymentController extends Controller
         $applicationId,
         TrademarkWorkflowService $workflow,
         RevolutMerchantService $revolut,
+        PaymentInvoiceEmailService $invoiceEmails,
     ) {
         $application = Application::findOrFail($applicationId);
 
@@ -292,6 +294,8 @@ class PaymentController extends Controller
                     return $lockedPayment->fresh();
                 });
             }
+
+            $invoiceEmails->sendToClientAndAdmins($transaction);
 
             $paymentType = $this->paymentType($payment);
 
@@ -405,63 +409,26 @@ class PaymentController extends Controller
             abort(404);
         }
 
-        $payment->loadMissing(['application', 'user']);
-        $application = $payment->application;
-
-        $pdf = \PDF::loadView('emails.attachments.invoice', [
-            'application' => $application,
-            'user' => $payment->user,
-            'payment' => $payment,
-            'invoiceNumber' => $this->invoiceNumber($payment),
-            'paymentLabel' => $this->paymentLabel($payment),
-            'issuedAt' => $payment->paid_at ?? $payment->created_at,
-            'firmName' => config('app.name', 'Legal Bruz'),
-            'firmEmail' => config('mail.from.address'),
-        ])->setPaper('a4');
-
-        return $pdf->stream('invoice-'.$application->id.'-'.$payment->id.'.pdf');
+        return $this->invoiceResponse(
+            app(PaymentInvoiceService::class)->forApplicationPayment($payment)
+        );
     }
 
     private function renderTransactionInvoice(PaymentTransaction $transaction)
     {
-        $transaction->loadMissing(['user', 'payable']);
-
-        if ($transaction->payable instanceof Payment) {
-            return $this->renderInvoice($transaction->payable);
-        }
-
-        if ($transaction->payable instanceof ConsultationBooking) {
-            return $this->renderConsultationInvoice($transaction, $transaction->payable);
-        }
-
         abort_unless($transaction->status === 'completed' && $transaction->paid_at, 404);
 
-        $pdf = \PDF::loadView('payments.transaction-invoice', [
-            'transaction' => $transaction,
-            'invoiceNumber' => 'PAY-INV-'.$transaction->paid_at->format('Y').'-'.$transaction->id,
-            'issuedAt' => $transaction->paid_at,
-            'firmName' => config('app.name', 'Legal Bruz'),
-            'firmEmail' => config('mail.from.address'),
-        ])->setPaper('a4');
-
-        return $pdf->stream('payment-invoice-'.$transaction->id.'.pdf');
+        return $this->invoiceResponse(
+            app(PaymentInvoiceService::class)->forTransaction($transaction)
+        );
     }
 
-    private function renderConsultationInvoice(PaymentTransaction $transaction, ConsultationBooking $booking)
+    private function invoiceResponse(\App\Support\GeneratedPaymentInvoice $invoice)
     {
-        abort_unless($transaction->status === 'completed', 404);
-
-        $issuedAt = $transaction->paid_at ?? $booking->paid_at ?? $transaction->created_at;
-        $pdf = \PDF::loadView('consultations.payment-invoice', [
-            'booking' => $booking,
-            'transaction' => $transaction,
-            'invoiceNumber' => 'CON-INV-'.$issuedAt->format('Y').'-'.$booking->id,
-            'issuedAt' => $issuedAt,
-            'firmName' => config('app.name', 'Legal Bruz'),
-            'firmEmail' => config('mail.from.address'),
-        ])->setPaper('a4');
-
-        return $pdf->stream('consultation-invoice-'.$booking->id.'.pdf');
+        return response($invoice->contents, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename='.$invoice->filename,
+        ]);
     }
 
     private function hasPaymentsColumn(string $column): bool
@@ -476,15 +443,6 @@ class PaymentController extends Controller
         }
 
         return (string) $payment->percentage === '100%' ? 'final' : 'advance';
-    }
-
-    private function paymentLabel(Payment $payment): string
-    {
-        return match ($this->paymentKind($payment)) {
-            'full' => 'Full Payment',
-            'final' => 'Final Payment',
-            default => 'Advance Payment (50%)',
-        };
     }
 
     private function paymentKind(Payment $payment): string
@@ -502,10 +460,4 @@ class PaymentController extends Controller
         return (string) $payment->percentage === '100%' ? 'final' : 'advance';
     }
 
-    private function invoiceNumber(Payment $payment): string
-    {
-        $issuedAt = $payment->paid_at ?? $payment->created_at ?? now();
-
-        return 'INV-'.$issuedAt->format('Y').'-'.$payment->application_id.'-'.$payment->id;
-    }
 }

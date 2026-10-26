@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Mail\PaymentInvoiceMail;
 use App\Models\Admin;
 use App\Models\Application;
 use App\Models\ConsultationBooking;
@@ -9,14 +10,80 @@ use App\Models\Payment;
 use App\Models\PaymentTransaction;
 use App\Models\TrademarkSearchReportRequest;
 use App\Models\User;
+use App\Services\PaymentInvoiceEmailService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class RevolutPaymentHistoryTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_completed_payment_emails_the_original_invoice_to_client_and_admin_once(): void
+    {
+        Mail::fake();
+
+        $user = User::factory()->create(['email' => 'invoice-client@example.test']);
+        $admin = Admin::create([
+            'name' => 'Invoice Admin',
+            'email' => 'invoice-admin@example.test',
+            'password' => bcrypt('password'),
+        ]);
+        $application = Application::create([
+            'user_id' => $user->id,
+            'type' => 'trademark',
+            'entity_type' => 'individual',
+            'applicant_name' => 'Exact Invoice Applicant',
+            'phone' => '+447123456789',
+            'email' => $user->email,
+            'brand_name' => 'Exact Invoice Mark',
+        ]);
+        $payment = Payment::create([
+            'application_id' => $application->id,
+            'user_id' => $user->id,
+            'amount' => 399,
+            'total_amount' => 399,
+            'payment_type' => 'full',
+            'percentage' => '100%',
+            'payment_method' => 'revolut',
+            'status' => 'completed',
+            'reference_number' => 'invoice_email_order',
+            'transaction_id' => 'invoice_email_payment',
+            'paid_at' => now(),
+        ]);
+        $transaction = PaymentTransaction::create([
+            'user_id' => $user->id,
+            'payable_type' => Payment::class,
+            'payable_id' => $payment->id,
+            'service' => 'trademark_application_full',
+            'provider' => 'revolut',
+            'provider_order_id' => 'invoice_email_order',
+            'provider_payment_id' => 'invoice_email_payment',
+            'amount' => 399,
+            'currency' => 'GBP',
+            'status' => 'completed',
+            'paid_at' => now(),
+        ]);
+
+        $service = app(PaymentInvoiceEmailService::class);
+        $service->sendToClientAndAdmins($transaction);
+        $service->sendToClientAndAdmins($transaction->fresh());
+
+        Mail::assertSent(PaymentInvoiceMail::class, 2);
+        Mail::assertSent(PaymentInvoiceMail::class, function (PaymentInvoiceMail $mail) use ($user, $application, $payment): bool {
+            return $mail->hasTo($user->email)
+                && $mail->invoice->filename === 'invoice-'.$application->id.'-'.$payment->id.'.pdf'
+                && str_starts_with($mail->invoice->contents, '%PDF');
+        });
+        Mail::assertSent(PaymentInvoiceMail::class, fn (PaymentInvoiceMail $mail): bool => $mail->hasTo($admin->email));
+
+        $this->assertEqualsCanonicalizing(
+            [$user->email, $admin->email],
+            $transaction->fresh()->metadata['invoice_email_recipients']
+        );
+    }
 
     public function test_customer_and_admin_can_view_completed_payment_history_and_invoice(): void
     {
@@ -217,13 +284,21 @@ class RevolutPaymentHistoryTest extends TestCase
 
     public function test_signed_webhook_retrieves_and_records_authoritative_order_state(): void
     {
+        Mail::fake();
         config([
             'revolut.secret_key' => 'sk_test_secret',
             'revolut.webhook_secret' => 'wsk_test_secret',
             'revolut.environment' => 'sandbox',
             'revolut.api_version' => '2026-08-17',
         ]);
+        $user = User::factory()->create(['email' => 'webhook-client@example.test']);
+        $admin = Admin::create([
+            'name' => 'Webhook Admin',
+            'email' => 'webhook-admin@example.test',
+            'password' => bcrypt('password'),
+        ]);
         PaymentTransaction::create([
+            'user_id' => $user->id,
             'service' => 'consultation',
             'provider' => 'revolut',
             'provider_order_id' => 'order_webhook_1',
@@ -256,6 +331,9 @@ class RevolutPaymentHistoryTest extends TestCase
             'provider_payment_id' => 'payment_webhook_1',
             'status' => 'completed',
         ]);
+        Mail::assertSent(PaymentInvoiceMail::class, 2);
+        Mail::assertSent(PaymentInvoiceMail::class, fn (PaymentInvoiceMail $mail): bool => $mail->hasTo($user->email));
+        Mail::assertSent(PaymentInvoiceMail::class, fn (PaymentInvoiceMail $mail): bool => $mail->hasTo($admin->email));
     }
 
     public function test_webhook_rejects_an_invalid_signature_without_contacting_revolut(): void

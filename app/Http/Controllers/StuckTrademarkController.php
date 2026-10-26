@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\PaymentVerificationException;
+use App\Mail\AdminWorkflowNotification;
 use App\Mail\EventNotification;
+use App\Models\Admin;
 use App\Models\DiscountCoupon;
 use App\Models\Notification;
 use App\Models\PaymentTransaction;
@@ -11,10 +13,12 @@ use App\Models\StuckTrademarkCase;
 use App\Models\StuckTrademarkDocument;
 use App\Models\StuckTrademarkStatusLog;
 use App\Services\RevolutMerchantService;
+use App\Services\PaymentInvoiceEmailService;
 use App\Support\StuckTrademarkWorkflow;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -454,7 +458,11 @@ class StuckTrademarkController extends Controller
         }
     }
 
-    public function confirmAuditPayment(StuckTrademarkCase $case, RevolutMerchantService $revolut)
+    public function confirmAuditPayment(
+        StuckTrademarkCase $case,
+        RevolutMerchantService $revolut,
+        PaymentInvoiceEmailService $invoiceEmails,
+    )
     {
         $this->authorizeApplicant($case);
 
@@ -479,6 +487,7 @@ class StuckTrademarkController extends Controller
             $transaction->provider_payment_id,
             $transaction->metadata ?? [],
         );
+        $invoiceEmails->sendToClientAndAdmins($transaction);
 
         return redirect()->route('stuck-trademark.show', $case)->with('success', 'Audit payment verified successfully.');
     }
@@ -678,7 +687,11 @@ class StuckTrademarkController extends Controller
         }
     }
 
-    public function confirmExecutionPayment(StuckTrademarkCase $case, RevolutMerchantService $revolut)
+    public function confirmExecutionPayment(
+        StuckTrademarkCase $case,
+        RevolutMerchantService $revolut,
+        PaymentInvoiceEmailService $invoiceEmails,
+    )
     {
         $this->authorizeApplicant($case);
 
@@ -725,6 +738,7 @@ class StuckTrademarkController extends Controller
 
         $this->logStatus($case, $from, $case->status, 'Execution package payment completed', 'Applicant paid the approved execution package fee.');
         $this->notifyApplicant($case, 'stuck_trademark_execution_payment_paid', 'Execution payment received', 'Your execution package payment has been received. Recovery work is now active.');
+        $invoiceEmails->sendToClientAndAdmins($transaction);
 
         return redirect()->route('stuck-trademark.show', $case)->with('success', 'Execution payment verified successfully.');
     }
@@ -1472,6 +1486,7 @@ class StuckTrademarkController extends Controller
                 $actionUrl,
                 $actionText
             ));
+            request()->attributes->set('workflow_client_email_sent', true);
         } catch (\Throwable $e) {
             report($e);
         }
@@ -1547,5 +1562,22 @@ class StuckTrademarkController extends Controller
         }
     }
 
-    private function notifyAdmins(string $title, string $message): void {}
+    private function notifyAdmins(string $title, string $message): void
+    {
+        try {
+            Admin::query()->pluck('email')->filter()->unique()->each(function (string $email) use ($title, $message): void {
+                Mail::to($email)->send(new AdminWorkflowNotification(
+                    $title,
+                    $message,
+                    route('admin.stuck-trademark.index'),
+                ));
+            });
+            request()->attributes->set('workflow_admin_email_sent', true);
+        } catch (\Throwable $exception) {
+            Log::warning('Recovery workflow admin email failed.', [
+                'title' => $title,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
 }

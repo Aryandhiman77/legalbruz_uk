@@ -641,6 +641,7 @@ class TrademarkWorkflowService
             } else {
                 Mail::to($application->user->email)->send($notification);
             }
+            request()->attributes->set('workflow_client_email_sent', true);
         } catch (\Throwable $e) {
             Log::warning('Workflow notification email failed.', [
                 'application_id' => $application->id,
@@ -676,6 +677,7 @@ class TrademarkWorkflowService
             Admin::query()->pluck('email')->filter()->unique()->each(function (string $email) use ($title, $message, $actionUrl) {
                 Mail::to($email)->send(new AdminWorkflowNotification($title, $message, $actionUrl));
             });
+            request()->attributes->set('workflow_admin_email_sent', true);
         } catch (\Throwable $e) {
             Log::warning('Admin workflow notification email failed.', [
                 'title' => $title,

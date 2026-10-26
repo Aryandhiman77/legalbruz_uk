@@ -22,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->web(append: [
             \App\Http\Middleware\TrackWebsiteVisitor::class,
+            \App\Http\Middleware\EnsureWorkflowActionEmail::class,
         ]);
 
         $middleware->alias([

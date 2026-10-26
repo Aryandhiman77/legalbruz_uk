@@ -8,6 +8,7 @@ use App\Models\ContactMessage;
 use App\Models\PaymentTransaction;
 use App\Models\TrademarkPricing;
 use App\Services\RevolutMerchantService;
+use App\Services\PaymentInvoiceEmailService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -117,7 +118,11 @@ class ConsultationBookingController extends Controller
         ]);
     }
 
-    public function confirm(ConsultationBooking $booking, RevolutMerchantService $revolut): RedirectResponse
+    public function confirm(
+        ConsultationBooking $booking,
+        RevolutMerchantService $revolut,
+        PaymentInvoiceEmailService $invoiceEmails,
+    ): RedirectResponse
     {
         if ($booking->payment_status === 'paid') {
             return redirect()->route('book-call.success', $booking);
@@ -151,6 +156,8 @@ class ConsultationBookingController extends Controller
                 $booking->message,
             ),
         ]);
+
+        $invoiceEmails->sendToClientAndAdmins($transaction);
 
         return redirect()->route('book-call.success', $booking)->with('success', 'Payment confirmed successfully.');
     }

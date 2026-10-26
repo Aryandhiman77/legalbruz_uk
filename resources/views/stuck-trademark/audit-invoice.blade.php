@@ -3,6 +3,7 @@
     $auditDiscountAmount = (float) ($case->audit_discount_amount ?: 0);
     $auditPaidAmount = (float) ($case->audit_paid_amount ?: max($auditOriginalAmount - $auditDiscountAmount, 0));
     $hasAuditDiscount = $auditDiscountAmount > 0 && $auditPaidAmount < $auditOriginalAmount;
+    $currency = strtoupper(isset($transaction) ? $transaction->currency : config('revolut.currency', 'GBP'));
 @endphp
 <!DOCTYPE html>
 <html lang="en">
@@ -111,7 +112,7 @@
                     <td>Stuck / delayed trademark recovery audit package</td>
                     <td>{{ $case->audit_transaction_id ?: ($case->audit_payment_reference ?: 'N/A') }}</td>
                     <td>{{ $case->audit_paid_at?->timezone(config('app.timezone', 'Europe/London'))->format('d M Y') }}</td>
-                    <td class="text-right">INR {{ number_format($auditPaidAmount, 2) }}</td>
+                    <td class="text-right">{{ $currency }} {{ number_format($auditPaidAmount, 2) }}</td>
                 </tr>
             </tbody>
         </table>
@@ -124,17 +125,17 @@
                 <table>
                     <tr>
                         <td>Audit package amount</td>
-                        <td class="text-right">INR {{ number_format($auditOriginalAmount, 2) }}</td>
+                        <td class="text-right">{{ $currency }} {{ number_format($auditOriginalAmount, 2) }}</td>
                     </tr>
                     @if ($hasAuditDiscount)
                         <tr class="discount-row">
                             <td>Discount{{ $case->audit_coupon_label ? ' (' . $case->audit_coupon_label . ')' : '' }}</td>
-                            <td class="text-right">- INR {{ number_format($auditDiscountAmount, 2) }}</td>
+                            <td class="text-right">- {{ $currency }} {{ number_format($auditDiscountAmount, 2) }}</td>
                         </tr>
                     @endif
                     <tr>
                         <td class="grand-total">Invoice total</td>
-                        <td class="text-right grand-total">INR {{ number_format($auditPaidAmount, 2) }}</td>
+                        <td class="text-right grand-total">{{ $currency }} {{ number_format($auditPaidAmount, 2) }}</td>
                     </tr>
                 </table>
             </td>

@@ -635,6 +635,7 @@ class WorkflowController extends Controller
                         route('admin.view-application', $application->id)
                     ));
                 });
+            request()->attributes->set('workflow_admin_email_sent', true);
         } catch (\Throwable $exception) {
             report($exception);
         }

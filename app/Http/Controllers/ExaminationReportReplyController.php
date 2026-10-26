@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\PaymentVerificationException;
+use App\Mail\AdminWorkflowNotification;
 use App\Mail\EventNotification;
 use App\Models\Admin;
 use App\Models\DiscountCoupon;
@@ -17,6 +18,7 @@ use App\Models\ExaminationReportReplyCase;
 use App\Models\Notification;
 use App\Models\PaymentTransaction;
 use App\Services\RevolutMerchantService;
+use App\Services\PaymentInvoiceEmailService;
 use App\Support\ExaminationReportReplyWorkflow as Workflow;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -342,7 +344,11 @@ class ExaminationReportReplyController extends Controller
         }
     }
 
-    public function confirmPayment(ExaminationReportReplyCase $case, RevolutMerchantService $revolut): RedirectResponse
+    public function confirmPayment(
+        ExaminationReportReplyCase $case,
+        RevolutMerchantService $revolut,
+        PaymentInvoiceEmailService $invoiceEmails,
+    ): RedirectResponse
     {
         $this->authorizeClient($case);
         if ($case->payment_status === 'paid') {
@@ -374,44 +380,7 @@ class ExaminationReportReplyController extends Controller
         $this->transition($case, Workflow::ADMIN_PAYMENT_COMPLETED, 'Client completed objection reply payment.', 'client');
         $this->notifyAdmins($case, 'Payment completed for Trademark Objection Reply case '.$case->case_number.'.');
         $this->notifyClient($case, null, 'Your payment has been completed successfully. The payment invoice has been emailed to you and is also available in your case dashboard.');
-
-        try {
-            $case->refresh()->loadMissing('user');
-            $issuedAt = $case->paid_at;
-            $invoiceName = 'objection-reply-invoice-'.$case->case_number.'.pdf';
-            $invoicePdf = \PDF::loadView('examination-reply.payment-invoice', [
-                'case' => $case,
-                'user' => $case->user,
-                'invoiceNumber' => 'ERR-INV-'.$issuedAt->format('Y').'-'.$case->id,
-                'issuedAt' => $issuedAt,
-                'firmName' => config('app.name', 'Legal Bruz'),
-                'firmEmail' => config('mail.from.address'),
-            ])->setPaper('a4');
-            $this->emailClient(
-                $case,
-                'Payment Successful – Trademark Objection Reply',
-                'Your payment for Trademark Objection Reply case '.$case->case_number.' was completed successfully. Your invoice is attached.',
-                'Open Case',
-                [[
-                    'data' => $invoicePdf->output(),
-                    'name' => $invoiceName,
-                    'mime' => 'application/pdf',
-                ]]
-            );
-        } catch (Throwable $exception) {
-            Log::warning('Examination reply payment invoice email could not be prepared.', [
-                'case_id' => $case->id,
-                'error' => $exception->getMessage(),
-            ]);
-            ExaminationReplyNotificationLog::create([
-                'case_id' => $case->id,
-                'notification_type' => 'Payment Successful – Trademark Objection Reply',
-                'channel' => 'email',
-                'message' => 'Payment succeeded, but the invoice email could not be prepared.',
-                'sent_at' => null,
-                'status' => 'failed',
-            ]);
-        }
+        $invoiceEmails->sendToClientAndAdmins($transaction);
 
         return redirect()->route('examination-reply.show', $case)->with('success', 'Payment verified successfully.');
     }
@@ -2072,9 +2041,6 @@ class ExaminationReportReplyController extends Controller
 
     private function notifyAdmins(ExaminationReportReplyCase $case, string $message): void
     {
-        foreach (Admin::query()->pluck('id') as $adminId) {
-            // Existing notifications are user-scoped, so keep admin audit in the case log.
-        }
         ExaminationReplyNotificationLog::create([
             'case_id' => $case->id,
             'notification_type' => 'admin_update',
@@ -2083,6 +2049,22 @@ class ExaminationReportReplyController extends Controller
             'sent_at' => now(),
             'status' => 'logged',
         ]);
+
+        try {
+            Admin::query()->pluck('email')->filter()->unique()->each(function (string $email) use ($case, $message): void {
+                Mail::to($email)->send(new AdminWorkflowNotification(
+                    'Client action – Trademark Objection Reply '.$case->case_number,
+                    $message,
+                    route('admin.examination-reply.show', $case),
+                ));
+            });
+            request()->attributes->set('workflow_admin_email_sent', true);
+        } catch (Throwable $exception) {
+            Log::warning('Objection reply admin email failed.', [
+                'case_id' => $case->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
     }
 
     private function emailClient(ExaminationReportReplyCase $case, string $title, string $message, string $actionText, array $attachments = []): bool
@@ -2111,6 +2093,7 @@ class ExaminationReportReplyController extends Controller
                 route('examination-reply.show', $case),
                 $actionText
             ));
+            request()->attributes->set('workflow_client_email_sent', true);
 
             ExaminationReplyNotificationLog::create([
                 'case_id' => $case->id,

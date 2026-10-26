@@ -466,6 +466,7 @@ class AdminTrademarkExecutionController extends Controller
                 route('stuck-trademark.show', $case),
                 'Open Recovery Case'
             ));
+            request()->attributes->set('workflow_client_email_sent', true);
         } catch (\Throwable $e) {
             report($e);
         }

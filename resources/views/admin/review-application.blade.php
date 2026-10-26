@@ -79,12 +79,13 @@
         $paidTotal = (float) $completedPayments->sum('amount');
         $latestPayment = $payments->first();
         $latestCompletedPayment = $completedPayments->first();
+        $displayPayment = $latestCompletedPayment ?: $latestPayment;
         $billing = array_merge($billing, [
             'invoice_number' => data_get($billing, 'invoice_number') ?: $latestCompletedPayment?->reference_number,
             'professional_fee' => data_get($billing, 'professional_fee') ?: $latestPayment?->total_amount,
             'ukipo_official_fee' => data_get($billing, 'ukipo_official_fee'),
             'total_paid' => data_get($billing, 'total_paid') ?: ($paidTotal ?: null),
-            'payment_status' => $latestPayment?->status ?: data_get($billing, 'payment_status'),
+            'payment_status' => $displayPayment?->status ?: data_get($billing, 'payment_status'),
         ]);
         $applicant['joint_applicants'] = array_key_exists('joint_applicants', $details)
             ? (bool) $details['joint_applicants']

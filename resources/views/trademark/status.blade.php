@@ -223,18 +223,24 @@
                     || ((float) $payment->total_amount > 0 && (float) $payment->amount >= (float) $payment->total_amount)
                 );
         });
-        $advancePayment = $payments->first(function ($payment) {
+        $isAdvancePayment = function ($payment) {
             $paymentType = strtolower((string) ($payment->payment_type ?? ''));
             $percentage = strtolower((string) ($payment->percentage ?? ''));
 
             return $paymentType === 'advance' || $percentage === '50%';
-        }) ?: $fullPayment;
-        $finalPayment = $fullPayment ?: $payments->first(function ($payment) {
+        };
+        $isFinalPayment = function ($payment) {
             $paymentType = strtolower((string) ($payment->payment_type ?? ''));
             $percentage = strtolower((string) ($payment->percentage ?? ''));
 
             return $paymentType === 'final' || ($paymentType !== 'advance' && $percentage === '100%');
-        });
+        };
+        $advancePayment = $fullPayment
+            ?: $payments->first(fn ($payment) => $isAdvancePayment($payment) && $isCompletedPayment($payment))
+            ?: $payments->first($isAdvancePayment);
+        $finalPayment = $fullPayment
+            ?: $payments->first(fn ($payment) => $isFinalPayment($payment) && $isCompletedPayment($payment))
+            ?: $payments->first($isFinalPayment);
         $serviceTotalAmount = \App\Models\TrademarkPricing::amountForApplicantType($application->entity_type);
         $halfPaymentAmount = $serviceTotalAmount / 2;
         $hasFullPayment = (bool) $fullPayment;

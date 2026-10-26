@@ -586,6 +586,16 @@ class AdminTrademarkReviewWorkflowTest extends TestCase
             'paid_at' => now(),
             'reference_number' => 'order_admin_proof_123',
         ]);
+        Payment::create([
+            'application_id' => $application->id,
+            'user_id' => $client->id,
+            'amount' => 199.50,
+            'total_amount' => 399,
+            'payment_type' => 'advance',
+            'percentage' => '50%',
+            'payment_method' => 'revolut',
+            'status' => 'failed',
+        ]);
 
         $response = $this->actingAs($admin, 'admin')
             ->get(route('admin.view-application', $application->id));
@@ -605,6 +615,10 @@ class AdminTrademarkReviewWorkflowTest extends TestCase
             ->assertSee('order_admin_proof_123')
             ->assertSee('£199.50')
             ->assertSee(route('admin.payment.invoice', $payment), false);
+        $this->assertMatchesRegularExpression(
+            '/Payment Status<\/span>\s*<div class="data-value">completed<\/div>/',
+            $response->getContent()
+        );
 
         $this->actingAs($admin, 'admin')
             ->get(route('admin.payment.invoice', $payment))
