@@ -35,12 +35,6 @@
         </tr>
     </table>
 
-    @php
-        $billingBusinessName = strcasecmp(trim((string) $booking->business_name), 'Legal Bruz LLP') === 0
-            ? $firmName
-            : $booking->business_name;
-    @endphp
-
     <table class="details section">
         <tr>
             <td width="50%">
@@ -49,7 +43,7 @@
                 {{ $booking->email }}<br>
                 {{ $booking->phone }}
                 @if (filled($booking->business_name))
-                    <br>{{ $billingBusinessName }}
+                    <br>{{ $booking->business_name }}
                 @endif
             </td>
             <td width="50%" class="text-right">

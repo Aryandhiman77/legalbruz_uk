@@ -172,19 +172,6 @@ class RevolutPaymentHistoryTest extends TestCase
         $this->assertStringContainsString('Registered office:</strong> 10 Example Street', $invoice);
         $this->assertStringNotContainsString('Registered Office: Registered Office:', $invoice);
 
-        $booking->business_name = 'Legal Bruz LLP';
-        $legacyNameInvoice = view('consultations.payment-invoice', [
-            'booking' => $booking,
-            'transaction' => $transaction,
-            'invoiceNumber' => 'CON-INV-TEST-1',
-            'issuedAt' => $transaction->paid_at,
-            'firmName' => 'Legal Bruz Ltd.',
-            'firmEmail' => 'test@example.com',
-        ])->render();
-
-        $this->assertStringContainsString('Legal Bruz Ltd.', $legacyNameInvoice);
-        $this->assertStringNotContainsString('Legal Bruz LLP', $legacyNameInvoice);
-
         $admin = Admin::create(['name' => 'Admin', 'email' => 'invoice-admin@example.test', 'password' => bcrypt('password')]);
         $this->actingAs($admin, 'admin')
             ->get(route('admin.payment.transaction.invoice', $transaction))
