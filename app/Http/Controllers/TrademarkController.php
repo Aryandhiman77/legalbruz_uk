@@ -265,7 +265,8 @@ class TrademarkController extends Controller
         );
 
         return redirect()->route('payment.show', $application->id)
-            ->with('success', 'Application created. Please complete 50% payment.');
+            ->with('success', 'Application created. Please complete 50% payment.')
+            ->with('clear_trademark_application_draft', true);
     }
 
     /**

@@ -246,4 +246,14 @@
             margin-left: 15px;
         }
     </style>
+
+    @if (session('clear_trademark_application_draft'))
+        <script>
+            try {
+                localStorage.removeItem(@json('legalbruz:uk-trademark-application:v1:user:' . auth()->id()));
+            } catch (error) {
+                // The completed application is already stored server-side; local draft cleanup is best-effort.
+            }
+        </script>
+    @endif
 @endsection

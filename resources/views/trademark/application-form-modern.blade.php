@@ -38,6 +38,11 @@
                     <div class="form-alert" role="alert"><strong>Please check the highlighted fields.</strong><span>Your information has been kept so you can correct it.</span></div>
                 @endif
 
+                <div class="local-draft-notice" data-local-draft-status role="status" aria-live="polite">
+                    <strong>Draft saved on this browser</strong>
+                    <span>Your progress and current step are saved automatically. File uploads must be selected again after a reload.</span>
+                </div>
+
                 <form action="{{ route('trademark.store') }}" method="POST" enctype="multipart/form-data" id="ukTrademarkForm" novalidate>
                     @csrf
 
@@ -160,7 +165,7 @@
     </main>
 
     <style>
-        .uk-application-page{padding:52px 20px 80px;background:#f3f8fa;color:#0c2d52;min-height:100vh}.application-shell{width:min(1120px,100%);margin:auto}.application-heading{text-align:center;max-width:760px;margin:0 auto 34px}.application-kicker{display:inline-block;margin-bottom:10px;color:#087f73;font-size:.76rem;font-weight:800;letter-spacing:.16em}.application-heading h1{margin:0;font-size:clamp(2rem,4vw,3.25rem);font-weight:800;letter-spacing:-.04em}.application-heading p{margin:14px auto 0;color:#60748b;font-size:1rem;line-height:1.7}.form-progress{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:0 0 18px;padding:0;list-style:none}.form-progress li{display:flex;align-items:center;gap:10px;min-width:0;padding:13px 14px;border:1px solid #d9e6eb;border-radius:14px;background:#fff;color:#708195}.form-progress li span{display:grid;place-items:center;flex:0 0 34px;height:34px;border-radius:50%;background:#edf4f5;font-size:.72rem;font-weight:800}.form-progress li strong{overflow:hidden;font-size:.76rem;white-space:nowrap;text-overflow:ellipsis}.form-progress li.is-active,.form-progress li.is-complete{border-color:#8fd6ce;color:#075e57}.form-progress li.is-active span,.form-progress li.is-complete span{background:#0c9486;color:#fff}.application-card{padding:clamp(24px,4vw,48px);border:1px solid #d9e6eb;border-radius:24px;background:#fff;box-shadow:0 22px 60px rgba(10,45,75,.08)}.form-alert{display:flex;gap:8px;flex-direction:column;margin-bottom:24px;padding:14px 16px;border:1px solid #f5b8b4;border-radius:12px;background:#fff2f1;color:#9f2118}.form-step{display:none}.form-step.is-active{display:block}.step-heading{display:flex;gap:16px;align-items:flex-start;margin-bottom:30px;padding-bottom:20px;border-bottom:1px solid #e2ecef}.step-heading>span{display:grid;place-items:center;flex:0 0 48px;height:48px;border-radius:14px;background:#e5f5f2;color:#087f73;font-weight:900}.step-heading h2{margin:0 0 5px;font-size:1.55rem;font-weight:800}.step-heading p{margin:0;color:#6a7c90;font-size:.94rem}.form-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:22px 20px}.compact-grid{gap:20px}.field{min-width:0}.field-half{grid-column:span 6}.field-full{grid-column:1/-1}.field-postcode,.field-location{grid-column:span 3}.field label,.choice-row>span{display:block;margin-bottom:8px;color:#173657;font-size:.88rem;font-weight:750}.field label b,.choice-row b{color:#d92d20}.field label span{color:#7a8a9b;font-size:.72rem;font-weight:650}.field input:not([type=radio]):not([type=checkbox]),.field select,.field textarea{width:100%;min-height:48px;padding:11px 13px;border:1px solid #cbdbe2;border-radius:10px;background:#fff;color:#162f4c;font:inherit;outline:none;transition:border-color .2s,box-shadow .2s}.field textarea{resize:vertical}.field input[readonly]{background:#f1f5f7;color:#526579}.field input:focus,.field select:focus,.field textarea:focus{border-color:#12998c;box-shadow:0 0 0 3px rgba(18,153,140,.12)}.field small{display:block;margin-top:6px;color:#6d7e91;font-size:.75rem;line-height:1.5}.field .is-invalid{border-color:#d92d20!important;box-shadow:0 0 0 3px rgba(217,45,32,.08)!important}.field-error,.client-error{margin-top:6px;color:#b42318;font-size:.77rem;font-weight:700;line-height:1.4}.conditional-fields{padding:20px;border:1px solid #dce9ec;border-radius:14px;background:#f7fbfb}.postcode-control{display:grid;grid-template-columns:minmax(0,1fr) 94px;gap:7px}.postcode-control button{border:0;border-radius:10px;background:#0c9486;color:#fff;font-size:.71rem;font-weight:800}.postcode-control button:disabled{opacity:.65}.choice-row{display:flex;align-items:center;gap:22px;flex-wrap:wrap;padding:15px 17px;border:1px solid #dce7eb;border-radius:12px;background:#f9fbfc}.choice-row>span{margin:0 auto 0 0}.choice-row label{display:flex;align-items:center;gap:7px;margin:0}.choice-row input{accent-color:#0c9486}.checkbox-field label{display:flex;gap:10px;align-items:flex-start;padding:16px;border:1px solid #b9ded9;border-radius:12px;background:#f0faf8}.checkbox-field input{margin-top:3px;accent-color:#0c9486}.step-actions{display:flex;justify-content:space-between;gap:14px;margin-top:34px;padding-top:24px;border-top:1px solid #e4ecef}.button-primary,.button-secondary{display:inline-flex;align-items:center;justify-content:center;min-width:160px;min-height:48px;padding:11px 20px;border-radius:10px;font-size:.88rem;font-weight:800;text-decoration:none;cursor:pointer}.button-primary{border:1px solid #0b8d80;background:#0b8d80;color:#fff}.button-primary:hover{background:#08776d;color:#fff}.button-secondary{border:1px solid #b9cbd3;background:#fff;color:#173657}.fee-note{display:flex;justify-content:space-between;gap:20px;margin-top:28px;padding:18px;border-radius:14px;background:#eaf7f5;color:#18554f}.fee-note span{color:#57716e;font-size:.82rem}.fee-note s{color:#72827f}.form-step[hidden],.conditional-fields[hidden],[data-first-use][hidden]{display:none!important}
+        .uk-application-page{padding:52px 20px 80px;background:#f3f8fa;color:#0c2d52;min-height:100vh}.application-shell{width:min(1120px,100%);margin:auto}.application-heading{text-align:center;max-width:760px;margin:0 auto 34px}.application-kicker{display:inline-block;margin-bottom:10px;color:#087f73;font-size:.76rem;font-weight:800;letter-spacing:.16em}.application-heading h1{margin:0;font-size:clamp(2rem,4vw,3.25rem);font-weight:800;letter-spacing:-.04em}.application-heading p{margin:14px auto 0;color:#60748b;font-size:1rem;line-height:1.7}.form-progress{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:0 0 18px;padding:0;list-style:none}.form-progress li{display:flex;align-items:center;gap:10px;min-width:0;padding:13px 14px;border:1px solid #d9e6eb;border-radius:14px;background:#fff;color:#708195}.form-progress li span{display:grid;place-items:center;flex:0 0 34px;height:34px;border-radius:50%;background:#edf4f5;font-size:.72rem;font-weight:800}.form-progress li strong{overflow:hidden;font-size:.76rem;white-space:nowrap;text-overflow:ellipsis}.form-progress li.is-active,.form-progress li.is-complete{border-color:#8fd6ce;color:#075e57}.form-progress li.is-active span,.form-progress li.is-complete span{background:#0c9486;color:#fff}.application-card{padding:clamp(24px,4vw,48px);border:1px solid #d9e6eb;border-radius:24px;background:#fff;box-shadow:0 22px 60px rgba(10,45,75,.08)}.form-alert{display:flex;gap:8px;flex-direction:column;margin-bottom:24px;padding:14px 16px;border:1px solid #f5b8b4;border-radius:12px;background:#fff2f1;color:#9f2118}.local-draft-notice{display:flex;flex-wrap:wrap;gap:5px 10px;align-items:center;margin-bottom:24px;padding:12px 14px;border:1px solid #b9ded9;border-radius:12px;background:#f0faf8;color:#18554f}.local-draft-notice strong{font-size:.84rem}.local-draft-notice span{color:#57716e;font-size:.78rem;line-height:1.45}.local-draft-notice.is-warning{border-color:#f1cf8f;background:#fff8e8;color:#8a5a00}.form-step{display:none}.form-step.is-active{display:block}.step-heading{display:flex;gap:16px;align-items:flex-start;margin-bottom:30px;padding-bottom:20px;border-bottom:1px solid #e2ecef}.step-heading>span{display:grid;place-items:center;flex:0 0 48px;height:48px;border-radius:14px;background:#e5f5f2;color:#087f73;font-weight:900}.step-heading h2{margin:0 0 5px;font-size:1.55rem;font-weight:800}.step-heading p{margin:0;color:#6a7c90;font-size:.94rem}.form-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:22px 20px}.compact-grid{gap:20px}.field{min-width:0}.field-half{grid-column:span 6}.field-full{grid-column:1/-1}.field-postcode,.field-location{grid-column:span 3}.field label,.choice-row>span{display:block;margin-bottom:8px;color:#173657;font-size:.88rem;font-weight:750}.field label b,.choice-row b{color:#d92d20}.field label span{color:#7a8a9b;font-size:.72rem;font-weight:650}.field input:not([type=radio]):not([type=checkbox]),.field select,.field textarea{width:100%;min-height:48px;padding:11px 13px;border:1px solid #cbdbe2;border-radius:10px;background:#fff;color:#162f4c;font:inherit;outline:none;transition:border-color .2s,box-shadow .2s}.field textarea{resize:vertical}.field input[readonly]{background:#f1f5f7;color:#526579}.field input:focus,.field select:focus,.field textarea:focus{border-color:#12998c;box-shadow:0 0 0 3px rgba(18,153,140,.12)}.field small{display:block;margin-top:6px;color:#6d7e91;font-size:.75rem;line-height:1.5}.field .is-invalid{border-color:#d92d20!important;box-shadow:0 0 0 3px rgba(217,45,32,.08)!important}.field-error,.client-error{margin-top:6px;color:#b42318;font-size:.77rem;font-weight:700;line-height:1.4}.conditional-fields{padding:20px;border:1px solid #dce9ec;border-radius:14px;background:#f7fbfb}.postcode-control{display:grid;grid-template-columns:minmax(0,1fr) 94px;gap:7px}.postcode-control button{border:0;border-radius:10px;background:#0c9486;color:#fff;font-size:.71rem;font-weight:800}.postcode-control button:disabled{opacity:.65}.choice-row{display:flex;align-items:center;gap:22px;flex-wrap:wrap;padding:15px 17px;border:1px solid #dce7eb;border-radius:12px;background:#f9fbfc}.choice-row>span{margin:0 auto 0 0}.choice-row label{display:flex;align-items:center;gap:7px;margin:0}.choice-row input{accent-color:#0c9486}.checkbox-field label{display:flex;gap:10px;align-items:flex-start;padding:16px;border:1px solid #b9ded9;border-radius:12px;background:#f0faf8}.checkbox-field input{margin-top:3px;accent-color:#0c9486}.step-actions{display:flex;justify-content:space-between;gap:14px;margin-top:34px;padding-top:24px;border-top:1px solid #e4ecef}.button-primary,.button-secondary{display:inline-flex;align-items:center;justify-content:center;min-width:160px;min-height:48px;padding:11px 20px;border-radius:10px;font-size:.88rem;font-weight:800;text-decoration:none;cursor:pointer}.button-primary{border:1px solid #0b8d80;background:#0b8d80;color:#fff}.button-primary:hover{background:#08776d;color:#fff}.button-secondary{border:1px solid #b9cbd3;background:#fff;color:#173657}.fee-note{display:flex;justify-content:space-between;gap:20px;margin-top:28px;padding:18px;border-radius:14px;background:#eaf7f5;color:#18554f}.fee-note span{color:#57716e;font-size:.82rem}.fee-note s{color:#72827f}.form-step[hidden],.conditional-fields[hidden],[data-first-use][hidden]{display:none!important}
         @media(max-width:900px){.uk-application-page{padding:34px 18px 64px}.form-progress{display:flex;overflow-x:auto;padding-bottom:5px}.form-progress li{flex:0 0 155px}.field-postcode,.field-location{grid-column:span 6}.application-card{border-radius:20px}.fee-note{flex-direction:column}}
         @media(max-width:600px){.uk-application-page{padding:26px 14px 50px}.application-heading{margin-bottom:24px}.application-heading h1{font-size:2rem}.application-card{padding:22px 16px;border-radius:16px}.step-heading{gap:12px}.step-heading>span{flex-basis:42px;height:42px}.step-heading h2{font-size:1.3rem}.form-grid{grid-template-columns:1fr;gap:18px}.field-half,.field-full,.field-postcode,.field-location{grid-column:1}.conditional-fields{padding:15px}.step-actions{flex-direction:column-reverse}.button-primary,.button-secondary{width:100%}.choice-row{align-items:flex-start;gap:13px}.choice-row>span{width:100%}.fee-note{padding:15px}}
     </style>
@@ -170,29 +175,132 @@
             const form = document.getElementById('ukTrademarkForm');
             const steps = [...form.querySelectorAll('.form-step')];
             const indicators = [...document.querySelectorAll('[data-step-indicator]')];
+            const localDraftStatus = document.querySelector('[data-local-draft-status]');
+            const localDraftKey = @json('legalbruz:uk-trademark-application:v1:user:' . auth()->id());
+            const hasServerOldInput = @json(session()->hasOldInput());
+            const localDraftMaxAge = 30 * 24 * 60 * 60 * 1000;
+            const persistableFields = [...form.elements].filter(field =>
+                field.name
+                && field.name !== '_token'
+                && !['file', 'submit', 'button', 'reset'].includes(field.type)
+            );
             const ukMobilePattern = /^(?:\+44|0)7\d{9}$/;
             const ukPostcodePattern = /^(?:GIR\s?0AA|[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2})$/i;
             let currentStep = 1;
-            const showStep = step => { currentStep=step; steps.forEach(item=>item.classList.toggle('is-active',Number(item.dataset.step)===step)); indicators.forEach(item=>{const number=Number(item.dataset.stepIndicator);item.classList.toggle('is-active',number===step);item.classList.toggle('is-complete',number<step)}); window.scrollTo({top:Math.max(0,document.querySelector('.application-card').offsetTop-100),behavior:'smooth'}) };
+            let localDraftSaveTimer = null;
+            const setLocalDraftStatus = (title, message, warning = false) => {
+                localDraftStatus.classList.toggle('is-warning', warning);
+                localDraftStatus.innerHTML = `<strong>${title}</strong><span>${message}</span>`;
+            };
+            const showStep = (step, scroll = true) => {
+                currentStep = Math.min(Math.max(Number(step) || 1, 1), steps.length);
+                steps.forEach(item => item.classList.toggle('is-active', Number(item.dataset.step) === currentStep));
+                indicators.forEach(item => {
+                    const number = Number(item.dataset.stepIndicator);
+                    item.classList.toggle('is-active', number === currentStep);
+                    item.classList.toggle('is-complete', number < currentStep);
+                });
+                if (scroll) {
+                    window.scrollTo({top: Math.max(0, document.querySelector('.application-card').offsetTop - 100), behavior: 'smooth'});
+                }
+            };
+            const localDraftPayload = () => {
+                const fields = {};
+                persistableFields.forEach(field => {
+                    if (field.type === 'radio') {
+                        if (field.checked) fields[field.name] = field.value;
+                    } else if (field.type === 'checkbox') {
+                        fields[field.name] = field.checked;
+                    } else {
+                        fields[field.name] = field.value;
+                    }
+                });
+                return {version: 1, savedAt: Date.now(), step: currentStep, fields};
+            };
+            const saveLocalDraft = () => {
+                try {
+                    localStorage.setItem(localDraftKey, JSON.stringify(localDraftPayload()));
+                    setLocalDraftStatus('Draft saved locally', `Saved at ${new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}. File uploads are not stored.`);
+                } catch (error) {
+                    setLocalDraftStatus('Local draft unavailable', 'This browser could not save your progress. Keep this page open until submission.', true);
+                }
+            };
+            const scheduleLocalDraftSave = () => {
+                window.clearTimeout(localDraftSaveTimer);
+                localDraftSaveTimer = window.setTimeout(saveLocalDraft, 250);
+            };
+            const readLocalDraft = rawValue => {
+                if (!rawValue) return null;
+                try {
+                    const draft = JSON.parse(rawValue);
+                    if (draft.version !== 1 || !draft.savedAt || Date.now() - draft.savedAt > localDraftMaxAge) {
+                        localStorage.removeItem(localDraftKey);
+                        return null;
+                    }
+                    return draft;
+                } catch (error) {
+                    localStorage.removeItem(localDraftKey);
+                    return null;
+                }
+            };
+            const restoreLocalDraft = draft => {
+                if (!draft?.fields) return null;
+                persistableFields.forEach(field => {
+                    if (!Object.prototype.hasOwnProperty.call(draft.fields, field.name)) return;
+                    const value = draft.fields[field.name];
+                    if (field.type === 'radio') {
+                        field.checked = field.value === value;
+                    } else if (field.type === 'checkbox') {
+                        field.checked = Boolean(value);
+                    } else {
+                        field.value = value ?? '';
+                    }
+                });
+                return Math.min(Math.max(Number(draft.step) || 1, 1), steps.length);
+            };
             const labelFor = field => form.querySelector(`label[for="${field.id}"]`)?.textContent.replace('*','').replace(/Optional/g,'').trim() || 'This field';
             const clearClientError = field => { field.classList.remove('is-invalid'); field.closest('.field')?.querySelector(`[data-client-error="${field.id}"]`)?.remove() };
             const showClientError = (field,message) => { clearClientError(field); field.classList.add('is-invalid'); const error=document.createElement('div'); error.className='client-error'; error.dataset.clientError=field.id; error.textContent=message||field.validationMessage||`${labelFor(field)} is required.`; field.closest('.field')?.append(error) };
             const validateMobile = field => { const compact=field.value.replace(/[\s()-]+/g,''); field.setCustomValidity(!compact||ukMobilePattern.test(compact)?'':'Enter a valid UK mobile number beginning with 07 or +44 7.') };
             const validateStep = step => { const container=form.querySelector(`[data-step="${step}"]`); const fields=[...container.querySelectorAll('input,select,textarea')].filter(field=>!field.disabled&&!field.closest('[hidden]')); let firstInvalid=null; fields.forEach(field=>{if(field.matches('[data-uk-mobile]'))validateMobile(field);if(!field.checkValidity()){firstInvalid ||= field;showClientError(field,field.validationMessage||`${labelFor(field)} is required.`)}else clearClientError(field)});firstInvalid?.focus();return !firstInvalid };
-            form.querySelectorAll('[data-next]').forEach(button=>button.addEventListener('click',()=>{if(validateStep(currentStep))showStep(Number(button.dataset.next))}));
-            form.querySelectorAll('[data-prev]').forEach(button=>button.addEventListener('click',()=>showStep(Number(button.dataset.prev))));
-            form.querySelectorAll('input,select,textarea').forEach(field=>{field.addEventListener('input',()=>clearClientError(field));field.addEventListener('change',()=>clearClientError(field))});
+            form.querySelectorAll('[data-next]').forEach(button=>button.addEventListener('click',()=>{if(validateStep(currentStep)){showStep(Number(button.dataset.next));scheduleLocalDraftSave()}}));
+            form.querySelectorAll('[data-prev]').forEach(button=>button.addEventListener('click',()=>{showStep(Number(button.dataset.prev));scheduleLocalDraftSave()}));
+            form.querySelectorAll('input,select,textarea').forEach(field=>{field.addEventListener('input',()=>{clearClientError(field);scheduleLocalDraftSave()});field.addEventListener('change',()=>{clearClientError(field);scheduleLocalDraftSave()})});
             form.querySelectorAll('[data-uk-mobile]').forEach(field=>{field.addEventListener('input',()=>validateMobile(field));field.addEventListener('blur',()=>validateMobile(field))});
             const companyFields=document.querySelector('[data-company-fields]'); const toggleCompany=()=>{const visible=['limited_company','llp'].includes(document.getElementById('applicant_type').value);companyFields.hidden=!visible;companyFields.querySelectorAll('input').forEach(input=>input.required=visible)};document.getElementById('applicant_type').addEventListener('change',toggleCompany);toggleCompany();
             const jointFields=document.querySelector('[data-joint-fields]');const jointRequired=['additional_applicant_type','additional_applicant_name','additional_applicant_address','additional_applicant_email','additional_applicant_phone'];const toggleJoint=()=>{const visible=form.querySelector('[name="joint_applicants"]:checked')?.value==='yes';jointFields.hidden=!visible;jointRequired.forEach(id=>document.getElementById(id).required=visible)};form.querySelectorAll('[name="joint_applicants"]').forEach(input=>input.addEventListener('change',toggleJoint));toggleJoint();
             const priorityFields=document.querySelector('[data-priority-fields]');const priorityRequired=['priority_country','priority_application_number','priority_filing_date','priority_earlier_applicant'];const togglePriority=()=>{const visible=form.querySelector('[name="earlier_foreign_application"]:checked')?.value==='yes';priorityFields.hidden=!visible;priorityRequired.forEach(id=>document.getElementById(id).required=visible)};form.querySelectorAll('[name="earlier_foreign_application"]').forEach(input=>input.addEventListener('change',togglePriority));togglePriority();
             const firstUse=document.querySelector('[data-first-use]');const toggleUse=()=>firstUse.hidden=form.querySelector('[name="currently_in_use"]:checked')?.value!=='yes';form.querySelectorAll('[name="currently_in_use"]').forEach(input=>input.addEventListener('change',toggleUse));toggleUse();
+            let restoredStep = null;
+            if (!hasServerOldInput) {
+                try {
+                    const restoredDraft = readLocalDraft(localStorage.getItem(localDraftKey));
+                    restoredStep = restoreLocalDraft(restoredDraft);
+                    if (restoredStep) {
+                        toggleCompany();toggleJoint();togglePriority();toggleUse();
+                        setLocalDraftStatus('Saved draft restored', 'Your previous progress was restored. File uploads must be selected again.');
+                    }
+                } catch (error) {
+                    setLocalDraftStatus('Local draft unavailable', 'This browser could not restore your saved progress.', true);
+                }
+            }
             const postcode=document.getElementById('applicant_postcode');const status=document.getElementById('postcode_status');const lookupButton=document.querySelector('[data-postcode-lookup]');const lookupLabel=lookupButton.querySelector('[data-lookup-label]');
-            const loadPostcode=async focusOnError=>{const value=postcode.value.trim().toUpperCase().replace(/\s+/g,' ');postcode.value=value;if(!ukPostcodePattern.test(value)){status.textContent=value?'Enter a valid UK postcode, for example SW1A 1AA.':'Enter a UK postcode.';status.style.color='#b42318';postcode.setCustomValidity('Enter a valid UK postcode.');if(focusOnError)postcode.focus();return}lookupButton.disabled=true;lookupLabel.textContent='Wait';status.textContent='Finding address…';status.style.color='#60748b';try{const response=await fetch(`{{ url('/api/uk-postcodes') }}/${encodeURIComponent(value)}`,{headers:{Accept:'application/json'}});const result=await response.json();if(!response.ok||result.status!=='success')throw new Error(result.message||'Unable to find that postcode.');postcode.value=result.postcode;document.getElementById('applicant_nation').value=result.nation||'';document.getElementById('applicant_region').value=result.region||'';document.getElementById('applicant_town_city').value=result.town_city||'';document.getElementById('applicant_country').value='United Kingdom';postcode.setCustomValidity('');['applicant_nation','applicant_region','applicant_town_city'].forEach(id=>clearClientError(document.getElementById(id)));status.textContent=`Postcode found${result.nation?` · ${result.nation}`:''}${result.region?` · ${result.region}`:''}`;status.style.color='#087f73'}catch(error){postcode.setCustomValidity(error.message||'Unable to find that postcode.');status.textContent=error.message||'Unable to find that postcode.';status.style.color='#b42318'}finally{lookupButton.disabled=false;lookupLabel.textContent='Find address'}};
-            postcode.addEventListener('input',()=>{postcode.setCustomValidity('');['applicant_nation','applicant_region','applicant_town_city'].forEach(id=>document.getElementById(id).value='');status.textContent='UK postcodes only';status.style.color='#6d7e91'});lookupButton.addEventListener('click',()=>loadPostcode(true));postcode.addEventListener('blur',()=>{if(postcode.value.trim())loadPostcode(false)});
+            const loadPostcode=async focusOnError=>{const value=postcode.value.trim().toUpperCase().replace(/\s+/g,' ');postcode.value=value;if(!ukPostcodePattern.test(value)){status.textContent=value?'Enter a valid UK postcode, for example SW1A 1AA.':'Enter a UK postcode.';status.style.color='#b42318';postcode.setCustomValidity('Enter a valid UK postcode.');if(focusOnError)postcode.focus();return}lookupButton.disabled=true;lookupLabel.textContent='Wait';status.textContent='Finding address…';status.style.color='#60748b';try{const response=await fetch(`{{ url('/api/uk-postcodes') }}/${encodeURIComponent(value)}`,{headers:{Accept:'application/json'}});const result=await response.json();if(!response.ok||result.status!=='success')throw new Error(result.message||'Unable to find that postcode.');postcode.value=result.postcode;document.getElementById('applicant_nation').value=result.nation||'';document.getElementById('applicant_region').value=result.region||'';document.getElementById('applicant_town_city').value=result.town_city||'';document.getElementById('applicant_country').value='United Kingdom';postcode.setCustomValidity('');['applicant_nation','applicant_region','applicant_town_city'].forEach(id=>clearClientError(document.getElementById(id)));status.textContent=`Postcode found${result.nation?` · ${result.nation}`:''}${result.region?` · ${result.region}`:''}`;status.style.color='#087f73';scheduleLocalDraftSave()}catch(error){postcode.setCustomValidity(error.message||'Unable to find that postcode.');status.textContent=error.message||'Unable to find that postcode.';status.style.color='#b42318'}finally{lookupButton.disabled=false;lookupLabel.textContent='Find address'}};
+            postcode.addEventListener('input',()=>{postcode.setCustomValidity('');['applicant_nation','applicant_region','applicant_town_city'].forEach(id=>document.getElementById(id).value='');status.textContent='UK postcodes only';status.style.color='#6d7e91';scheduleLocalDraftSave()});lookupButton.addEventListener('click',()=>loadPostcode(true));postcode.addEventListener('blur',()=>{if(postcode.value.trim())loadPostcode(false)});
             [['trademark_image',4],['supporting_evidence',5],['priority_document',5]].forEach(([id,maxMb])=>{const input=document.getElementById(id);input?.addEventListener('change',()=>input.setCustomValidity(input.files[0]?.size>maxMb*1024*1024?`File must not exceed ${maxMb} MB.`:''))});
-            form.addEventListener('submit',event=>{for(let step=1;step<=steps.length;step++){if(!validateStep(step)){event.preventDefault();showStep(step);return}}});
-            const firstServerError=form.querySelector('.is-invalid');if(firstServerError)showStep(Number(firstServerError.closest('.form-step')?.dataset.step||1));
+            form.addEventListener('submit',event=>{saveLocalDraft();for(let step=1;step<=steps.length;step++){if(!validateStep(step)){event.preventDefault();showStep(step);return}}});
+            window.addEventListener('beforeunload', saveLocalDraft);
+            window.addEventListener('storage', event => {
+                if (event.key !== localDraftKey || !event.newValue || hasServerOldInput) return;
+                const syncedDraft = readLocalDraft(event.newValue);
+                const syncedStep = restoreLocalDraft(syncedDraft);
+                if (!syncedStep) return;
+                toggleCompany();toggleJoint();togglePriority();toggleUse();
+                showStep(syncedStep, false);
+                setLocalDraftStatus('Draft synced from another tab', 'Your latest locally saved progress is now shown.');
+            });
+            const firstServerError=form.querySelector('.is-invalid');
+            if(firstServerError){showStep(Number(firstServerError.closest('.form-step')?.dataset.step||1),false)}else if(restoredStep){showStep(restoredStep,false)}
         });
     </script>
 @endsection

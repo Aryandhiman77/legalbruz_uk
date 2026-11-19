@@ -135,6 +135,12 @@ class UkPostcodeLookupTest extends TestCase
             ->assertSee('<option value="Director"', false)
             ->assertSee('<option value="Authorised Signatory"', false)
             ->assertSee('id="ukTrademarkForm" novalidate', false)
+            ->assertSee('Draft saved on this browser')
+            ->assertSee('legalbruz:uk-trademark-application:v1:user:', false)
+            ->assertSee('localStorage.setItem(localDraftKey', false)
+            ->assertSee('localStorage.getItem(localDraftKey)', false)
+            ->assertSee("!['file', 'submit', 'button', 'reset'].includes(field.type)", false)
+            ->assertSee("window.addEventListener('storage'", false)
             ->assertSee('client-error')
             ->assertSee('placeholder="SW1A 1AA"', false)
             ->assertDontSee('6-digit pincode')
@@ -176,6 +182,7 @@ class UkPostcodeLookupTest extends TestCase
 
         $application = \App\Models\Application::query()->firstOrFail();
         $response->assertRedirect(route('payment.show', $application->id));
+        $response->assertSessionHas('clear_trademark_application_draft', true);
         $this->assertNull($application->logo_path);
         $this->assertSame(TrademarkWorkflow::DRAFT, $application->status);
         $this->assertSame(TrademarkWorkflow::DRAFT, $application->service_status);
