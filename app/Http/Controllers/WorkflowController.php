@@ -210,7 +210,8 @@ class WorkflowController extends Controller
         Request $request,
         $applicationId,
         $documentType,
-        PdfSignatureStampService $pdfSignatureStampService
+        PdfSignatureStampService $pdfSignatureStampService,
+        TrademarkWorkflowService $workflow
     )
     {
         $application = Auth::user()->applications()->findOrFail($applicationId);
@@ -245,6 +246,14 @@ class WorkflowController extends Controller
             ], 422);
         }
 
+        $previousSignedDocument = $application->documents()
+            ->where('document_type', $documentType . ' (Signed)')
+            ->latest('id')
+            ->first();
+        $submissionStatus = $previousSignedDocument?->status === 'reupload_requested'
+            ? 'reuploaded'
+            : 'uploaded';
+
         $signatureVisual = $this->prepareSignatureVisual($request, $validated['signature_mode'], '', $application, $documentType);
 
         try {
@@ -253,7 +262,7 @@ class WorkflowController extends Controller
                 $sourceDocument,
                 $validated['digital_signature'],
                 null,
-                'prepared',
+                $submissionStatus,
                 $signatureVisual['image_path']
             );
         } catch (\RuntimeException $exception) {
@@ -272,18 +281,26 @@ class WorkflowController extends Controller
         }
 
         $this->cleanupSignatureVisual($signatureVisual);
+        $workflow->completeTask($application, 'engagement_letter_signed');
+        $workflow->completeTask($application, 'signature_submitted');
+        $this->storeOnboardingMeta($application, null);
+        $this->logOnboardingPackageSentForReview($application, $signedDocument);
+        $workflow->refreshOnboardingStatus($application->fresh());
         $this->notifyAdminsOfApplicantAction(
             $application,
-            'Applicant applied onboarding signature',
-            'Signature applied to ' . str_replace('_', ' ', $documentType) . '.'
+            'Applicant submitted signed Engagement Letter',
+            'The signed Engagement Letter is ready for admin verification.'
         );
+        $request->session()->flash('success', 'Signed Engagement Letter submitted successfully for admin verification.');
 
         return response()->json([
-            'message' => 'Signature applied successfully.',
+            'message' => 'Signature applied and submitted successfully.',
             'document_id' => $signedDocument->id,
             'view_url' => route('user.document.view', $signedDocument->id),
             'download_url' => route('user.document.download', $signedDocument->id),
-            'status' => 'Signature Applied',
+            'status' => 'Submitted for Admin Verification',
+            'submitted' => true,
+            'redirect_url' => route('trademark.status', ['id' => $application->id, 'stage_action' => 1]),
         ]);
     }
 

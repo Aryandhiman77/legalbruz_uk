@@ -9,6 +9,7 @@ use App\Models\Application;
 use App\Models\Document;
 use App\Models\Payment;
 use App\Models\User;
+use App\Services\PdfSignatureStampService;
 use App\Services\TrademarkWorkflowService;
 use App\Support\TrademarkWorkflow;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -254,7 +255,7 @@ class AdminTrademarkReviewWorkflowTest extends TestCase
             'file_name' => 'engagement-letter.pdf',
             'file_type' => 'pdf',
             'file_size' => 1024,
-            'status' => 'uploaded',
+            'status' => 'prepared',
         ]);
 
         $this->actingAs($admin, 'admin')
@@ -262,8 +263,109 @@ class AdminTrademarkReviewWorkflowTest extends TestCase
             ->assertOk()
             ->assertSee('Signed Engagement Letter received')
             ->assertSee('Awaiting admin verification')
+            ->assertSee('Awaiting Approval')
+            ->assertSee('Mark as Approved')
             ->assertSee('data-scroll-to-documents', false)
             ->assertSee('href="#submitted-documents"', false)
+            ->assertDontSee('Engagement Letter signing pending');
+    }
+
+    public function test_applying_engagement_signature_submits_it_for_admin_verification(): void
+    {
+        Mail::fake();
+
+        $admin = Admin::create([
+            'name' => 'Verification Admin',
+            'email' => 'verification-admin@example.com',
+            'password' => bcrypt('password'),
+        ]);
+        $client = User::factory()->create();
+        $application = Application::create([
+            'user_id' => $client->id,
+            'type' => 'trademark',
+            'entity_type' => 'company',
+            'applicant_name' => 'Auto Submit Limited',
+            'phone' => '+447123456789',
+            'email' => $client->email,
+            'brand_name' => 'Auto Submit Mark',
+            'status' => TrademarkWorkflow::ONBOARDING_PENDING,
+            'service_status' => TrademarkWorkflow::ONBOARDING_PENDING,
+            'workflow_meta' => [
+                'signature_fields' => [
+                    'engagement_letter' => [[
+                        'type' => 'signature',
+                        'page' => 1,
+                        'x' => 20,
+                        'y' => 220,
+                        'width' => 60,
+                        'height' => 20,
+                    ]],
+                ],
+            ],
+        ]);
+        $sourceDocument = Document::create([
+            'application_id' => $application->id,
+            'user_id' => $client->id,
+            'document_type' => 'engagement_letter',
+            'file_path' => 'workflow/admin/'.$application->id.'/engagement-letter.pdf',
+            'file_name' => 'engagement-letter.pdf',
+            'file_type' => 'pdf',
+            'file_size' => 1024,
+            'status' => 'approved',
+        ]);
+
+        $pdfSigner = \Mockery::mock(PdfSignatureStampService::class);
+        $pdfSigner->shouldReceive('generateSignedWorkflowPdf')
+            ->once()
+            ->withArgs(function ($signedApplication, $source, $signature, $notes, $status, $signatureImagePath) use ($application, $sourceDocument): bool {
+                return $signedApplication->is($application)
+                    && $source->is($sourceDocument)
+                    && $signature === $application->user->name
+                    && $notes === null
+                    && $status === 'uploaded'
+                    && $signatureImagePath === null;
+            })
+            ->andReturnUsing(function () use ($application, $client): Document {
+                return Document::create([
+                    'application_id' => $application->id,
+                    'user_id' => $client->id,
+                    'document_type' => 'engagement_letter (Signed)',
+                    'file_path' => 'workflow/signed/signed-engagement-letter.pdf',
+                    'file_name' => 'signed-engagement-letter.pdf',
+                    'file_type' => 'pdf',
+                    'file_size' => 1024,
+                    'status' => 'uploaded',
+                    'verification_notes' => 'Electronically signed by user: '.$client->name,
+                ]);
+            });
+        $this->app->instance(PdfSignatureStampService::class, $pdfSigner);
+
+        $this->actingAs($client)
+            ->postJson(route('workflow.onboarding.apply-signature', [$application->id, 'engagement_letter']), [
+                'signature_mode' => 'type',
+                'digital_signature' => $client->name,
+            ])
+            ->assertOk()
+            ->assertJson([
+                'message' => 'Signature applied and submitted successfully.',
+                'status' => 'Submitted for Admin Verification',
+                'submitted' => true,
+            ]);
+
+        $signedDocument = Document::query()
+            ->where('application_id', $application->id)
+            ->where('document_type', 'engagement_letter (Signed)')
+            ->latest('id')
+            ->firstOrFail();
+
+        $this->assertSame('uploaded', $signedDocument->status);
+        $this->assertNotNull(data_get($application->fresh()->workflow_meta, 'onboarding_package_submitted_at'));
+
+        $this->actingAs($admin, 'admin')
+            ->get(route('admin.view-application', $application->id))
+            ->assertOk()
+            ->assertSee('Signed Engagement Letter received')
+            ->assertSee('Mark as Approved')
             ->assertDontSee('Engagement Letter signing pending');
     }
 

@@ -236,7 +236,7 @@
             $isAlreadyVerified = $doc->status === 'verified' || (bool) $doc->verified_at;
             $requiresVerification = in_array($doc->document_type, ['engagement_letter (Signed)', 'filing_authority (Signed)'], true);
 
-            return !$isAlreadyVerified && $requiresVerification && in_array($doc->status, ['uploaded', 'reuploaded'], true);
+            return !$isAlreadyVerified && $requiresVerification && in_array($doc->status, ['prepared', 'uploaded', 'reuploaded'], true);
         });
         $signedEngagementLetterForReview = $application->documents
             ->where('document_type', 'engagement_letter (Signed)')
@@ -245,7 +245,7 @@
         $engagementLetterAwaitingAdminReview = $signedEngagementLetterForReview
             && !$signedEngagementLetterForReview->verified_at
             && $signedEngagementLetterForReview->status !== 'verified'
-            && in_array($signedEngagementLetterForReview->status, ['uploaded', 'reuploaded'], true);
+            && in_array($signedEngagementLetterForReview->status, ['prepared', 'uploaded', 'reuploaded'], true);
         $placementValue = function (string $documentType, string $fieldType, string $key) use ($application) {
             $storedField = collect(data_get($application->workflow_meta, "signature_fields.$documentType", []))
                 ->firstWhere('type', $fieldType);
@@ -589,19 +589,23 @@
                                                 $displayStatus = $isAlreadyVerified
                                                     ? 'verified'
                                                     : ($isReuploadedSubmission ? 'reuploaded' : $doc->status);
-                                                $isReviewable = !$isAlreadyVerified && in_array($doc->status, ['uploaded', 'reuploaded'], true);
                                                 $requiresVerification = in_array($doc->document_type, ['engagement_letter (Signed)', 'filing_authority (Signed)'], true);
+                                                $isReviewable = !$isAlreadyVerified
+                                                    && $requiresVerification
+                                                    && in_array($doc->status, ['prepared', 'uploaded', 'reuploaded'], true);
                                                 $isReuploadRequested = $displayStatus === 'reupload_requested';
                                                 $statusLabel = $isAdminSentOnboardingDocument
                                                     ? 'Admin Sent'
                                                     : ($isReuploadRequested
                                                         ? 'Asked for Reupload'
-                                                        : ucwords(str_replace('_', ' ', $displayStatus)));
+                                                        : ($requiresVerification && $displayStatus === 'prepared'
+                                                            ? 'Awaiting Approval'
+                                                            : ucwords(str_replace('_', ' ', $displayStatus))));
                                                 $statusClass = $isAdminSentOnboardingDocument ? 'primary' : match ($displayStatus) {
                                                     'verified', 'approved' => 'success',
                                                     'reuploaded' => 'info',
                                                     'reupload_requested' => 'danger',
-                                                    'uploaded' => 'warning text-dark',
+                                                    'prepared', 'uploaded' => 'warning text-dark',
                                                     default => 'light text-dark border',
                                                 };
                                             @endphp

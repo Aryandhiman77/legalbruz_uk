@@ -2907,6 +2907,11 @@
                         previewSignedDocument(payload.view_url);
                         signedActions?.classList.remove('d-none');
                         openSignerButton?.classList.add('d-none');
+
+                        if (payload.submitted && payload.redirect_url) {
+                            window.location.assign(payload.redirect_url);
+                            return;
+                        }
                     } catch (error) {
                         alert(error.message || 'Could not apply the signature. Please try again.');
                         window.LegalBruzButtonLoading?.reset(applyButton);
